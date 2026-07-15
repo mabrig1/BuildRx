@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,18 +12,22 @@ function sanitizeNext(next: string | null) {
 }
 
 /**
- * Supabase OAuth / magic-link / recovery callback.
- * Exchanges the auth code for a session (setting the auth cookies),
- * then redirects into the app.
+ * Email OTP confirmation endpoint (token_hash flow).
+ * Used by Supabase email templates configured with
+ * {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=...
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type") as EmailOtpType | null;
   const next = sanitizeNext(searchParams.get("next"));
 
-  if (code) {
+  if (tokenHash && type) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.verifyOtp({
+      type,
+      token_hash: tokenHash,
+    });
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }

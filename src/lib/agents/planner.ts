@@ -22,6 +22,51 @@ Keep the plan small and buildable: at most 4 pages, 6 components, 4 tables.`;
 
 function mockPlan(prompt: string): AppPlan {
   const lower = prompt.toLowerCase();
+
+  if (lower.includes("church")) {
+    return {
+      appName: "Grace Community Church",
+      summary:
+        "A welcoming church website with service times, sermons, and upcoming events.",
+      pages: [
+        { name: "Home", path: "/", description: "Hero with service times and welcome message" },
+        { name: "About", path: "/about", description: "Our story, beliefs, and leadership" },
+        { name: "Sermons", path: "/sermons", description: "Sermon archive with speaker and date" },
+        { name: "Events", path: "/events", description: "Upcoming events calendar" },
+      ],
+      components: [
+        { name: "Hero", description: "Hero with church name and service times" },
+        { name: "EventList", description: "List of upcoming events" },
+        { name: "SermonCard", description: "Sermon with title, speaker, and date" },
+      ],
+      dataModel: [
+        {
+          table: "events",
+          description: "Upcoming church events",
+          columns: [
+            { name: "id", type: "uuid" },
+            { name: "title", type: "text" },
+            { name: "starts_at", type: "timestamptz" },
+            { name: "location", type: "text" },
+            { name: "created_at", type: "timestamptz" },
+          ],
+        },
+        {
+          table: "sermons",
+          description: "Sermon archive",
+          columns: [
+            { name: "id", type: "uuid" },
+            { name: "title", type: "text" },
+            { name: "speaker", type: "text" },
+            { name: "preached_on", type: "date" },
+            { name: "created_at", type: "timestamptz" },
+          ],
+        },
+      ],
+      features: ["Service times", "Sermon archive", "Events calendar"],
+    };
+  }
+
   const appName = lower.includes("coffee")
     ? "Brew & Bean"
     : lower.includes("task")

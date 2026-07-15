@@ -1,11 +1,12 @@
 import { pause } from "@/lib/agents/llm";
 import type { Agent } from "@/lib/agents/types";
+import { getFileSystem } from "@/lib/files/manager";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 /**
- * Deployment Agent: persists the generated files, records the
- * deployment, publishes the preview URL, and marks the project ready.
- * (Deterministic — no LLM involved.)
+ * Deployment Agent: saves the generated files through the file system
+ * manager, records the deployment, publishes the preview URL, and
+ * marks the project ready. (Deterministic — no LLM involved.)
  */
 export const deploymentAgent: Agent = {
   name: "deployment",
@@ -18,28 +19,18 @@ export const deploymentAgent: Agent = {
 
     const previewUrl = `/api/preview/${context.projectId}`;
 
+    emit({
+      type: "agent_log",
+      agent: "deployment",
+      message: `Saving ${context.files.size} files…`,
+    });
+    await getFileSystem(context.projectId).writeMany([
+      ...context.files.values(),
+    ]);
+
     if (context.persist && isSupabaseConfigured()) {
       const { createClient } = await import("@/lib/supabase/server");
       const supabase = await createClient();
-
-      emit({
-        type: "agent_log",
-        agent: "deployment",
-        message: `Saving ${context.files.size} files…`,
-      });
-
-      const rows = [...context.files.values()].map((file) => ({
-        project_id: context.projectId,
-        path: file.path,
-        content: file.content,
-        language: file.path.split(".").pop() ?? null,
-      }));
-      const { error: filesError } = await supabase
-        .from("project_files")
-        .upsert(rows, { onConflict: "project_id,path" });
-      if (filesError) {
-        throw new Error(`Failed to save files: ${filesError.message}`);
-      }
 
       emit({
         type: "agent_log",
@@ -75,7 +66,7 @@ export const deploymentAgent: Agent = {
       emit({
         type: "agent_log",
         agent: "deployment",
-        message: "Demo mode — publishing preview without persistence",
+        message: "Demo mode — files saved to the in-memory workspace",
       });
     }
 

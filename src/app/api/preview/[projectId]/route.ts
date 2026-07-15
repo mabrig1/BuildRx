@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
+import { getFileSystem } from "@/lib/files/manager";
 
 const DEMO_HTML = `<!doctype html>
 <html lang="en">
@@ -29,21 +28,17 @@ export async function GET(
 ) {
   const { projectId } = await params;
 
-  if (!isSupabaseConfigured()) {
-    return new NextResponse(DEMO_HTML, {
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
-  }
-
-  const supabase = await createClient();
-  const { data: file } = await supabase
-    .from("project_files")
-    .select("content")
-    .eq("project_id", projectId)
-    .eq("path", "preview/index.html")
-    .maybeSingle();
+  const file = await getFileSystem(projectId)
+    .read("preview/index.html")
+    .catch(() => null);
 
   if (!file) {
+    // Demo mode with no build yet: show the placeholder page.
+    if (projectId.startsWith("demo-")) {
+      return new NextResponse(DEMO_HTML, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
     return new NextResponse(
       "<!doctype html><html><body style='font-family:system-ui;display:grid;place-items:center;min-height:100vh;color:#71717a'>No preview yet — run a build first.</body></html>",
       {

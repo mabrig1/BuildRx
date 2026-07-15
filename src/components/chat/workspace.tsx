@@ -13,7 +13,7 @@ import {
 } from "@/components/chat/workspace-sidebar";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { UserNav } from "@/components/layout/user-nav";
-import { PreviewPanel } from "@/components/preview/preview-panel";
+import { RightPanel } from "@/components/preview/right-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +51,7 @@ export function Workspace({
   } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(project.previewUrl);
+  const [filesRefreshKey, setFilesRefreshKey] = useState(0);
 
   const lastUserMessage = [...initialMessages]
     .reverse()
@@ -113,6 +114,7 @@ export function Workspace({
               defaultPrompt={lastUserMessage}
               onDeployed={(url) => {
                 if (url) setPreviewUrl(url);
+                setFilesRefreshKey((k) => k + 1);
                 setMobileView("preview");
                 router.refresh();
               }}
@@ -150,9 +152,10 @@ export function Workspace({
               mobileView === "preview" && "hidden xl:flex"
             )}
           />
-          <PreviewPanel
+          <RightPanel
             projectId={project.id}
             previewUrl={previewUrl}
+            filesRefreshKey={filesRefreshKey}
             className={cn(
               "min-w-0 flex-1 xl:max-w-[46%] xl:border-l",
               mobileView === "chat" && "hidden xl:flex"

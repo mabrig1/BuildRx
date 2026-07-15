@@ -8,6 +8,7 @@ interface ChatState {
   setMessages: (messages: ChatMessage[]) => void;
   addMessage: (message: ChatMessage) => void;
   appendToLastMessage: (delta: string) => void;
+  updateMessage: (id: string, content: string) => void;
   setStreaming: (streaming: boolean) => void;
   clear: () => void;
 }
@@ -29,6 +30,12 @@ export const useChatStore = create<ChatState>((set) => ({
       };
       return { messages };
     }),
+  updateMessage: (id, content) =>
+    set((state) => ({
+      messages: state.messages.map((m) =>
+        m.id === id ? { ...m, content } : m
+      ),
+    })),
   setStreaming: (streaming) => set({ isStreaming: streaming }),
   clear: () => set({ messages: [], isStreaming: false }),
 }));

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Code2, Monitor } from "lucide-react";
 
-import { FilesPanel } from "@/components/files/files-panel";
+import { CodeEditorIde } from "@/components/editor/code-editor-ide";
 import { PreviewPanel } from "@/components/preview/preview-panel";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,7 @@ export function RightPanel({
         previewUrl={previewUrl}
         className={cn("min-h-0 flex-1", view !== "preview" && "hidden")}
       />
-      <FilesPanel
+      <CodeEditorIde
         projectId={projectId}
         refreshKey={filesRefreshKey}
         className={cn("min-h-0 flex-1", view !== "code" && "hidden")}

@@ -152,7 +152,9 @@ Both NVIDIA endpoints stream text by default (`stream: false` returns JSON with 
 | 5 | **Debug** | Static checks plus an LLM review pass; corrected files replace the originals |
 | 6 | **Deployment** | Persists files to `project_files`, records a `deployments` row, publishes the preview, marks the project `ready`, and posts a build summary into the project chat |
 
-Each agent reads and extends the shared context (the plan and the generated-file map), so later agents build on earlier output. The generated preview is served at `/api/preview/[projectId]` (sandboxed with a strict CSP) and renders live in the workspace preview panel. LLM agents run on Claude (`claude-opus-4-8`); without an `ANTHROPIC_API_KEY` the pipeline runs deterministic mock agents so the workflow is fully demoable. Deployment is currently simulated (files + preview publishing) — swapping in a real Vercel deploy only touches the Deployment Agent.
+Each agent reads and extends the shared context (the plan and the generated-file map), so later agents build on earlier output. The generated preview is served at `/api/preview/[projectId]` (sandboxed with a strict CSP) and renders live in the workspace preview panel.
+
+Generated files live in a virtual filesystem (`src/lib/files/manager.ts`, backed by `project_files` with an in-memory demo fallback) exposed via `/api/projects/[projectId]/files`. The workspace's **Code** tab is a full in-browser IDE: Monaco editor (bundled locally, no CDN) with syntax highlighting, a file explorer, multiple tabs with dirty indicators, debounced auto-save, search & replace, and a simulated terminal (`ls`, `cat`, `rm`, `npm run build`, …) operating on the same virtual filesystem. LLM agents run on Claude (`claude-opus-4-8`); without an `ANTHROPIC_API_KEY` the pipeline runs deterministic mock agents so the workflow is fully demoable. Deployment is currently simulated (files + preview publishing) — swapping in a real Vercel deploy only touches the Deployment Agent.
 
 ## Deployment
 

@@ -128,6 +128,17 @@ Supabase dashboard configuration:
 2. **Authentication → Providers → Google** — add your Google OAuth credentials; the authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`.
 3. Optional: point email templates at `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=...` — both the code (`/auth/callback`) and token-hash (`/auth/confirm`) flows are supported.
 
+## AI providers
+
+Two providers are integrated, each behind its own env vars:
+
+- **Anthropic Claude** (`ANTHROPIC_API_KEY`) powers the app-builder chat at `/api/chat` (streaming, conversation persistence).
+- **NVIDIA Inference API** (`NVIDIA_API_KEY`, key from [build.nvidia.com](https://build.nvidia.com)) powers two general-purpose endpoints:
+  - `POST /api/ai/generate` — text generation. Body: `{ prompt, system?, projectId?, model?, maxTokens?, temperature?, stream? }`
+  - `POST /api/ai/code` — code generation on a code-specialized model. Body: `{ prompt, language?, context?, projectId?, stream? }`
+
+Both NVIDIA endpoints stream text by default (`stream: false` returns JSON with token usage), require an authenticated session, and are rate limited per user (`NVIDIA_RATE_LIMIT_RPM`, default 20/min) with standard `X-RateLimit-*`/`Retry-After` headers. Every call is metered into `usage_logs` (and `ai_generations` when a `projectId` is supplied). Models default to `meta/llama-3.3-70b-instruct` (text) and `qwen/qwen2.5-coder-32b-instruct` (code), overridable via `NVIDIA_TEXT_MODEL` / `NVIDIA_CODE_MODEL`. Upstream 429/5xx responses are retried with backoff; failures surface as clean JSON errors.
+
 ## Deployment
 
 Deploy to [Vercel](https://vercel.com): import the repository, set the environment variables from `.env.example`, and deploy. `vercel.json` configures the framework and security headers.

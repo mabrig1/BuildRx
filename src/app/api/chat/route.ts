@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 
 import { APP_BUILDER_SYSTEM_PROMPT, CHAT_MODEL } from "@/lib/ai/prompts";
+import { recordAiUsage } from "@/lib/ai/usage";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { chatMessageSchema } from "@/lib/validations/chat";
@@ -135,28 +136,18 @@ export async function POST(request: Request) {
       .select("id")
       .single();
 
-    // Generation accounting is service-role only; skip when not configured.
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const { createAdminClient } = await import("@/lib/supabase/admin");
-      const admin = createAdminClient();
-      await admin.from("ai_generations").insert({
-        project_id: projectId,
-        message_id: message?.id ?? null,
-        user_id: user!.id,
-        model: CHAT_MODEL,
-        status: generation.status,
-        prompt_tokens: generation.promptTokens,
-        completion_tokens: generation.completionTokens,
-        duration_ms: generation.durationMs,
-        error: generation.error ?? null,
-        completed_at: new Date().toISOString(),
-      });
-      await admin.from("usage_logs").insert({
-        user_id: user!.id,
-        project_id: projectId,
-        action: "ai_message",
-      });
-    }
+    await recordAiUsage({
+      userId: user!.id,
+      projectId,
+      messageId: message?.id ?? null,
+      model: CHAT_MODEL,
+      status: generation.status,
+      promptTokens: generation.promptTokens,
+      completionTokens: generation.completionTokens,
+      durationMs: generation.durationMs,
+      error: generation.error,
+      action: "ai_message",
+    });
   }
 
   // No API key → mock stream, but still persist both sides of the chat.

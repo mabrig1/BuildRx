@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bot, Menu, Monitor } from "lucide-react";
 
+import { AgentRunPanel } from "@/components/agents/agent-run-panel";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import {
   WorkspaceSidebar,
@@ -41,12 +43,18 @@ export function Workspace({
   projects: SidebarProject[];
   templates: SidebarTemplate[];
 }) {
+  const router = useRouter();
   const [mobileView, setMobileView] = useState<"chat" | "preview">("chat");
   const [templatePrompt, setTemplatePrompt] = useState<{
     text: string;
     nonce: number;
   } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(project.previewUrl);
+
+  const lastUserMessage = [...initialMessages]
+    .reverse()
+    .find((m) => m.role === "user")?.content;
 
   function useTemplate(prompt: string) {
     setTemplatePrompt({ text: prompt, nonce: Date.now() });
@@ -100,6 +108,15 @@ export function Workspace({
           </Badge>
 
           <div className="ml-auto flex items-center gap-1">
+            <AgentRunPanel
+              projectId={project.id}
+              defaultPrompt={lastUserMessage}
+              onDeployed={(url) => {
+                if (url) setPreviewUrl(url);
+                setMobileView("preview");
+                router.refresh();
+              }}
+            />
             {/* Chat/Preview toggle — below xl the preview is a tab */}
             <Tabs
               value={mobileView}
@@ -135,7 +152,7 @@ export function Workspace({
           />
           <PreviewPanel
             projectId={project.id}
-            previewUrl={project.previewUrl}
+            previewUrl={previewUrl}
             className={cn(
               "min-w-0 flex-1 xl:max-w-[46%] xl:border-l",
               mobileView === "chat" && "hidden xl:flex"

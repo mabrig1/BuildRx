@@ -139,6 +139,21 @@ Two providers are integrated, each behind its own env vars:
 
 Both NVIDIA endpoints stream text by default (`stream: false` returns JSON with token usage), require an authenticated session, and are rate limited per user (`NVIDIA_RATE_LIMIT_RPM`, default 20/min) with standard `X-RateLimit-*`/`Retry-After` headers. Every call is metered into `usage_logs` (and `ai_generations` when a `projectId` is supplied). Models default to `meta/llama-3.3-70b-instruct` (text) and `qwen/qwen2.5-coder-32b-instruct` (code), overridable via `NVIDIA_TEXT_MODEL` / `NVIDIA_CODE_MODEL`. Upstream 429/5xx responses are retried with backoff; failures surface as clean JSON errors.
 
+## Multi-agent build system
+
+`POST /api/agents/run` executes an automated build pipeline in which six specialized agents collaborate through a shared workflow context, streaming NDJSON progress events consumed by the "Build app" panel in the workspace:
+
+| # | Agent | Role |
+| --- | --- | --- |
+| 1 | **Planner** | Turns the user's description into a structured plan (pages, components, data model, features) |
+| 2 | **UI** | Generates Next.js pages/components plus a self-contained static preview (`preview/index.html`) |
+| 3 | **Database** | Produces `supabase/schema.sql` (with RLS) and matching TypeScript types from the plan's data model |
+| 4 | **Coding** | Wires the app together — data helpers, layout, remaining logic — without regenerating existing files |
+| 5 | **Debug** | Static checks plus an LLM review pass; corrected files replace the originals |
+| 6 | **Deployment** | Persists files to `project_files`, records a `deployments` row, publishes the preview, marks the project `ready`, and posts a build summary into the project chat |
+
+Each agent reads and extends the shared context (the plan and the generated-file map), so later agents build on earlier output. The generated preview is served at `/api/preview/[projectId]` (sandboxed with a strict CSP) and renders live in the workspace preview panel. LLM agents run on Claude (`claude-opus-4-8`); without an `ANTHROPIC_API_KEY` the pipeline runs deterministic mock agents so the workflow is fully demoable. Deployment is currently simulated (files + preview publishing) — swapping in a real Vercel deploy only touches the Deployment Agent.
+
 ## Deployment
 
 Deploy to [Vercel](https://vercel.com): import the repository, set the environment variables from `.env.example`, and deploy. `vercel.json` configures the framework and security headers.

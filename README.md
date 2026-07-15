@@ -88,15 +88,30 @@ The app runs without env vars configured (auth middleware no-ops until Supabase 
 
 ## Database
 
-The initial schema (`supabase/migrations/0001_initial_schema.sql`) defines:
+The schema lives in `supabase/migrations/` as ordered, domain-scoped migrations. Apply with `npx supabase db push` (or `npx supabase db reset` locally, which also runs `seed.sql`).
 
-- **profiles** — user profiles, auto-created on signup via trigger
-- **projects** — user-owned app projects
-- **chat_messages** — per-project AI conversation history
-- **deployments** — deployment records per project
-- **subscriptions** — billing state (Stripe)
+| Table | Purpose |
+| --- | --- |
+| `users` | Application users, mirroring `auth.users` 1:1 (auto-created on signup via trigger) |
+| `templates` | Curated starter templates; the prompt seeds the first AI generation |
+| `projects` | User-owned app projects, optionally created from a template |
+| `project_files` | Virtual filesystem of generated source files (unique per `project_id + path`) |
+| `chat_messages` | Per-project AI conversation history |
+| `ai_generations` | One row per LLM call: model, token usage, timing, outcome |
+| `deployments` | Deployment attempts per project with status transitions |
+| `subscriptions` | One row per user, synced with Stripe by the webhook handler |
+| `usage_logs` | Append-only metering of billable actions (plan limits) |
+| `analytics` | Append-only product analytics events |
 
-All tables have row-level security enabled with owner-scoped policies.
+Design notes:
+
+- **RLS everywhere.** Every table has row-level security enabled. Owners get scoped CRUD on their projects and related rows; `is_public` projects (and their files) are readable by anyone; admins get read access via a `SECURITY DEFINER` `is_admin()` helper that avoids recursive policy evaluation.
+- **Column-level privileges.** Regular users can update only `name`, `avatar_url`, and `onboarded` on their own `users` row — `role` and `plan` are revoked from the `authenticated` role, so privilege escalation is blocked at the grant level, beneath RLS.
+- **Service-role writes.** `ai_generations`, `usage_logs`, `subscriptions`, and deployment status updates have no client write policies; only the server (service-role key) can write them, so metering and billing can't be forged from a browser.
+- **Cascades.** Deleting an auth user cascades through users → projects → files/messages/generations/deployments; nullable references (`triggered_by`, `created_by`, analytics attribution) use `on delete set null` to preserve history.
+- **Indexes** cover every foreign key plus the hot query paths: `(owner_id, updated_at desc)` for project lists, `(project_id, created_at)` for chat history, `(user_id, created_at desc)` for usage metering, `(event_type, created_at desc)` for analytics, and partial indexes for public projects and in-flight deployments.
+
+TypeScript mirrors of the schema live in `src/types/database.ts` (regenerate with `npx supabase gen types typescript` once connected to a project).
 
 ## Authentication
 

@@ -98,6 +98,21 @@ The initial schema (`supabase/migrations/0001_initial_schema.sql`) defines:
 
 All tables have row-level security enabled with owner-scoped policies.
 
+## Authentication
+
+Auth is built on Supabase Auth (`@supabase/ssr`). Sessions are JWTs stored in secure cookies, refreshed on every request by `src/middleware.ts`, which also redirects unauthenticated users off protected routes (`/dashboard`, `/projects`, `/chat`, `/settings`, `/billing`, `/admin`, `/profile`) and signed-in users away from the auth pages.
+
+Supported flows:
+
+- **Email + password** — signup (with optional email confirmation), login, password reset via email link
+- **Google OAuth** — enable the Google provider in Supabase (Authentication → Providers) with your OAuth client ID/secret
+
+Supabase dashboard configuration:
+
+1. **Authentication → URL Configuration** — set the Site URL to your deployment URL and add `https://<your-domain>/auth/callback` to the redirect allow list (plus `http://localhost:3000/auth/callback` for local dev).
+2. **Authentication → Providers → Google** — add your Google OAuth credentials; the authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`.
+3. Optional: point email templates at `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=...` — both the code (`/auth/callback`) and token-hash (`/auth/confirm`) flows are supported.
+
 ## Deployment
 
 Deploy to [Vercel](https://vercel.com): import the repository, set the environment variables from `.env.example`, and deploy. `vercel.json` configures the framework and security headers.

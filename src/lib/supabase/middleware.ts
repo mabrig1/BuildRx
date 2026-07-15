@@ -1,9 +1,23 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/** Routes that require an authenticated session. */
+const protectedPrefixes = [
+  "/dashboard",
+  "/projects",
+  "/chat",
+  "/settings",
+  "/billing",
+  "/admin",
+  "/profile",
+];
+
+/** Auth pages a signed-in user should be bounced away from. */
+const authPages = ["/login", "/signup", "/forgot-password"];
+
 /**
- * Refreshes the Supabase auth session on every request and redirects
- * unauthenticated users away from protected routes.
+ * Refreshes the Supabase auth session on every request (rotating the JWT
+ * in the auth cookies when needed) and enforces route protection.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -39,23 +53,24 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const protectedPrefixes = [
-    "/dashboard",
-    "/projects",
-    "/chat",
-    "/settings",
-    "/billing",
-    "/admin",
-  ];
+  const { pathname } = request.nextUrl;
 
-  const isProtected = protectedPrefixes.some((prefix) =>
-    request.nextUrl.pathname.startsWith(prefix)
+  const isProtected = protectedPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 
   if (!user && isProtected) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
-    redirectUrl.searchParams.set("next", request.nextUrl.pathname);
+    redirectUrl.search = "";
+    redirectUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (user && authPages.includes(pathname)) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/dashboard";
+    redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }
 

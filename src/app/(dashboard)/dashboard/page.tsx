@@ -1,85 +1,158 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bot, FolderKanban, Plus, Rocket } from "lucide-react";
-
-import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
+import { redirect } from "next/navigation";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  ArrowRight,
+  Bot,
+  CreditCard,
+  FolderKanban,
+  Rocket,
+} from "lucide-react";
+
+import { ConnectSupabaseNotice } from "@/components/dashboard/connect-supabase-notice";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { PageHeader } from "@/components/layout/page-header";
+import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
+import type { ProjectSummary } from "@/components/projects/project-card";
+import { ProjectsGrid } from "@/components/projects/projects-grid";
+import { Button } from "@/components/ui/button";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Dashboard",
 };
 
-const stats = [
-  { label: "Projects", value: "0", icon: FolderKanban },
-  { label: "AI messages this month", value: "0", icon: Bot },
-  { label: "Deployments", value: "0", icon: Rocket },
-];
+interface DashboardData {
+  greetingName: string | null;
+  plan: string;
+  projectCount: number;
+  messagesThisMonth: number;
+  deploymentCount: number;
+  recentProjects: ProjectSummary[];
+}
 
-export default function DashboardPage() {
+async function loadDashboardData(): Promise<DashboardData> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/login?next=/dashboard");
+  }
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const [recent, projectCount, messageCount, deploymentCount, userRow] =
+    await Promise.all([
+      supabase
+        .from("projects")
+        .select("id, name, description, status, preview_url, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(6),
+      supabase
+        .from("projects")
+        .select("*", { count: "exact", head: true }),
+      supabase
+        .from("chat_messages")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", monthStart.toISOString()),
+      supabase
+        .from("deployments")
+        .select("*", { count: "exact", head: true }),
+      supabase.from("users").select("name, plan").eq("id", user.id).single(),
+    ]);
+
+  return {
+    greetingName:
+      userRow.data?.name?.split(" ")[0] ??
+      (user.user_metadata.name as string | undefined)?.split(" ")[0] ??
+      null,
+    plan: userRow.data?.plan ?? "free",
+    projectCount: projectCount.count ?? 0,
+    messagesThisMonth: messageCount.count ?? 0,
+    deploymentCount: deploymentCount.count ?? 0,
+    recentProjects: (recent.data ?? []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      status: row.status,
+      previewUrl: row.preview_url,
+      updatedAt: row.updated_at,
+    })),
+  };
+}
+
+export default async function DashboardPage() {
+  const configured = isSupabaseConfigured();
+
+  const data: DashboardData = configured
+    ? await loadDashboardData()
+    : {
+        greetingName: null,
+        plan: "free",
+        projectCount: 0,
+        messagesThisMonth: 0,
+        deploymentCount: 0,
+        recentProjects: [],
+      };
+
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <PageHeader
-        title="Dashboard"
+        title={
+          data.greetingName ? `Welcome back, ${data.greetingName}` : "Dashboard"
+        }
         description="An overview of your projects and activity."
       >
-        <Button asChild>
-          <Link href="/projects">
-            <Plus />
-            New project
-          </Link>
-        </Button>
+        <CreateProjectDialog />
       </PageHeader>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {stats.map((stat) => (
-          <Card key={stat.label} className="gap-2">
-            <CardHeader>
-              <CardDescription className="flex items-center gap-2">
-                <stat.icon className="size-4" />
-                {stat.label}
-              </CardDescription>
-              <CardTitle className="text-3xl tabular-nums">
-                {stat.value}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        ))}
+      {!configured ? <ConnectSupabaseNotice /> : null}
+
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Projects"
+          value={String(data.projectCount)}
+          icon={FolderKanban}
+        />
+        <StatCard
+          label="AI messages"
+          value={String(data.messagesThisMonth)}
+          hint="This month"
+          icon={Bot}
+        />
+        <StatCard
+          label="Deployments"
+          value={String(data.deploymentCount)}
+          icon={Rocket}
+        />
+        <StatCard
+          label="Plan"
+          value={data.plan.charAt(0).toUpperCase() + data.plan.slice(1)}
+          hint="Manage in Billing"
+          icon={CreditCard}
+        />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Get started</CardTitle>
-          <CardDescription>
-            Create your first project and describe the app you want to build.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed py-12 text-center">
-            <div className="bg-primary/10 text-primary flex size-12 items-center justify-center rounded-full">
-              <Bot className="size-6" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium">No projects yet</p>
-              <p className="text-muted-foreground text-sm">
-                Start a conversation with AI to build your first app.
-              </p>
-            </div>
-            <Button asChild>
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Recent projects
+          </h2>
+          {data.recentProjects.length > 0 ? (
+            <Button variant="ghost" size="sm" asChild>
               <Link href="/projects">
-                <Plus />
-                Create project
+                View all
+                <ArrowRight />
               </Link>
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          ) : null}
+        </div>
+        <ProjectsGrid projects={data.recentProjects} />
+      </section>
     </div>
   );
 }

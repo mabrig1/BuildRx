@@ -168,3 +168,7 @@ Deploy to [Vercel](https://vercel.com): import the repository, set the environme
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
 | `npm run lint` | Run ESLint |
+
+## Admin analytics
+
+`/admin` (admin role required; open with demo data before Supabase is connected) tracks platform health: total users, active users (7d), projects created, AI requests (30d), and MRR as stat tiles; signups (30d) and AI requests (14d) charts plus revenue-by-plan; login history (tracked as `login`/`signup` analytics events from the auth flows); course progress (from `course_progress` analytics events); and a user activity feed from `usage_logs`. Reports export as CSV via `/api/admin/reports?type=users|usage|revenue`. Optional PostHog integration (`NEXT_PUBLIC_POSTHOG_KEY`) captures client pageviews and mirrors server events.

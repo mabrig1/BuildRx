@@ -44,7 +44,7 @@ export async function login(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
@@ -52,6 +52,13 @@ export async function login(
   if (error) {
     return { error: error.message };
   }
+
+  const { trackServerEvent } = await import("@/lib/analytics/track");
+  await trackServerEvent({
+    userId: data.user?.id ?? null,
+    eventType: "login",
+    properties: { method: "password" },
+  });
 
   redirect(sanitizeNext(next));
 }
@@ -79,6 +86,12 @@ export async function signup(input: SignupInput): Promise<ActionResult> {
 
   // Email confirmation disabled → session is live, go straight in.
   if (data.session) {
+    const { trackServerEvent } = await import("@/lib/analytics/track");
+    await trackServerEvent({
+      userId: data.user?.id ?? null,
+      eventType: "signup",
+      properties: { method: "password" },
+    });
     redirect("/dashboard");
   }
 

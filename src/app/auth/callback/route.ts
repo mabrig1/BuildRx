@@ -22,8 +22,14 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      const { trackServerEvent } = await import("@/lib/analytics/track");
+      await trackServerEvent({
+        userId: data.user?.id ?? null,
+        eventType: "login",
+        properties: { method: "oauth" },
+      });
       return NextResponse.redirect(`${origin}${next}`);
     }
   }

@@ -150,6 +150,7 @@ export interface Database {
           status: ProjectStatus;
           is_public: boolean;
           preview_url: string | null;
+          github_repo: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -163,6 +164,7 @@ export interface Database {
           status?: ProjectStatus;
           is_public?: boolean;
           preview_url?: string | null;
+          github_repo?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -176,6 +178,7 @@ export interface Database {
           status?: ProjectStatus;
           is_public?: boolean;
           preview_url?: string | null;
+          github_repo?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -385,6 +388,46 @@ export interface Database {
           {
             foreignKeyName: "deployments_triggered_by_fkey";
             columns: ["triggered_by"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      integration_connections: {
+        Row: {
+          id: string;
+          user_id: string;
+          provider: "github" | "vercel" | "netlify" | "railway";
+          access_token: string;
+          account_name: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          provider: "github" | "vercel" | "netlify" | "railway";
+          access_token: string;
+          account_name?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          provider?: "github" | "vercel" | "netlify" | "railway";
+          access_token?: string;
+          account_name?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "integration_connections_user_id_fkey";
+            columns: ["user_id"];
             referencedRelation: "users";
             referencedColumns: ["id"];
           },

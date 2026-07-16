@@ -72,17 +72,15 @@ export default async function AdminPage() {
         title="Admin analytics"
         description="Platform health, usage, and revenue."
       >
-        <div className="flex items-center gap-2">
-          {data.demo ? <Badge variant="outline">demo data</Badge> : null}
-          {(["users", "usage", "revenue"] as const).map((report) => (
-            <Button key={report} variant="outline" size="sm" asChild>
-              <a href={`/api/admin/reports?type=${report}`} download>
-                <Download />
-                <span className="capitalize">{report}.csv</span>
-              </a>
-            </Button>
-          ))}
-        </div>
+        {data.demo ? <Badge variant="outline">demo data</Badge> : null}
+        {(["users", "usage", "revenue"] as const).map((report) => (
+          <Button key={report} variant="outline" size="sm" asChild>
+            <a href={`/api/admin/reports?type=${report}`} download>
+              <Download />
+              <span className="capitalize">{report}.csv</span>
+            </a>
+          </Button>
+        ))}
       </PageHeader>
 
       {/* Stat tiles */}
@@ -105,7 +103,7 @@ export default async function AdminPage() {
       {/* Charts */}
       <AdminCharts data={data} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Login history */}
         <Card>
           <CardHeader>
@@ -195,7 +193,7 @@ export default async function AdminPage() {
           {data.activity.length === 0 ? (
             <p className="text-muted-foreground text-sm">No activity yet.</p>
           ) : (
-            <ul className="grid gap-2">
+            <ul className="grid grid-cols-1 gap-2">
               {data.activity.map((entry, index) => (
                 <li
                   key={index}

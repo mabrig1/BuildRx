@@ -105,8 +105,13 @@ export function Workspace({
             </SheetContent>
           </Sheet>
 
-          <h1 className="truncate text-sm font-semibold">{project.name}</h1>
-          <Badge variant="secondary" className="capitalize">
+          <h1 className="min-w-0 truncate text-sm font-semibold">
+            {project.name}
+          </h1>
+          <Badge
+            variant="secondary"
+            className="hidden capitalize sm:inline-flex"
+          >
             {project.status}
           </Badge>
 
@@ -132,15 +137,17 @@ export function Workspace({
               <TabsList className="h-8">
                 <TabsTrigger value="chat" className="gap-1.5 px-2.5 text-xs">
                   <Bot className="size-3.5" />
-                  Chat
+                  <span className="hidden sm:inline">Chat</span>
                 </TabsTrigger>
                 <TabsTrigger value="preview" className="gap-1.5 px-2.5 text-xs">
                   <Monitor className="size-3.5" />
-                  Preview
+                  <span className="hidden sm:inline">Preview</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-            <ThemeToggle />
+            <div className="hidden sm:block">
+              <ThemeToggle />
+            </div>
             <UserNav />
           </div>
         </header>

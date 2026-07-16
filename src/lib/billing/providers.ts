@@ -1,4 +1,4 @@
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
 /**
  * Payment provider adapters: Paystack and Flutterwave (server-only).
@@ -112,7 +112,15 @@ export function paystackVerifySignature(
   const secret = process.env.PAYSTACK_SECRET_KEY;
   if (!secret || !signature) return false;
   const expected = createHmac("sha512", secret).update(rawBody).digest("hex");
-  return expected === signature;
+  return constantTimeEquals(expected, signature);
+}
+
+/** Timing-safe string comparison (signatures/secrets). */
+function constantTimeEquals(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
 }
 
 // ------------------------------------------------------------------
@@ -184,5 +192,6 @@ export function flutterwaveVerifySignature(
   signature: string | null
 ): boolean {
   const hash = process.env.FLUTTERWAVE_SECRET_HASH;
-  return Boolean(hash && signature && signature === hash);
+  if (!hash || !signature) return false;
+  return constantTimeEquals(signature, hash);
 }

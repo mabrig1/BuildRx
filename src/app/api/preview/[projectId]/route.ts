@@ -70,6 +70,8 @@ export async function GET(
       "Content-Security-Policy":
         "default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'",
       "X-Frame-Options": "SAMEORIGIN",
+      // Owner-scoped content — never let shared caches store it.
+      "Cache-Control": "private, no-store",
     },
   });
 }

@@ -92,7 +92,7 @@ export default async function BillingPage() {
         {summary.demo ? <Badge variant="outline">demo</Badge> : null}
       </PageHeader>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Current plan */}
         <Card>
           <CardHeader>
@@ -159,7 +159,7 @@ export default async function BillingPage() {
       </div>
 
       {/* Plans */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {plans.map((plan) => {
           const isCurrent = plan.id === summary.plan;
           return (

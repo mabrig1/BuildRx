@@ -14,11 +14,12 @@ import {
   Zap,
 } from "lucide-react";
 
+import dynamic from "next/dynamic";
+
 import {
   ErrorConsole,
   type ConsoleEntry,
 } from "@/components/preview/error-console";
-import { SandpackEngine } from "@/components/preview/sandpack-preview";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -34,6 +35,23 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { usePreviewStore } from "@/stores/preview-store";
+
+// Sandpack is a large dependency — load it only when the user switches
+// the preview engine to it, keeping it out of the workspace bundle.
+const SandpackEngine = dynamic(
+  () =>
+    import("@/components/preview/sandpack-preview").then(
+      (mod) => mod.SandpackEngine
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-muted-foreground flex flex-1 items-center justify-center text-sm">
+        Loading Sandpack…
+      </div>
+    ),
+  }
+);
 
 const viewportWidths = {
   desktop: "100%",

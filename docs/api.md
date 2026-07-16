@@ -57,6 +57,8 @@ Text generation via the NVIDIA Inference API.
   "model": "optional model override",
   "maxTokens": 1024,
   "temperature": 0.7,
+  "topP": 0.95,
+  "seed": 42,
   "stream": true
 }
 ```

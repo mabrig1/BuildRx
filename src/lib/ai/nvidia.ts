@@ -7,7 +7,7 @@
  */
 
 const DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1";
-const DEFAULT_TEXT_MODEL = "poolside/laguna-xs-2.1";
+const DEFAULT_TEXT_MODEL = "z-ai/glm-5.2";
 const DEFAULT_CODE_MODEL = "poolside/laguna-xs-2.1";
 
 const MAX_RETRIES = 2;
@@ -21,6 +21,8 @@ export interface NvidiaChatOptions {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  topP?: number;
+  seed?: number;
 }
 
 export interface NvidiaUsage {
@@ -177,6 +179,8 @@ function buildBody(
     messages,
     max_tokens: options.maxTokens ?? 2048,
     temperature: options.temperature ?? 0.6,
+    ...(options.topP !== undefined ? { top_p: options.topP } : {}),
+    ...(options.seed !== undefined ? { seed: options.seed } : {}),
     stream,
     ...(stream ? { stream_options: { include_usage: true } } : {}),
   };

@@ -16,7 +16,7 @@ export const maxDuration = 120;
 /**
  * POST /api/ai/generate — text generation via the NVIDIA Inference API.
  *
- * Body: { prompt, system?, projectId?, model?, maxTokens?, temperature?, stream? }
+ * Body: { prompt, system?, projectId?, model?, maxTokens?, temperature?, topP?, seed?, stream? }
  * Streams text deltas by default; set stream:false for a JSON response.
  */
 export async function POST(request: Request) {
@@ -50,6 +50,8 @@ export async function POST(request: Request) {
     model: input.model,
     maxTokens: input.maxTokens,
     temperature: input.temperature,
+    topP: input.topP,
+    seed: input.seed,
   };
 
   const startedAt = Date.now();

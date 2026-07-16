@@ -37,8 +37,8 @@ Get a key at [build.nvidia.com](https://build.nvidia.com). These endpoints retur
 | --- | --- | --- |
 | `NVIDIA_API_KEY` | For the NVIDIA endpoints | Bearer token for the NIM OpenAI-compatible API. |
 | `NVIDIA_API_BASE_URL` | No | API base URL. Default: `https://integrate.api.nvidia.com/v1`. |
-| `NVIDIA_TEXT_MODEL` | No | Model for `/api/ai/generate`. Default: `meta/llama-3.3-70b-instruct`. |
-| `NVIDIA_CODE_MODEL` | No | Model for `/api/ai/code`. Default: `qwen/qwen2.5-coder-32b-instruct`. |
+| `NVIDIA_TEXT_MODEL` | No | Model for `/api/ai/generate`. Default: `poolside/laguna-xs-2.1`. |
+| `NVIDIA_CODE_MODEL` | No | Model for `/api/ai/code`. Default: `poolside/laguna-xs-2.1`. |
 | `NVIDIA_RATE_LIMIT_RPM` | No | Per-user requests/minute across the AI endpoints (also applies to `/api/agents/run`). Default: `20`. |
 
 ## PostHog (product analytics)

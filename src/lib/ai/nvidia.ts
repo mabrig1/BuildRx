@@ -7,8 +7,8 @@
  */
 
 const DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1";
-const DEFAULT_TEXT_MODEL = "meta/llama-3.3-70b-instruct";
-const DEFAULT_CODE_MODEL = "qwen/qwen2.5-coder-32b-instruct";
+const DEFAULT_TEXT_MODEL = "poolside/laguna-xs-2.1";
+const DEFAULT_CODE_MODEL = "poolside/laguna-xs-2.1";
 
 const MAX_RETRIES = 2;
 

@@ -6,6 +6,7 @@ import { Bot, Menu, Monitor } from "lucide-react";
 
 import { AgentRunPanel } from "@/components/agents/agent-run-panel";
 import { ChatPanel } from "@/components/chat/chat-panel";
+import { DeployPanel } from "@/components/deploy/deploy-panel";
 import { GitHubPanel } from "@/components/github/github-panel";
 import {
   WorkspaceSidebar,
@@ -111,6 +112,7 @@ export function Workspace({
 
           <div className="ml-auto flex items-center gap-1">
             <GitHubPanel projectId={project.id} projectName={project.name} />
+            <DeployPanel projectId={project.id} />
             <AgentRunPanel
               projectId={project.id}
               defaultPrompt={lastUserMessage}

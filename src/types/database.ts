@@ -151,6 +151,7 @@ export interface Database {
           is_public: boolean;
           preview_url: string | null;
           github_repo: string | null;
+          custom_domain: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -165,6 +166,7 @@ export interface Database {
           is_public?: boolean;
           preview_url?: string | null;
           github_repo?: string | null;
+          custom_domain?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -179,6 +181,7 @@ export interface Database {
           is_public?: boolean;
           preview_url?: string | null;
           github_repo?: string | null;
+          custom_domain?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -350,7 +353,10 @@ export interface Database {
           project_id: string;
           triggered_by: string | null;
           status: DeploymentStatus;
+          provider: string;
           url: string | null;
+          domain: string | null;
+          logs: string | null;
           vercel_deployment_id: string | null;
           error: string | null;
           created_at: string;
@@ -361,7 +367,10 @@ export interface Database {
           project_id: string;
           triggered_by?: string | null;
           status?: DeploymentStatus;
+          provider?: string;
           url?: string | null;
+          domain?: string | null;
+          logs?: string | null;
           vercel_deployment_id?: string | null;
           error?: string | null;
           created_at?: string;
@@ -372,7 +381,10 @@ export interface Database {
           project_id?: string;
           triggered_by?: string | null;
           status?: DeploymentStatus;
+          provider?: string;
           url?: string | null;
+          domain?: string | null;
+          logs?: string | null;
           vercel_deployment_id?: string | null;
           error?: string | null;
           created_at?: string;

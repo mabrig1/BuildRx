@@ -2,6 +2,20 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  async headers() {
+    return [
+      {
+        // WebContainers need cross-origin isolation (SharedArrayBuffer).
+        // Scoped to the dedicated runner route so the rest of the app is
+        // unaffected.
+        source: "/preview/:projectId/container",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+        ],
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

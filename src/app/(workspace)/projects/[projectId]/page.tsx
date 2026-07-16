@@ -116,20 +116,28 @@ export default async function ProjectWorkspacePage({
 }) {
   const { projectId } = await params;
 
-  const data: WorkspaceData = isSupabaseConfigured()
-    ? await loadWorkspace(projectId)
-    : {
-        // Demo mode before Supabase is connected.
-        project: {
-          id: projectId,
-          name: "Demo Project",
-          status: "draft",
-          previewUrl: null,
-        },
-        messages: [],
-        projects: [{ id: projectId, name: "Demo Project" }],
-        templates: fallbackTemplates,
-      };
+  let data: WorkspaceData;
+  if (isSupabaseConfigured()) {
+    data = await loadWorkspace(projectId);
+  } else {
+    // Demo mode before Supabase is connected: pick up an existing
+    // generated preview from the in-memory filesystem.
+    const { getFileSystem } = await import("@/lib/files/manager");
+    const previewFile = await getFileSystem(projectId)
+      .read("preview/index.html")
+      .catch(() => null);
+    data = {
+      project: {
+        id: projectId,
+        name: "Demo Project",
+        status: previewFile ? "ready" : "draft",
+        previewUrl: previewFile ? `/api/preview/${projectId}` : null,
+      },
+      messages: [],
+      projects: [{ id: projectId, name: "Demo Project" }],
+      templates: fallbackTemplates,
+    };
+  }
 
   return (
     <Workspace

@@ -48,7 +48,22 @@ export async function GET(
     );
   }
 
-  return new NextResponse(file.content, {
+  // Forward runtime errors/logs from the previewed page to the parent
+  // frame so the workspace error console can display them.
+  const forwarder = `<script>(function(){
+  function send(level, text){ try { parent.postMessage({ __previewEvent: { level: level, text: String(text).slice(0, 2000) } }, "*"); } catch(e){}
+  }
+  window.addEventListener("error", function(e){ send("error", e.message + (e.filename ? " (" + e.filename + ":" + e.lineno + ")" : "")); });
+  window.addEventListener("unhandledrejection", function(e){ send("error", "Unhandled rejection: " + (e.reason && e.reason.message || e.reason)); });
+  var origError = console.error, origWarn = console.warn;
+  console.error = function(){ send("error", Array.prototype.join.call(arguments, " ")); origError.apply(console, arguments); };
+  console.warn = function(){ send("warn", Array.prototype.join.call(arguments, " ")); origWarn.apply(console, arguments); };
+})();</script>`;
+  const html = file.content.includes("</body>")
+    ? file.content.replace("</body>", `${forwarder}</body>`)
+    : file.content + forwarder;
+
+  return new NextResponse(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       // Generated content: keep it sandboxed away from the app origin.

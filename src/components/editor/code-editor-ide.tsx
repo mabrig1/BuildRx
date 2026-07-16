@@ -226,6 +226,10 @@ export function CodeEditorIde({
               : t
           )
         );
+        // Instant refresh: notify preview engines in this tab.
+        window.dispatchEvent(
+          new CustomEvent("vfs-changed", { detail: { path } })
+        );
         setSaveState("saved");
         setTimeout(() => setSaveState("idle"), 1500);
       } catch {

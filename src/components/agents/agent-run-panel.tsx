@@ -107,6 +107,7 @@ export function AgentRunPanel({
       case "workflow_complete":
         setFinished(true);
         toast.success(`Build complete — ${event.fileCount} files generated`);
+        window.dispatchEvent(new CustomEvent("vfs-changed", { detail: {} }));
         onDeployed?.(event.previewUrl);
         break;
       case "error":

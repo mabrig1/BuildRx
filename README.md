@@ -1,74 +1,88 @@
 # App-Creator
 
-An AI app builder, similar to Lovable — describe the app you want in plain English and watch it come to life with live preview and one-click deployment.
+An AI app builder in the spirit of Lovable: describe the app you want in plain English, watch a team of AI agents plan, build, debug, and deploy it — then edit the generated code in an in-browser IDE, see it render live, push it to GitHub, and ship it to Vercel, Netlify, or Railway.
 
-> **Status:** project architecture and configuration only. Feature implementation comes next.
+## Features
+
+- **AI chat workspace** — streaming Claude-powered chat per project, with conversation history, message editing, markdown + code-block rendering
+- **Multi-agent build pipeline** — six specialized agents (Planner → UI → Database → Coding → Debug → Deployment) collaborate through a shared context to turn one prompt into a complete project: pages, components, database schema, API routes, styling, and structure files
+- **Virtual project filesystem** — every generated file is stored per project, browsable and editable
+- **In-browser IDE** — Monaco editor (bundled, no CDN) with a file explorer, tabs, auto-save, search & replace, and a simulated terminal
+- **Live preview environment** — instant-refresh static preview, a Sandpack engine, and a WebContainer runner that boots the generated project's real dev server in the browser; device viewports, error console, fullscreen
+- **GitHub integration** — connect an account, create/link repositories, push the whole project as a commit, pull changes back, browse commit history
+- **One-click deployment** — Vercel, Netlify, and Railway with live build logs, deployment history, status tracking, and custom domains
+- **Auth** — Supabase email/password + Google OAuth, secure-cookie JWT sessions, protected routes
+- **Subscriptions** — Free (5 projects) and Pro (unlimited) plans, Paystack & Flutterwave checkouts, invoices, server-enforced usage limits
+- **Admin analytics** — users, activity, AI usage, revenue, login history, and CSV report exports, with optional PostHog tracking
+- **Demo mode** — the entire product works with zero configuration (in-memory stores, simulated providers) so you can explore before adding any keys
 
 ## Tech stack
 
 | Layer | Technology |
 | --- | --- |
-| Framework | [Next.js 15](https://nextjs.org) (App Router, Turbopack) |
-| Language | TypeScript |
+| Framework | [Next.js 15](https://nextjs.org) (App Router, Turbopack) + React 19 + TypeScript |
 | Styling | Tailwind CSS v4 + [Shadcn UI](https://ui.shadcn.com) (Radix primitives) |
-| Auth & Database | [Supabase](https://supabase.com) (PostgreSQL, RLS, Auth) |
-| State management | Zustand |
-| Forms & validation | React Hook Form + Zod |
-| Notifications | Sonner |
-| Deployment | Vercel |
+| Auth & database | [Supabase](https://supabase.com) (PostgreSQL, RLS, Auth) |
+| AI | Anthropic Claude (chat + agents) · NVIDIA Inference API (text/code endpoints) |
+| Editor & preview | Monaco · Sandpack · WebContainers |
+| State / forms | Zustand · React Hook Form + Zod |
+| Payments | Paystack · Flutterwave |
+| Analytics | PostHog (optional) + first-party events |
+| Charts | Recharts |
 
-## Getting started
+## Quickstart
 
 ```bash
-# 1. Install dependencies
+git clone <your-fork-url> app-creator && cd app-creator
 npm install
-
-# 2. Configure environment
-cp .env.example .env.local
-# fill in your Supabase / Anthropic / billing (Paystack, Flutterwave) keys
-
-# 3. Apply the database schema (Supabase CLI)
-npx supabase db push
-
-# 4. Run the dev server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) — the app runs fully in **demo mode** with no environment variables (in-memory data, simulated integrations). To connect real services, follow the [installation guide](docs/installation.md) and the [environment variable reference](docs/environment-variables.md).
 
-The app runs without env vars configured (auth middleware no-ops until Supabase keys are present), so you can explore the UI immediately.
+## Documentation
+
+| Guide | Contents |
+| --- | --- |
+| [Installation](docs/installation.md) | Prerequisites, Supabase setup, migrations, auth providers, first run, troubleshooting |
+| [Environment variables](docs/environment-variables.md) | Every variable, where to get it, what breaks without it |
+| [Deployment](docs/deployment.md) | Deploying App-Creator to Vercel, webhooks, domains, post-deploy checklist |
+| [API reference](docs/api.md) | Every endpoint: auth, request/response shapes, streaming formats, errors |
 
 ## Project structure
 
 ```
+├── docs/                          # Installation, env, deployment, API docs
 ├── supabase/
-│   ├── migrations/            # SQL migrations (schema + RLS policies)
-│   └── seed.sql               # Local development seed data
+│   ├── migrations/                # 12 ordered migrations (schema + RLS)
+│   └── seed.sql                   # Starter templates
 ├── src/
 │   ├── app/
-│   │   ├── (auth)/            # login, signup, forgot-password
-│   │   ├── (dashboard)/       # dashboard, projects, chat, settings, billing, admin
-│   │   ├── preview/[projectId]/  # full-screen live preview
-│   │   ├── auth/callback/     # Supabase OAuth callback
-│   │   └── api/               # chat, projects, stripe webhook endpoints
+│   │   ├── (auth)/                # login, signup, forgot/reset password + actions
+│   │   ├── (dashboard)/           # dashboard, projects, chat, settings, billing, admin, profile
+│   │   ├── (workspace)/projects/[projectId]/   # the build workspace (chat + IDE + preview)
+│   │   ├── preview/[projectId]/   # full-page preview (+ /container WebContainer runner)
+│   │   ├── auth/                  # OAuth callback + email OTP confirm
+│   │   └── api/                   # chat, ai, agents, projects/files, github, deploy, billing, admin
 │   ├── components/
-│   │   ├── ui/                # Shadcn UI primitives
-│   │   ├── layout/            # sidebar, header, user nav, theme toggle
-│   │   ├── providers/         # theme provider
-│   │   └── {auth,chat,projects,preview,billing,admin}/  # feature components
+│   │   ├── ui/                    # Shadcn UI primitives
+│   │   ├── layout/ providers/     # app shell, theme
+│   │   └── {auth,chat,agents,editor,preview,files,github,deploy,billing,admin,projects,dashboard}/
 │   ├── lib/
-│   │   ├── supabase/          # browser / server / admin clients + middleware
-│   │   ├── validations/       # Zod schemas
-│   │   ├── ai/                # AI generation logic (upcoming)
-│   │   ├── constants.ts       # site config, navigation, plans
-│   │   └── utils.ts
-│   ├── stores/                # Zustand stores (projects, chat, preview, ui)
-│   ├── hooks/                 # shared React hooks
-│   ├── types/                 # domain + database types
-│   └── middleware.ts          # session refresh + route protection
-├── components.json            # Shadcn UI configuration
-├── vercel.json                # Vercel deployment configuration
-└── .env.example               # required environment variables
+│   │   ├── agents/                # the six build agents + orchestrator
+│   │   ├── ai/                    # Claude prompts, NVIDIA client, usage metering, route helpers
+│   │   ├── analytics/             # PostHog, event tracking, admin aggregates
+│   │   ├── billing/               # plans/limits, Paystack & Flutterwave, activation
+│   │   ├── deploy/                # Vercel/Netlify/Railway adapters
+│   │   ├── files/                 # virtual filesystem manager
+│   │   ├── github/                # GitHub REST + Git Data API client
+│   │   ├── supabase/              # browser/server/admin clients + session middleware
+│   │   ├── validations/           # Zod schemas
+│   │   └── rate-limit.ts constants.ts utils.ts
+│   ├── stores/                    # Zustand stores
+│   ├── hooks/ types/
+│   └── middleware.ts              # session refresh + route protection
+└── .env.example
 ```
 
 ## Routes
@@ -76,105 +90,34 @@ The app runs without env vars configured (auth middleware no-ops until Supabase 
 | Route | Purpose |
 | --- | --- |
 | `/` | Marketing landing page |
-| `/login`, `/signup`, `/forgot-password` | Authentication |
-| `/dashboard` | Overview of projects and activity |
-| `/projects` | Project management |
-| `/projects/[projectId]` | AI chat + preview workspace |
-| `/chat` | Standalone AI chat interface |
-| `/preview/[projectId]` | Full-screen live preview |
-| `/settings` | Account settings |
-| `/billing` | Plans and usage |
-| `/admin` | Platform administration (admins only) |
+| `/login` `/signup` `/forgot-password` `/reset-password` | Authentication |
+| `/dashboard` | Overview, stats, recent projects |
+| `/projects` | Project management (create/search/duplicate/delete) |
+| `/projects/[id]` | Build workspace: AI chat, agent builds, IDE, live preview, GitHub, deploy |
+| `/preview/[id]` | Full-page live preview (`/container` runs it in a WebContainer) |
+| `/chat` | Jumps into your most recent project's chat |
+| `/settings` `/profile` `/billing` | Account, profile, subscription & invoices |
+| `/admin` | Admin analytics (admin role required) |
 
 ## Database
 
-The schema lives in `supabase/migrations/` as ordered, domain-scoped migrations. Apply with `npx supabase db push` (or `npx supabase db reset` locally, which also runs `seed.sql`).
+Twelve ordered migrations in `supabase/migrations/` define the schema — apply with `npx supabase db push`. Tables: `users`, `templates`, `projects`, `project_files`, `chat_messages`, `ai_generations`, `deployments`, `subscriptions`, `invoices`, `usage_logs`, `analytics`, `integration_connections`.
 
-| Table | Purpose |
-| --- | --- |
-| `users` | Application users, mirroring `auth.users` 1:1 (auto-created on signup via trigger) |
-| `templates` | Curated starter templates; the prompt seeds the first AI generation |
-| `projects` | User-owned app projects, optionally created from a template |
-| `project_files` | Virtual filesystem of generated source files (unique per `project_id + path`) |
-| `chat_messages` | Per-project AI conversation history |
-| `ai_generations` | One row per LLM call: model, token usage, timing, outcome |
-| `deployments` | Deployment attempts per project with status transitions |
-| `subscriptions` | One row per user, synced with Paystack/Flutterwave by the billing webhooks |
-| `usage_logs` | Append-only metering of billable actions (plan limits) |
-| `analytics` | Append-only product analytics events |
+Security model:
 
-Design notes:
-
-- **RLS everywhere.** Every table has row-level security enabled. Owners get scoped CRUD on their projects and related rows; `is_public` projects (and their files) are readable by anyone; admins get read access via a `SECURITY DEFINER` `is_admin()` helper that avoids recursive policy evaluation.
-- **Column-level privileges.** Regular users can update only `name`, `avatar_url`, and `onboarded` on their own `users` row — `role` and `plan` are revoked from the `authenticated` role, so privilege escalation is blocked at the grant level, beneath RLS.
-- **Service-role writes.** `ai_generations`, `usage_logs`, `subscriptions`, and deployment status updates have no client write policies; only the server (service-role key) can write them, so metering and billing can't be forged from a browser.
-- **Cascades.** Deleting an auth user cascades through users → projects → files/messages/generations/deployments; nullable references (`triggered_by`, `created_by`, analytics attribution) use `on delete set null` to preserve history.
-- **Indexes** cover every foreign key plus the hot query paths: `(owner_id, updated_at desc)` for project lists, `(project_id, created_at)` for chat history, `(user_id, created_at desc)` for usage metering, `(event_type, created_at desc)` for analytics, and partial indexes for public projects and in-flight deployments.
-
-TypeScript mirrors of the schema live in `src/types/database.ts` (regenerate with `npx supabase gen types typescript` once connected to a project).
-
-## Authentication
-
-Auth is built on Supabase Auth (`@supabase/ssr`). Sessions are JWTs stored in secure cookies, refreshed on every request by `src/middleware.ts`, which also redirects unauthenticated users off protected routes (`/dashboard`, `/projects`, `/chat`, `/settings`, `/billing`, `/admin`, `/profile`) and signed-in users away from the auth pages.
-
-Supported flows:
-
-- **Email + password** — signup (with optional email confirmation), login, password reset via email link
-- **Google OAuth** — enable the Google provider in Supabase (Authentication → Providers) with your OAuth client ID/secret
-
-Supabase dashboard configuration:
-
-1. **Authentication → URL Configuration** — set the Site URL to your deployment URL and add `https://<your-domain>/auth/callback` to the redirect allow list (plus `http://localhost:3000/auth/callback` for local dev).
-2. **Authentication → Providers → Google** — add your Google OAuth credentials; the authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`.
-3. Optional: point email templates at `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=...` — both the code (`/auth/callback`) and token-hash (`/auth/confirm`) flows are supported.
-
-## AI providers
-
-Two providers are integrated, each behind its own env vars:
-
-- **Anthropic Claude** (`ANTHROPIC_API_KEY`) powers the app-builder chat at `/api/chat` (streaming, conversation persistence).
-- **NVIDIA Inference API** (`NVIDIA_API_KEY`, key from [build.nvidia.com](https://build.nvidia.com)) powers two general-purpose endpoints:
-  - `POST /api/ai/generate` — text generation. Body: `{ prompt, system?, projectId?, model?, maxTokens?, temperature?, stream? }`
-  - `POST /api/ai/code` — code generation on a code-specialized model. Body: `{ prompt, language?, context?, projectId?, stream? }`
-
-Both NVIDIA endpoints stream text by default (`stream: false` returns JSON with token usage), require an authenticated session, and are rate limited per user (`NVIDIA_RATE_LIMIT_RPM`, default 20/min) with standard `X-RateLimit-*`/`Retry-After` headers. Every call is metered into `usage_logs` (and `ai_generations` when a `projectId` is supplied). Models default to `meta/llama-3.3-70b-instruct` (text) and `qwen/qwen2.5-coder-32b-instruct` (code), overridable via `NVIDIA_TEXT_MODEL` / `NVIDIA_CODE_MODEL`. Upstream 429/5xx responses are retried with backoff; failures surface as clean JSON errors.
-
-## Multi-agent build system
-
-`POST /api/agents/run` executes an automated build pipeline in which six specialized agents collaborate through a shared workflow context, streaming NDJSON progress events consumed by the "Build app" panel in the workspace:
-
-| # | Agent | Role |
-| --- | --- | --- |
-| 1 | **Planner** | Turns the user's description into a structured plan (pages, components, data model, features) |
-| 2 | **UI** | Generates Next.js pages/components plus a self-contained static preview (`preview/index.html`) |
-| 3 | **Database** | Produces `supabase/schema.sql` (with RLS) and matching TypeScript types from the plan's data model |
-| 4 | **Coding** | Wires the app together — data helpers, layout, remaining logic — without regenerating existing files |
-| 5 | **Debug** | Static checks plus an LLM review pass; corrected files replace the originals |
-| 6 | **Deployment** | Persists files to `project_files`, records a `deployments` row, publishes the preview, marks the project `ready`, and posts a build summary into the project chat |
-
-Each agent reads and extends the shared context (the plan and the generated-file map), so later agents build on earlier output. The generated preview is served at `/api/preview/[projectId]` (sandboxed with a strict CSP) and renders live in the workspace preview panel.
-
-Generated files live in a virtual filesystem (`src/lib/files/manager.ts`, backed by `project_files` with an in-memory demo fallback) exposed via `/api/projects/[projectId]/files`. The workspace's **Code** tab is a full in-browser IDE: Monaco editor (bundled locally, no CDN) with syntax highlighting, a file explorer, multiple tabs with dirty indicators, debounced auto-save, search & replace, and a simulated terminal (`ls`, `cat`, `rm`, `npm run build`, …) operating on the same virtual filesystem. LLM agents run on Claude (`claude-opus-4-8`); without an `ANTHROPIC_API_KEY` the pipeline runs deterministic mock agents so the workflow is fully demoable. Deployment is currently simulated (files + preview publishing) — swapping in a real Vercel deploy only touches the Deployment Agent.
-
-## Deployment
-
-Deploy to [Vercel](https://vercel.com): import the repository, set the environment variables from `.env.example`, and deploy. `vercel.json` configures the framework and security headers.
+- **RLS on every table** — owner-scoped CRUD; public projects readable by anyone; admin reads via a `SECURITY DEFINER is_admin()` helper
+- **Column-level privileges** — clients can never change their own `role` or `plan` (revoked beneath RLS)
+- **Service-role-only writes** for billing, invoices, metering, and generation accounting — usage and payments can't be forged from a browser
+- Full details in the migration files, each validated against Postgres 16
 
 ## Scripts
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start the dev server (Turbopack) |
-| `npm run build` | Production build |
-| `npm run start` | Serve the production build |
-| `npm run lint` | Run ESLint |
+| `npm run dev` | Dev server (Turbopack) |
+| `npm run build` / `npm run start` | Production build / serve |
+| `npm run lint` | ESLint |
 
-## Admin analytics
+## License
 
-`/admin` (admin role required; open with demo data before Supabase is connected) tracks platform health: total users, active users (7d), projects created, AI requests (30d), and MRR as stat tiles; signups (30d) and AI requests (14d) charts plus revenue-by-plan; login history (tracked as `login`/`signup` analytics events from the auth flows); course progress (from `course_progress` analytics events); and a user activity feed from `usage_logs`. Reports export as CSV via `/api/admin/reports?type=users|usage|revenue`. Optional PostHog integration (`NEXT_PUBLIC_POSTHOG_KEY`) captures client pageviews and mirrors server events.
-
-## Subscription plans & billing
-
-Two plans: **Free** (5 projects, 50 AI requests/month) and **Pro** ($25/month — unlimited projects, 2,000 AI requests/month), defined in `src/lib/constants.ts`. Usage limits are enforced server-side at creation points: project create/duplicate checks the project quota, and every AI endpoint (chat, generate, code, agent builds) checks the monthly AI-request quota (returning 402 with an upgrade prompt).
-
-Payments run through **Paystack** and **Flutterwave** hosted checkouts: `POST /api/billing/checkout` initializes the transaction, `/api/billing/verify` confirms it server-side on callback, and signed webhooks (`/api/billing/webhooks/paystack` — HMAC-SHA512, `/api/billing/webhooks/flutterwave` — verif-hash) handle renewals. Activation writes the subscription, syncs `users.plan`, and records a row in the new `invoices` table (all service-role writes — clients can't forge billing state). The billing dashboard (`/billing`) shows the current plan with renewal/cancellation state, usage meters against plan limits, plan comparison with provider-choice upgrade, cancel-at-period-end, and the invoice history. Set `PAYSTACK_SECRET_KEY`, `FLUTTERWAVE_SECRET_KEY` + `FLUTTERWAVE_SECRET_HASH`, and optionally `BILLING_CURRENCY`/`PAYSTACK_PLAN_CODE_PRO` (provider-side auto-renewal); without keys the checkout simulates in demo mode.
+Private project — all rights reserved.

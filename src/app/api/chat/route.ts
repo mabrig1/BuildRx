@@ -79,6 +79,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { checkAiRequestLimit } = await import("@/lib/billing/limits");
+  const limitError = await checkAiRequestLimit(user.id);
+  if (limitError) {
+    return NextResponse.json({ error: limitError }, { status: 402 });
+  }
+
   // RLS also enforces this, but a explicit check gives a clean 404.
   const { data: project } = await supabase
     .from("projects")

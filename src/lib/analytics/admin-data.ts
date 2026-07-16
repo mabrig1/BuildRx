@@ -96,9 +96,8 @@ function demoData(): AdminAnalytics {
     signupsByDay,
     aiRequestsByDay,
     revenueByPlan: [
-      { plan: "Free", mrr: 0, subscribers: 1096 },
-      { plan: "Pro", mrr: 3650, subscribers: 146 },
-      { plan: "Team", mrr: 1220, subscribers: 21 },
+      { plan: "Free", mrr: 0, subscribers: 1117 },
+      { plan: "Pro", mrr: 4175, subscribers: 167 },
     ],
     loginHistory: [
       { user: "ada@example.com", method: "password", at: new Date(Date.now() - 6e5).toISOString() },

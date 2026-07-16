@@ -25,7 +25,7 @@ npm install
 
 # 2. Configure environment
 cp .env.example .env.local
-# fill in your Supabase / Anthropic / Stripe keys
+# fill in your Supabase / Anthropic / billing (Paystack, Flutterwave) keys
 
 # 3. Apply the database schema (Supabase CLI)
 npx supabase db push
@@ -99,7 +99,7 @@ The schema lives in `supabase/migrations/` as ordered, domain-scoped migrations.
 | `chat_messages` | Per-project AI conversation history |
 | `ai_generations` | One row per LLM call: model, token usage, timing, outcome |
 | `deployments` | Deployment attempts per project with status transitions |
-| `subscriptions` | One row per user, synced with Stripe by the webhook handler |
+| `subscriptions` | One row per user, synced with Paystack/Flutterwave by the billing webhooks |
 | `usage_logs` | Append-only metering of billable actions (plan limits) |
 | `analytics` | Append-only product analytics events |
 
@@ -172,3 +172,9 @@ Deploy to [Vercel](https://vercel.com): import the repository, set the environme
 ## Admin analytics
 
 `/admin` (admin role required; open with demo data before Supabase is connected) tracks platform health: total users, active users (7d), projects created, AI requests (30d), and MRR as stat tiles; signups (30d) and AI requests (14d) charts plus revenue-by-plan; login history (tracked as `login`/`signup` analytics events from the auth flows); course progress (from `course_progress` analytics events); and a user activity feed from `usage_logs`. Reports export as CSV via `/api/admin/reports?type=users|usage|revenue`. Optional PostHog integration (`NEXT_PUBLIC_POSTHOG_KEY`) captures client pageviews and mirrors server events.
+
+## Subscription plans & billing
+
+Two plans: **Free** (5 projects, 50 AI requests/month) and **Pro** ($25/month — unlimited projects, 2,000 AI requests/month), defined in `src/lib/constants.ts`. Usage limits are enforced server-side at creation points: project create/duplicate checks the project quota, and every AI endpoint (chat, generate, code, agent builds) checks the monthly AI-request quota (returning 402 with an upgrade prompt).
+
+Payments run through **Paystack** and **Flutterwave** hosted checkouts: `POST /api/billing/checkout` initializes the transaction, `/api/billing/verify` confirms it server-side on callback, and signed webhooks (`/api/billing/webhooks/paystack` — HMAC-SHA512, `/api/billing/webhooks/flutterwave` — verif-hash) handle renewals. Activation writes the subscription, syncs `users.plan`, and records a row in the new `invoices` table (all service-role writes — clients can't forge billing state). The billing dashboard (`/billing`) shows the current plan with renewal/cancellation state, usage meters against plan limits, plan comparison with provider-choice upgrade, cancel-at-period-end, and the invoice history. Set `PAYSTACK_SECRET_KEY`, `FLUTTERWAVE_SECRET_KEY` + `FLUTTERWAVE_SECRET_HASH`, and optionally `BILLING_CURRENCY`/`PAYSTACK_PLAN_CODE_PRO` (provider-side auto-renewal); without keys the checkout simulates in demo mode.

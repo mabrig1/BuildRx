@@ -37,6 +37,18 @@ export async function authorizeAiRequest(): Promise<AuthorizedRequest> {
     userId = user.id;
   }
 
+  // Plan usage limits (monthly AI request quota).
+  if (userId) {
+    const { checkAiRequestLimit } = await import("@/lib/billing/limits");
+    const limitError = await checkAiRequestLimit(userId);
+    if (limitError) {
+      return {
+        ok: false,
+        response: NextResponse.json({ error: limitError }, { status: 402 }),
+      };
+    }
+  }
+
   const headerList = await headers();
   const ip =
     headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";

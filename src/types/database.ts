@@ -451,6 +451,8 @@ export interface Database {
           user_id: string;
           plan: PlanId;
           status: SubscriptionStatus;
+          provider: string | null;
+          provider_ref: string | null;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           current_period_start: string | null;
@@ -464,6 +466,8 @@ export interface Database {
           user_id: string;
           plan?: PlanId;
           status?: SubscriptionStatus;
+          provider?: string | null;
+          provider_ref?: string | null;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           current_period_start?: string | null;
@@ -477,6 +481,8 @@ export interface Database {
           user_id?: string;
           plan?: PlanId;
           status?: SubscriptionStatus;
+          provider?: string | null;
+          provider_ref?: string | null;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           current_period_start?: string | null;
@@ -490,6 +496,61 @@ export interface Database {
             foreignKeyName: "subscriptions_user_id_fkey";
             columns: ["user_id"];
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      invoices: {
+        Row: {
+          id: string;
+          user_id: string;
+          subscription_id: string | null;
+          provider: string;
+          reference: string;
+          plan: PlanId;
+          amount: number;
+          currency: string;
+          status: "paid" | "pending" | "failed" | "refunded";
+          paid_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          subscription_id?: string | null;
+          provider: string;
+          reference: string;
+          plan: PlanId;
+          amount: number;
+          currency?: string;
+          status?: "paid" | "pending" | "failed" | "refunded";
+          paid_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          subscription_id?: string | null;
+          provider?: string;
+          reference?: string;
+          plan?: PlanId;
+          amount?: number;
+          currency?: string;
+          status?: "paid" | "pending" | "failed" | "refunded";
+          paid_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invoices_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "invoices_subscription_id_fkey";
+            columns: ["subscription_id"];
+            referencedRelation: "subscriptions";
             referencedColumns: ["id"];
           },
         ];

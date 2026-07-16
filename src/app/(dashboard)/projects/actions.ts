@@ -32,6 +32,12 @@ export async function createProject(
     return { error: "You must be signed in to create a project." };
   }
 
+  const { checkProjectLimit } = await import("@/lib/billing/limits");
+  const limitError = await checkProjectLimit(user.id);
+  if (limitError) {
+    return { error: limitError };
+  }
+
   const { data: project, error } = await supabase
     .from("projects")
     .insert({
@@ -87,6 +93,12 @@ export async function duplicateProject(id: string): Promise<ActionResult> {
   } = await supabase.auth.getUser();
   if (!user) {
     return { error: "You must be signed in to duplicate a project." };
+  }
+
+  const { checkProjectLimit } = await import("@/lib/billing/limits");
+  const limitError = await checkProjectLimit(user.id);
+  if (limitError) {
+    return { error: limitError };
   }
 
   const { data: source, error: sourceError } = await supabase

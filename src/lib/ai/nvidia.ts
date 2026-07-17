@@ -80,23 +80,37 @@ export const NVIDIA_MODELS: NvidiaModelInfo[] = [
   },
 ];
 
+/**
+ * Env values pasted into dashboards often carry stray whitespace or
+ * newlines; a newline in the key makes the Authorization header invalid
+ * and every request fail. Trim everything (empty → undefined).
+ */
+function cleanEnv(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+export function nvidiaApiKey(): string | undefined {
+  return cleanEnv(process.env.NVIDIA_API_KEY);
+}
+
 export function isNvidiaConfigured() {
-  return Boolean(process.env.NVIDIA_API_KEY);
+  return Boolean(nvidiaApiKey());
 }
 
 export function nvidiaTextModel() {
-  return process.env.NVIDIA_TEXT_MODEL ?? DEFAULT_TEXT_MODEL;
+  return cleanEnv(process.env.NVIDIA_TEXT_MODEL) ?? DEFAULT_TEXT_MODEL;
 }
 
 export function nvidiaCodeModel() {
-  return process.env.NVIDIA_CODE_MODEL ?? DEFAULT_CODE_MODEL;
+  return cleanEnv(process.env.NVIDIA_CODE_MODEL) ?? DEFAULT_CODE_MODEL;
 }
 
 /** Effective API base URL (env override or the NIM default). */
 export function nvidiaBaseUrl() {
   return (
-    process.env.NVIDIA_API_BASE_URL ??
-    process.env.NVIDIA_BASE_URL ??
+    cleanEnv(process.env.NVIDIA_API_BASE_URL) ??
+    cleanEnv(process.env.NVIDIA_BASE_URL) ??
     DEFAULT_BASE_URL
   ).replace(/\/$/, "");
 }
@@ -149,7 +163,7 @@ async function parseErrorDetail(response: Response): Promise<string> {
 async function requestChatCompletion(
   body: Record<string, unknown>
 ): Promise<Response> {
-  const apiKey = process.env.NVIDIA_API_KEY;
+  const apiKey = nvidiaApiKey();
   if (!apiKey) {
     throw new NvidiaApiError("NVIDIA_API_KEY is not configured.", 503, false);
   }

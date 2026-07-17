@@ -187,9 +187,18 @@ async function requestChatCompletion(
         },
         body: JSON.stringify(body),
       });
-    } catch {
+    } catch (error) {
+      // Surface the real network-level cause (DNS, TLS, timeout, invalid
+      // header, …) — "fetch failed" alone is undiagnosable in prod logs.
+      const cause =
+        error instanceof Error
+          ? error.cause instanceof Error
+            ? `${error.message}: ${error.cause.message}`
+            : error.message
+          : String(error);
+      console.error(`NVIDIA API fetch failed (attempt ${attempt + 1}):`, cause);
       lastError = new NvidiaApiError(
-        "Could not reach the NVIDIA API.",
+        `Could not reach the NVIDIA API (${cause}).`,
         503,
         true
       );

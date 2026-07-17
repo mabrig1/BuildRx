@@ -115,6 +115,7 @@ export const plannerAgent: Agent = {
         system: SYSTEM,
         prompt: `Build plan for this app request:\n\n${context.prompt}`,
         maxTokens: 4096,
+        role: "reasoning",
       });
       context.plan = extractJson<AppPlan>(text);
     }

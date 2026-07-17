@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Menu, Monitor } from "lucide-react";
+import { Bot, Download, Menu, Monitor } from "lucide-react";
 
 import { AgentRunPanel } from "@/components/agents/agent-run-panel";
 import { ChatPanel } from "@/components/chat/chat-panel";
@@ -116,6 +116,21 @@ export function Workspace({
           </Badge>
 
           <div className="ml-auto flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              asChild
+            >
+              <a
+                href={`/api/projects/${project.id}/export`}
+                download
+                aria-label="Download project as zip"
+                title="Download project as zip"
+              >
+                <Download className="size-4" />
+              </a>
+            </Button>
             <GitHubPanel projectId={project.id} projectName={project.name} />
             <DeployPanel projectId={project.id} />
             <AgentRunPanel

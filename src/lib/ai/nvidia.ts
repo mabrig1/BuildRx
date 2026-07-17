@@ -9,6 +9,7 @@
 const DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1";
 const DEFAULT_TEXT_MODEL = "z-ai/glm-5.2";
 const DEFAULT_CODE_MODEL = "poolside/laguna-xs-2.1";
+const DEFAULT_CHAT_MODEL = "stepfun-ai/step-3.7-flash";
 
 const MAX_RETRIES = 2;
 
@@ -70,7 +71,7 @@ export const NVIDIA_MODELS: NvidiaModelInfo[] = [
     id: "stepfun-ai/step-3.7-flash",
     label: "Step 3.7 Flash",
     kind: "text",
-    description: "Fast reasoning model for low-latency text generation",
+    description: "Fast reasoning model — default for interactive chat",
   },
   {
     id: "poolside/laguna-xs-2.1",
@@ -104,6 +105,11 @@ export function nvidiaTextModel() {
 
 export function nvidiaCodeModel() {
   return cleanEnv(process.env.NVIDIA_CODE_MODEL) ?? DEFAULT_CODE_MODEL;
+}
+
+/** Fast model for interactive chat (low latency beats depth there). */
+export function nvidiaChatModel() {
+  return cleanEnv(process.env.NVIDIA_CHAT_MODEL) ?? DEFAULT_CHAT_MODEL;
 }
 
 /** Effective API base URL (env override or the NIM default). */

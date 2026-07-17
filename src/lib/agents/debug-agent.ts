@@ -79,6 +79,7 @@ export const debugAgent: Agent = {
     const text = await runAgentCompletion({
       system: SYSTEM,
       prompt: `Review these generated project files:\n\n${bundle}`,
+      role: "reasoning",
     });
 
     const fixes = parseFileBlocks(text);

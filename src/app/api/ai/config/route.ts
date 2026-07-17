@@ -1,6 +1,7 @@
 import {
   isNvidiaConfigured,
   nvidiaBaseUrl,
+  nvidiaChatModel,
   nvidiaCodeModel,
   nvidiaTextModel,
 } from "@/lib/ai/nvidia";
@@ -16,5 +17,6 @@ export async function GET() {
     baseUrl: nvidiaBaseUrl(),
     textModel: nvidiaTextModel(),
     codeModel: nvidiaCodeModel(),
+    chatModel: nvidiaChatModel(),
   });
 }

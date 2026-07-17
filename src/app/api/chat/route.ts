@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import {
   isNvidiaConfigured,
+  nvidiaChatModel,
   streamChatCompletion,
   type NvidiaMessage,
 } from "@/lib/ai/nvidia";
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
             { role: "system", content: APP_BUILDER_SYSTEM_PROMPT },
             { role: "user", content },
           ],
-          { maxTokens: 4096 }
+          { model: nvidiaChatModel(), maxTokens: 4096 }
         );
         return new Response(stream, {
           headers: {
@@ -197,7 +198,7 @@ export async function POST(request: Request) {
       ];
       const { stream, completion, model } = await streamChatCompletion(
         nvidiaMessages,
-        { maxTokens: 4096 }
+        { model: nvidiaChatModel(), maxTokens: 4096 }
       );
       void completion
         .then((result) =>

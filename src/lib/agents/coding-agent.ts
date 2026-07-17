@@ -179,6 +179,7 @@ export const codingAgent: Agent = {
           `Files that already exist (do not regenerate):\n${existingPaths.join("\n")}`,
           `Original request: ${context.prompt}`,
         ].join("\n\n"),
+        role: "code",
       });
       files = parseFileBlocks(text);
     }

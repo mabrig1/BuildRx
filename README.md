@@ -10,6 +10,7 @@ An AI app builder in the spirit of Lovable: describe the app you want in plain E
 - **In-browser IDE** — Monaco editor (bundled, no CDN) with a file explorer, tabs, auto-save, search & replace, and a simulated terminal
 - **Live preview environment** — instant-refresh static preview, a Sandpack engine, and a WebContainer runner that boots the generated project's real dev server in the browser; device viewports, error console, fullscreen
 - **GitHub integration** — connect an account, create/link repositories, push the whole project as a commit, pull changes back, browse commit history
+- **Zip export** — download any project's files as a zip archive in one click
 - **One-click deployment** — Vercel, Netlify, and Railway with live build logs, deployment history, status tracking, and custom domains
 - **Auth** — Supabase email/password + Google OAuth, secure-cookie JWT sessions, protected routes
 - **Subscriptions** — Free (5 projects) and Pro (unlimited) plans, Paystack & Flutterwave checkouts, invoices, server-enforced usage limits
@@ -23,7 +24,7 @@ An AI app builder in the spirit of Lovable: describe the app you want in plain E
 | Framework | [Next.js 15](https://nextjs.org) (App Router, Turbopack) + React 19 + TypeScript |
 | Styling | Tailwind CSS v4 + [Shadcn UI](https://ui.shadcn.com) (Radix primitives) |
 | Auth & database | [Supabase](https://supabase.com) (PostgreSQL, RLS, Auth) |
-| AI | Anthropic Claude (chat + agents) · NVIDIA Inference API (text/code endpoints) |
+| AI | Anthropic Claude (chat + agents) · NVIDIA Inference API (GLM 5.2 reasoning · Laguna XS 2.1 code · Step 3.7 Flash chat) |
 | Editor & preview | Monaco · Sandpack · WebContainers |
 | State / forms | Zustand · React Hook Form + Zod |
 | Payments | Paystack · Flutterwave |

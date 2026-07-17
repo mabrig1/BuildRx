@@ -165,6 +165,7 @@ export const uiAgent: Agent = {
       const text = await runAgentCompletion({
         system: SYSTEM,
         prompt: `Build plan:\n${JSON.stringify(plan, null, 2)}\n\nOriginal request: ${context.prompt}`,
+        role: "code",
       });
       files = parseFileBlocks(text);
     }

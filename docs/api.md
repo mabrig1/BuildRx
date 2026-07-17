@@ -131,7 +131,9 @@ Event stream:
 {"type":"workflow_complete","previewUrl":"/api/preview/<id>","fileCount":17}
 ```
 
-An `{"type":"error","agent":?,"message":"..."}` event may appear at any point; the stream always ends after `workflow_complete` or `error`. Generated files are saved to the project filesystem. Without `ANTHROPIC_API_KEY`, prompt-aware mock agents run the same pipeline. Errors before the stream starts: 400 · 401 · 402 · 404 · 429.
+An `{"type":"error","agent":?,"message":"..."}` event may appear at any point; the stream always ends after `workflow_complete` or `error`. Generated files are saved to the project filesystem.
+
+Model selection: Anthropic Claude when `ANTHROPIC_API_KEY` is set; otherwise the NVIDIA models — the reasoning agents (Planner, Debug) use `NVIDIA_TEXT_MODEL` and the code-producing agents (UI, Database, Coding) use `NVIDIA_CODE_MODEL`. With neither key, prompt-aware mock agents run the same pipeline. Errors before the stream starts: 400 · 401 · 402 · 404 · 429.
 
 ---
 
@@ -155,6 +157,10 @@ Returns `{ "success": true }`. Paths are validated — no traversal (`..`), no a
 ### `DELETE /api/projects/{projectId}/files?path=...`
 
 Deletes the file. Returns `{ "success": true }`.
+
+### `GET /api/projects/{projectId}/export`
+
+Downloads the project's entire virtual filesystem as a zip archive (`Content-Disposition: attachment; filename="<project-slug>.zip"`). 404 if the project has no files yet.
 
 ### `GET /api/preview/{projectId}`
 

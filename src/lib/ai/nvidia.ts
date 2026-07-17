@@ -92,7 +92,8 @@ export function nvidiaCodeModel() {
   return process.env.NVIDIA_CODE_MODEL ?? DEFAULT_CODE_MODEL;
 }
 
-function baseUrl() {
+/** Effective API base URL (env override or the NIM default). */
+export function nvidiaBaseUrl() {
   return (
     process.env.NVIDIA_API_BASE_URL ??
     process.env.NVIDIA_BASE_URL ??
@@ -163,7 +164,7 @@ async function requestChatCompletion(
 
     let response: Response;
     try {
-      response = await fetch(`${baseUrl()}/chat/completions`, {
+      response = await fetch(`${nvidiaBaseUrl()}/chat/completions`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,

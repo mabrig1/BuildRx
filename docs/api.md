@@ -101,6 +101,10 @@ Lists the NVIDIA models available to the two endpoints above, plus the configure
 }
 ```
 
+### `GET /api/ai/config`
+
+Configuration check without an API call: `{ "hasKey": true, "baseUrl": "https://integrate.api.nvidia.com/v1", "textModel": "…", "codeModel": "…" }`. The key itself is never returned.
+
 ### `GET /api/ai/test`
 
 NVIDIA connectivity check — sends a one-word completion to the configured endpoint. Auth-free by design (it verifies configuration, not user data).

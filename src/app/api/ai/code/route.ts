@@ -32,6 +32,13 @@ function codeSystemPrompt(language?: string) {
  *
  * Body: { prompt, language?, context?, projectId?, stream? }
  */
+/** Temporary deployment check — confirms the route is live. */
+export async function GET() {
+  return Response.json({
+    status: "API is working",
+  });
+}
+
 export async function POST(request: Request) {
   const auth = await authorizeAiRequest();
   if (!auth.ok) return auth.response;

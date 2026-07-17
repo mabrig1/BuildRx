@@ -19,6 +19,13 @@ export const maxDuration = 120;
  * Body: { prompt, system?, projectId?, model?, maxTokens?, temperature?, topP?, seed?, stream? }
  * Streams text deltas by default; set stream:false for a JSON response.
  */
+/** Temporary deployment check — confirms the route is live. */
+export async function GET() {
+  return Response.json({
+    status: "API is working",
+  });
+}
+
 export async function POST(request: Request) {
   const auth = await authorizeAiRequest();
   if (!auth.ok) return auth.response;

@@ -281,3 +281,8 @@ export function getFileSystem(projectId: string): FileSystemManager {
     ? new SupabaseFileSystem(projectId)
     : new DemoFileSystem(projectId);
 }
+
+/** Project ids present in the in-memory demo store (demo mode only). */
+export function demoProjectIds(): string[] {
+  return [...demoStore().keys()];
+}

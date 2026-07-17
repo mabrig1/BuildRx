@@ -137,7 +137,27 @@ Model selection: Anthropic Claude when `ANTHROPIC_API_KEY` is set; otherwise the
 
 ---
 
+## Projects
+
+### `GET /api/projects`
+
+Lists the signed-in user's projects → `{ "projects": [{ "id", "name", "description", "status", "previewUrl", "updatedAt" }, …] }`. Demo mode lists the in-memory demo projects.
+
+### `POST /api/projects`
+
+Creates a project (enforces the plan's project limit — 402 when reached):
+
+```json
+{ "name": "My App", "description": "optional" }
+```
+
+Returns `201 { "project": { "id", "name", "status" } }` (`{ "id", "simulated": true }` in demo mode). The dashboard UI uses a server action for the same operation.
+
 ## Project files
+
+### `GET /api/files` (alias)
+
+Flat-path alias for the per-project files API below, addressed by query/body `projectId`: `GET /api/files?projectId=&path=`, `PUT /api/files { projectId, path, content }`, `DELETE /api/files?projectId=&path=`. Same responses and rules as the canonical routes.
 
 ### `GET /api/projects/{projectId}/files`
 
@@ -190,6 +210,7 @@ Errors: 400 not connected / no linked repo / no files yet · 401 · 502 GitHub A
 
 | Endpoint | Description |
 | --- | --- |
+| `GET /api/deploy` | API index: supported providers, your connection status, and the operation endpoints |
 | `GET /api/deploy/connection` | `{ connections: { vercel, netlify, railway } }` (booleans) |
 | `POST /api/deploy/connection` `{ provider, token }` | Connect a provider token (validated against the provider's API) |
 | `DELETE /api/deploy/connection?provider=` | Disconnect |

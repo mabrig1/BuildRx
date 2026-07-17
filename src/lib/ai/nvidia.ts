@@ -47,6 +47,39 @@ export class NvidiaApiError extends Error {
   }
 }
 
+export interface NvidiaModelInfo {
+  id: string;
+  label: string;
+  kind: "text" | "code";
+  description: string;
+}
+
+/**
+ * Models available through the NVIDIA Inference API integration.
+ * Any of these can be requested per-call via the `model` field on
+ * /api/ai/generate and /api/ai/code.
+ */
+export const NVIDIA_MODELS: NvidiaModelInfo[] = [
+  {
+    id: "z-ai/glm-5.2",
+    label: "GLM 5.2",
+    kind: "text",
+    description: "Reasoning model — default for text generation",
+  },
+  {
+    id: "stepfun-ai/step-3.7-flash",
+    label: "Step 3.7 Flash",
+    kind: "text",
+    description: "Fast reasoning model for low-latency text generation",
+  },
+  {
+    id: "poolside/laguna-xs-2.1",
+    label: "Laguna XS 2.1",
+    kind: "code",
+    description: "Code-specialized model — default for code generation",
+  },
+];
+
 export function isNvidiaConfigured() {
   return Boolean(process.env.NVIDIA_API_KEY);
 }
@@ -60,10 +93,11 @@ export function nvidiaCodeModel() {
 }
 
 function baseUrl() {
-  return (process.env.NVIDIA_API_BASE_URL ?? DEFAULT_BASE_URL).replace(
-    /\/$/,
-    ""
-  );
+  return (
+    process.env.NVIDIA_API_BASE_URL ??
+    process.env.NVIDIA_BASE_URL ??
+    DEFAULT_BASE_URL
+  ).replace(/\/$/, "");
 }
 
 function errorForStatus(status: number, detail: string): NvidiaApiError {

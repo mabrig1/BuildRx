@@ -42,7 +42,8 @@ Streaming project chat (Claude). Persists the user message, streams the assistan
 { "projectId": "uuid-or-demo-id", "content": "Add a pricing page" }
 ```
 
-- Demo mode / no `ANTHROPIC_API_KEY`: streams a labeled mock response instead.
+- No `ANTHROPIC_API_KEY` but `NVIDIA_API_KEY` set: streams from the NVIDIA text model instead (`X-Model` header names it).
+- Neither key: streams a labeled mock response.
 - Errors: 400 invalid body · 401 · 402 quota · 404 unknown project.
 
 ### `POST /api/ai/generate`
@@ -82,6 +83,30 @@ Code generation using the code-specialized NVIDIA model (`NVIDIA_CODE_MODEL`), l
 ```
 
 Same streaming/response/error behavior as `/api/ai/generate`.
+
+### `GET /api/ai/models`
+
+Lists the NVIDIA models available to the two endpoints above, plus the configured defaults:
+
+```json
+{
+  "configured": true,
+  "textModel": "z-ai/glm-5.2",
+  "codeModel": "poolside/laguna-xs-2.1",
+  "models": [
+    { "id": "z-ai/glm-5.2", "label": "GLM 5.2", "kind": "text", "description": "…" },
+    { "id": "stepfun-ai/step-3.7-flash", "label": "Step 3.7 Flash", "kind": "text", "description": "…" },
+    { "id": "poolside/laguna-xs-2.1", "label": "Laguna XS 2.1", "kind": "code", "description": "…" }
+  ]
+}
+```
+
+### `GET /api/ai/test`
+
+NVIDIA connectivity check — sends a one-word completion to the configured endpoint. Auth-free by design (it verifies configuration, not user data).
+
+- Success: `{ "connected": true, "message": "Connected to NVIDIA successfully", "model": "…", "reply": "…" }`
+- Failure: `{ "connected": false, "error": "…" }` with 503 (no key) or the upstream status.
 
 ### `POST /api/agents/run`
 

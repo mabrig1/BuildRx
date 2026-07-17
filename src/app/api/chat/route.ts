@@ -1,6 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 
+import {
+  isNvidiaConfigured,
+  streamChatCompletion,
+  type NvidiaMessage,
+} from "@/lib/ai/nvidia";
 import { APP_BUILDER_SYSTEM_PROMPT, CHAT_MODEL } from "@/lib/ai/prompts";
 import { recordAiUsage } from "@/lib/ai/usage";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -59,8 +64,28 @@ export async function POST(request: Request) {
   }
   const { projectId, content } = parsed.data;
 
-  // Demo mode: no Supabase → stream a mock response with no persistence.
+  // Demo mode: no Supabase → no persistence. Stream a real NVIDIA
+  // response when a key is configured, otherwise the canned demo reply.
   if (!isSupabaseConfigured()) {
+    if (isNvidiaConfigured()) {
+      try {
+        const { stream, model } = await streamChatCompletion(
+          [
+            { role: "system", content: APP_BUILDER_SYSTEM_PROMPT },
+            { role: "user", content },
+          ],
+          { maxTokens: 4096 }
+        );
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "X-Model": model,
+          },
+        });
+      } catch {
+        // fall through to the demo response
+      }
+    }
     return new Response(mockStream(), {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
@@ -129,6 +154,7 @@ export async function POST(request: Request) {
       durationMs: number;
       status: "completed" | "failed";
       error?: string;
+      model?: string;
     }
   ) {
     const supabase = await createClient();
@@ -146,7 +172,7 @@ export async function POST(request: Request) {
       userId: user!.id,
       projectId,
       messageId: message?.id ?? null,
-      model: CHAT_MODEL,
+      model: generation.model ?? CHAT_MODEL,
       status: generation.status,
       promptTokens: generation.promptTokens,
       completionTokens: generation.completionTokens,
@@ -156,7 +182,46 @@ export async function POST(request: Request) {
     });
   }
 
-  // No API key → mock stream, but still persist both sides of the chat.
+  // No Anthropic key → fall back to the NVIDIA endpoint (with the full
+  // conversation history), still persisting both sides of the chat.
+  if (!process.env.ANTHROPIC_API_KEY && isNvidiaConfigured()) {
+    const startedAt = Date.now();
+    try {
+      const nvidiaMessages: NvidiaMessage[] = [
+        { role: "system", content: APP_BUILDER_SYSTEM_PROMPT },
+        ...messages.map((m) => ({
+          role: m.role as "user" | "assistant",
+          content:
+            typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+        })),
+      ];
+      const { stream, completion, model } = await streamChatCompletion(
+        nvidiaMessages,
+        { maxTokens: 4096 }
+      );
+      void completion
+        .then((result) =>
+          persistAssistantMessage(result.text, {
+            promptTokens: result.usage.promptTokens,
+            completionTokens: result.usage.completionTokens,
+            durationMs: Date.now() - startedAt,
+            status: "completed",
+            model: result.model,
+          })
+        )
+        .catch(() => undefined);
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "X-Model": model,
+        },
+      });
+    } catch {
+      // fall through to the mock stream below
+    }
+  }
+
+  // No API key at all → mock stream, but still persist both sides.
   if (!process.env.ANTHROPIC_API_KEY) {
     const upstream = mockStream();
     const [toClient, toPersist] = upstream.tee();

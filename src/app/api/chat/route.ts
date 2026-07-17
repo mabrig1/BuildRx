@@ -57,6 +57,14 @@ function mockStream(): ReadableStream<Uint8Array> {
   });
 }
 
+/** Temporary deployment check — confirms the route is live. */
+export async function GET() {
+  return Response.json({
+    status: "API is working",
+    message: "Chat endpoint is alive",
+  });
+}
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = chatMessageSchema.safeParse(body);

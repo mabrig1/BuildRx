@@ -73,7 +73,21 @@ Requests are authenticated by the `verif-hash` header matching `FLUTTERWAVE_SECR
 
 Use each provider's dashboard test tools (or test-mode keys) to send a test event and confirm a `200` response before going live.
 
-## 4. Custom domain
+## 4. Split-domain architecture (optional)
+
+BuildRx can serve the marketing site and the product on separate hosts from **one deployment**:
+
+```
+buildrx.online          → Home, Features, Pricing, Docs (+ redirects app routes)
+app.buildrx.online      → Dashboard, Chat, Editor, Preview, Deploy, auth
+```
+
+1. In Vercel, add **both** domains to the project (Settings → Domains): the apex (`buildrx.online`, plus `www` if you want it) and `app.buildrx.online` (CNAME to `cname.vercel-dns.com`).
+2. Set `NEXT_PUBLIC_APP_HOST=app.buildrx.online` for the **Production** environment only (previews should stay single-host) and redeploy.
+
+Middleware then routes by host: app routes requested on the apex redirect to the subdomain, marketing pages requested on the subdomain redirect to the apex, and `app.buildrx.online/` lands on the dashboard. Auth cookies live on the app subdomain, so login/signup always happen there. Leave the variable unset to serve everything on one host.
+
+## 5. Custom domain
 
 Add your domain in Vercel (Project → Settings → Domains) and point DNS at it. Then update, in this order:
 
@@ -81,7 +95,7 @@ Add your domain in Vercel (Project → Settings → Domains) and point DNS at it
 2. Supabase Site URL + redirect allow list
 3. Paystack / Flutterwave webhook URLs
 
-## 5. Post-deploy checklist
+## 6. Post-deploy checklist
 
 - [ ] Landing page loads; `/login` and `/signup` work
 - [ ] Sign up with a fresh email — the `users` row is created (trigger)

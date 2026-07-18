@@ -9,14 +9,21 @@ import {
 } from "lucide-react";
 
 export const siteConfig = {
-  name: "App-Creator",
+  name: "BuildRx",
   description:
     "Build production-ready apps by chatting with AI. Describe what you want, watch it come to life.",
   url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   links: {
-    github: "https://github.com/mabrig1/App-Creator",
+    github: "https://github.com/mabrig1/BuildRx",
   },
 } as const;
+
+/** Marketing site navigation (buildrx.online). */
+export const marketingNav = [
+  { title: "Features", href: "/features" },
+  { title: "Pricing", href: "/pricing" },
+  { title: "Docs", href: "/docs" },
+] as const;
 
 export type NavItem = {
   title: string;

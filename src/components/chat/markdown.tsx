@@ -91,6 +91,15 @@ export const Markdown = memo(function Markdown({
             // CodeBlock renders its own <pre>.
             return <>{children}</>;
           },
+          table({ children }) {
+            // Wide tables scroll inside their own container instead of
+            // stretching the page on small screens.
+            return (
+              <div className="overflow-x-auto">
+                <table>{children}</table>
+              </div>
+            );
+          },
         }}
       >
         {content}

@@ -5,10 +5,12 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Check,
+  Download,
   ExternalLink,
   GitBranch,
   GitCommitHorizontal,
   Loader2,
+  Lock,
   Plug,
   Unplug,
 } from "lucide-react";
@@ -19,6 +21,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -30,7 +39,7 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { timeAgo } from "@/lib/utils";
-import type { GitHubCommit } from "@/lib/github/client";
+import type { GitHubCommit, GitHubRepo } from "@/lib/github/client";
 
 function GithubMark({ className }: { className?: string }) {
   return (
@@ -63,6 +72,8 @@ export function GitHubPanel({
   );
   const [isPrivate, setIsPrivate] = useState(true);
   const [linkName, setLinkName] = useState("");
+  const [repos, setRepos] = useState<GitHubRepo[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState("");
   const [commitMessage, setCommitMessage] = useState("Update from App-Creator");
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -92,12 +103,30 @@ export function GitHubPanel({
     }
   }, [projectId]);
 
+  const loadRepos = useCallback(async () => {
+    try {
+      const response = await fetch("/api/github/repos/list");
+      if (response.ok) {
+        const data = await response.json();
+        setRepos(data.repos ?? []);
+      }
+    } catch {
+      // leave as-is — the manual owner/name input still works
+    }
+  }, []);
+
   useEffect(() => {
     if (open) {
       void loadStatus();
       void loadCommits();
     }
   }, [open, loadStatus, loadCommits]);
+
+  useEffect(() => {
+    if (open && status?.connected && !status.repo) {
+      void loadRepos();
+    }
+  }, [open, status?.connected, status?.repo, loadRepos]);
 
   async function call(
     label: string,
@@ -117,11 +146,35 @@ export function GitHubPanel({
       }
       onSuccess?.(data);
       await loadStatus();
+      return data;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : `${label} failed`);
+      return null;
     } finally {
       setBusy(null);
     }
+  }
+
+  /** Link + pull in one action — closes the gap where those were two separate manual steps. */
+  async function importRepo(fullName: string) {
+    if (!fullName.includes("/")) {
+      toast.error("Pick a repository or enter it as owner/name.");
+      return;
+    }
+    const linked = await call("Import", "/api/github/repos", {
+      method: "PUT",
+      body: JSON.stringify({ projectId, fullName }),
+    });
+    if (!linked) return;
+    await call(
+      "Import",
+      "/api/github/pull",
+      { method: "POST", body: JSON.stringify({ projectId }) },
+      (data) => {
+        toast.success(`Imported ${data.fileCount} files from ${fullName}`);
+        window.dispatchEvent(new CustomEvent("vfs-changed", { detail: {} }));
+      }
+    );
   }
 
   return (
@@ -272,35 +325,63 @@ export function GitHubPanel({
                       </Button>
                     </div>
                     <div className="grid gap-1.5">
-                      <Label htmlFor="gh-link">…or link an existing one</Label>
+                      <Label>…or import an existing repository</Label>
+                      {repos.length > 0 ? (
+                        <div className="flex gap-2">
+                          <Select value={selectedRepo} onValueChange={setSelectedRepo}>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Pick a repository" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {repos.map((repo) => (
+                                <SelectItem key={repo.fullName} value={repo.fullName}>
+                                  <span className="flex items-center gap-1.5">
+                                    {repo.private ? (
+                                      <Lock className="size-3 shrink-0" />
+                                    ) : null}
+                                    {repo.fullName}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            onClick={() => void importRepo(selectedRepo)}
+                            disabled={busy !== null || !selectedRepo}
+                          >
+                            {busy === "Import" ? (
+                              <Loader2 className="animate-spin" />
+                            ) : (
+                              <Download />
+                            )}
+                            Import
+                          </Button>
+                        </div>
+                      ) : null}
                       <div className="flex gap-2">
                         <Input
                           id="gh-link"
                           value={linkName}
                           onChange={(e) => setLinkName(e.target.value)}
-                          placeholder="owner/name"
+                          placeholder="…or type owner/name"
                         />
                         <Button
                           variant="outline"
-                          onClick={() =>
-                            void call(
-                              "Link repository",
-                              "/api/github/repos",
-                              {
-                                method: "PUT",
-                                body: JSON.stringify({
-                                  projectId,
-                                  fullName: linkName,
-                                }),
-                              },
-                              () => toast.success("Repository linked")
-                            )
-                          }
+                          onClick={() => void importRepo(linkName)}
                           disabled={busy !== null || !linkName.includes("/")}
                         >
-                          Link
+                          {busy === "Import" ? (
+                            <Loader2 className="animate-spin" />
+                          ) : (
+                            <Download />
+                          )}
+                          Import
                         </Button>
                       </div>
+                      <p className="text-muted-foreground text-xs">
+                        Links the repository to this project and pulls its files in one step.
+                      </p>
                     </div>
                   </div>
                 ) : (

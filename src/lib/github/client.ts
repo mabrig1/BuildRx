@@ -118,6 +118,28 @@ export class GitHubClient {
     };
   }
 
+  /** The authenticated user's own repos, most recently pushed first — powers the repo picker for GitHub import. */
+  async listRepos(limit = 30): Promise<GitHubRepo[]> {
+    const repos = await this.request<
+      Array<{
+        full_name: string;
+        html_url: string;
+        default_branch: string;
+        private: boolean;
+        updated_at: string;
+      }>
+    >(
+      "GET",
+      `/user/repos?sort=pushed&direction=desc&per_page=${Math.min(limit, 100)}`
+    );
+    return repos.map((repo) => ({
+      fullName: repo.full_name,
+      htmlUrl: repo.html_url,
+      defaultBranch: repo.default_branch ?? "main",
+      private: repo.private,
+    }));
+  }
+
   async getRepo(fullName: string): Promise<GitHubRepo> {
     const repo = await this.request<{
       full_name: string;

@@ -4,11 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { editor } from "monaco-editor";
 import {
+  Bug,
   Check,
   ChevronDown,
   ChevronRight,
   CircleDot,
   File as FileIcon,
+  FileText,
   FolderClosed,
   FolderOpen,
   FolderTree,
@@ -17,18 +19,31 @@ import {
   Replace,
   Save,
   Search,
+  Sparkles,
   SquareTerminal,
+  TestTube2,
+  Wand2,
   X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
 import {
+  AiCodeActionDialog,
+  type AiCodeAction,
+} from "@/components/editor/ai-code-action-dialog";
+import {
   monacoLanguageFor,
   setupMonaco,
 } from "@/components/editor/monaco-setup";
 import { TerminalPanel } from "@/components/editor/terminal";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
@@ -148,6 +163,7 @@ export function CodeEditorIde({
     "idle"
   );
   const [showTerminal, setShowTerminal] = useState(false);
+  const [aiAction, setAiAction] = useState<AiCodeAction | null>(null);
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -263,6 +279,29 @@ export function CodeEditorIde({
     void saveFile(activeTab.path, activeTab.content);
   }
 
+  function handleAiApply(newContent: string) {
+    if (!activeTab) return;
+    const path = activeTab.path;
+    setTabs((prev) =>
+      prev.map((t) => (t.path === path ? { ...t, content: newContent, dirty: true } : t))
+    );
+    void saveFile(path, newContent);
+  }
+
+  async function handleSaveNewFile(path: string, content: string) {
+    const response = await fetch(`/api/projects/${projectId}/files`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, content }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.error ?? "Failed to save file");
+    }
+    await loadTree();
+    await openFile(path);
+  }
+
   function triggerFind(replace: boolean) {
     editorRef.current?.focus();
     editorRef.current?.trigger(
@@ -372,6 +411,46 @@ export function CodeEditorIde({
                   {saveState === "saving" ? "Saving" : "Saved"}
                 </span>
               ) : null}
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        disabled={!activeTab}
+                        aria-label="AI actions"
+                      >
+                        <Sparkles className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>AI actions</TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onSelect={() => setAiAction("explain")}>
+                    <FileText />
+                    Explain code
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setAiAction("debug")}>
+                    <Bug />
+                    Debug code
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setAiAction("refactor")}>
+                    <Wand2 />
+                    Refactor
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setAiAction("tests")}>
+                    <TestTube2 />
+                    Generate tests
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setAiAction("docs")}>
+                    <FileText />
+                    Generate documentation
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -472,6 +551,22 @@ export function CodeEditorIde({
           filePaths={filePaths}
           onFilesChanged={() => void loadTree()}
           className="h-48 shrink-0 border-t"
+        />
+      ) : null}
+
+      {aiAction && activeTab ? (
+        <AiCodeActionDialog
+          action={aiAction}
+          open={aiAction !== null}
+          onOpenChange={(open) => {
+            if (!open) setAiAction(null);
+          }}
+          filePath={activeTab.path}
+          code={activeTab.content}
+          language={monacoLanguageFor(activeTab.path)}
+          projectId={projectId}
+          onApply={handleAiApply}
+          onSaveAsNewFile={handleSaveNewFile}
         />
       ) : null}
     </div>

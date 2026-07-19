@@ -377,6 +377,32 @@ Single-shot Q&A over the document's extracted text — stateless, no persisted c
 
 ---
 
+## AI Coding
+
+Generic code operations — not tied to a project's file system (`code` in, result out). The workspace code editor wires these to the currently open file, but any snippet works. All five take `{ code, language?, provider, model?, projectId? }` plus an action-specific field, and work in demo mode like `/api/ai/generate`.
+
+### `POST /api/ai/code/explain`
+
+→ `{ "explanation": "…", "model": "…" }`.
+
+### `POST /api/ai/code/debug`
+
+Body adds `errorMessage?` (paste the error/symptom for a better fix). → `{ "explanation", "code": string | null, "model" }`. `code` is `null` when the model's response couldn't be parsed into a code block (e.g. it just said "this looks correct") — show the explanation, there's nothing to apply.
+
+### `POST /api/ai/code/refactor`
+
+Body adds `instruction` (required — what to change, free text). → `{ "explanation", "code", "model" }`, same shape as `debug`.
+
+### `POST /api/ai/code/docs`
+
+Adds documentation comments (JSDoc/docstrings) without changing behavior. → `{ "explanation", "code", "model" }`.
+
+### `POST /api/ai/code/tests`
+
+Body adds `filePath?` (used to suggest a conventional `*.test.ts` sibling path). → `{ "testCode", "suggestedFileName"?, "model" }`.
+
+---
+
 ## Projects
 
 ### `GET /api/projects`
@@ -438,6 +464,8 @@ Tokens are entered in the workspace UI and stored per-user in `integration_conne
 | `POST /api/github/connection` `{ token }` | Connect with a personal access token (needs `repo` scope); validates against the GitHub API |
 | `DELETE /api/github/connection` | Disconnect |
 | `POST /api/github/repos` `{ projectId, name, isPrivate?, description? }` | Create a repository and link it → `{ repo: "owner/name", url }` |
+| `PUT /api/github/repos` `{ projectId, fullName: "owner/name" }` | Link an **existing** repository (any repo the token can access) to the project → `{ repo: "owner/name" }` |
+| `GET /api/github/repos/list` | The connected account's own repos, most recently pushed first → `{ repos: [{ fullName, htmlUrl, defaultBranch, private }, …] }`. Powers the import picker — pair with `PUT` + `POST /pull` below, or let the UI do both in one "Import" click. |
 | `POST /api/github/push` `{ projectId, message? }` | Push all project files as one commit (Git Data API: blobs → tree → commit → ref) → `{ commitSha, commitUrl, fileCount }` |
 | `POST /api/github/pull` `{ projectId }` | Pull the repo's files into the project filesystem → `{ fileCount }` |
 | `GET /api/github/commits?projectId=` | `{ commits: [{ sha, message, author, date, url }, …] }` |

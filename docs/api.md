@@ -112,6 +112,121 @@ NVIDIA connectivity check — sends a one-word completion to the configured endp
 - Success: `{ "connected": true, "message": "Connected to NVIDIA successfully", "model": "…", "reply": "…" }`
 - Failure: `{ "connected": false, "error": "…" }` with 503 (no key) or the upstream status.
 
+### `POST /api/ai/vision`
+
+Image understanding via a vision-language NIM — describes a screenshot/mockup (image-to-code). Body: `{ imageDataUrl, prompt?, projectId? }` → `{ text, model, usage }`.
+
+### `POST /api/ai/parse`
+
+Structured text/data extraction from an image (spec doc, form screenshot) via Nemotron Parse. Same shape as `/api/ai/vision`.
+
+### `POST /api/ai/image`
+
+Text-to-image generation (hero art, icons, placeholders). Body: `{ prompt, negativePrompt?, aspectRatio?, seed?, projectId? }` → `{ imageDataUrl, model }` (a `data:image/png;base64,…` URL).
+
+### `POST /api/ai/transcribe`
+
+Speech-to-text for voice input. `multipart/form-data` with a `file` field (+ optional `language`, `projectId`) → `{ text, model }`. 503 until `NVIDIA_ASR_API_URL` is set (see `.env.example`).
+
+### `POST /api/ai/moderate`
+
+Classifies text as safe/unsafe via the Nemotron Safety Guard model. Body: `{ text }` → `{ safe, categories, model }`. `/api/chat` calls this automatically before every prompt reaches a model.
+
+### `POST /api/ai/plan`
+
+Turns a feature request into a structured multi-file build plan via the long-context planning model, before any code is generated. Body: `{ prompt, context?, projectId? }` → `{ plan: { summary, files: [{ path, description }] }, model }`.
+
+## AI Platform (multi-provider)
+
+Additive to the endpoints above — `/api/chat`, `/api/ai/generate`, and `/api/ai/code` are unchanged and still exist. These new endpoints let a caller target **any** configured provider by id instead of always going through NVIDIA/Anthropic.
+
+Provider ids: `nvidia | openai | anthropic | gemini | deepseek | grok`.
+
+### `GET /api/ai/providers`
+
+Every provider BuildRx knows about, its configuration status, default model, and model catalog (with pricing where known):
+
+```json
+{
+  "providers": [
+    {
+      "id": "openai",
+      "label": "OpenAI",
+      "configured": true,
+      "defaultModel": "gpt-4o-mini",
+      "models": [
+        { "id": "gpt-4o", "label": "GPT-4o", "contextWindow": 128000, "pricing": { "inputPer1M": 2.5, "outputPer1M": 10 } }
+      ]
+    }
+  ]
+}
+```
+
+### `GET /api/ai/settings` / `PUT /api/ai/settings`
+
+The signed-in user's default provider/model (AI Settings page). `GET` returns `{ "defaultProvider": "nvidia", "defaultModel": "…" }` (falls back to the NVIDIA default when nothing's been saved, or when Supabase isn't configured). `PUT` body: `{ "defaultProvider": "openai", "defaultModel": "gpt-4o-mini" }` → `{ "success": true }`. 503 if Supabase isn't configured (nowhere to persist it).
+
+### `POST /api/ai/complete`
+
+A single completion from any configured provider, one request/response shape regardless of which:
+
+```json
+{
+  "provider": "anthropic",
+  "prompt": "Explain OAuth in one paragraph",
+  "system": "optional system prompt",
+  "model": "optional override — defaults to the provider's default model",
+  "maxTokens": 2048,
+  "temperature": 0.6,
+  "topP": 0.95,
+  "stream": true,
+  "projectId": "optional — attributes usage"
+}
+```
+
+Same streaming/non-streaming behavior as `/api/ai/generate` (`X-Model` and `X-Provider` headers on the stream; `{ text, model, provider, usage }` when `stream:false`). 503 if the requested provider isn't configured · 502 on an upstream provider error.
+
+### `POST /api/ai/compare`
+
+"Model comparison mode" — runs one prompt against 2-6 provider/model pairs **in parallel** (always non-streaming, so every result can be laid out side by side at once) and returns each with its text, token usage, estimated cost, and latency. One provider failing doesn't fail the others — it comes back with an `error` field instead. Saved to `model_comparisons` when signed in.
+
+```json
+{
+  "prompt": "Write a haiku about databases",
+  "system": "optional",
+  "targets": [
+    { "provider": "openai", "model": "gpt-4o-mini" },
+    { "provider": "anthropic", "model": "claude-haiku-4-5-20251001" }
+  ]
+}
+```
+
+```json
+{
+  "results": [
+    {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "text": "…",
+      "promptTokens": 12,
+      "completionTokens": 24,
+      "costUsd": 0.000016,
+      "durationMs": 812
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "durationMs": 0,
+      "error": "Anthropic isn't configured on this deployment."
+    }
+  ]
+}
+```
+
+`costUsd` is `null` when a model's pricing isn't in the catalog (e.g. NVIDIA's free tier) — token counts and text are still returned.
+
+---
+
 ### `POST /api/agents/run`
 
 Runs the six-agent build pipeline (Planner → UI → Database → Coding → Debug → Deployment) for a project. Streams progress as **NDJSON** (`application/x-ndjson`) — one JSON event per line:

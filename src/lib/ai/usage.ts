@@ -1,4 +1,5 @@
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import type { AiProvider } from "@/types/database";
 
 /**
  * Records an AI call into ai_generations (when tied to a project) and
@@ -11,6 +12,8 @@ export async function recordAiUsage(params: {
   projectId?: string | null;
   messageId?: string | null;
   model: string;
+  /** Defaults to 'nvidia' at the database level when omitted. */
+  provider?: AiProvider;
   status: "completed" | "failed";
   promptTokens: number;
   completionTokens: number;
@@ -33,6 +36,7 @@ export async function recordAiUsage(params: {
         message_id: params.messageId ?? null,
         user_id: params.userId,
         model: params.model,
+        ...(params.provider ? { provider: params.provider } : {}),
         status: params.status,
         prompt_tokens: params.promptTokens,
         completion_tokens: params.completionTokens,

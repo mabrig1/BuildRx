@@ -47,6 +47,13 @@ export type UsageAction =
   | "deployment"
   | "preview"
   | "export";
+export type AiProvider =
+  | "nvidia"
+  | "openai"
+  | "anthropic"
+  | "gemini"
+  | "deepseek"
+  | "grok";
 
 export interface Database {
   public: {
@@ -290,6 +297,7 @@ export interface Database {
           message_id: string | null;
           user_id: string | null;
           model: string;
+          provider: AiProvider;
           status: GenerationStatus;
           prompt_tokens: number;
           completion_tokens: number;
@@ -304,6 +312,7 @@ export interface Database {
           message_id?: string | null;
           user_id?: string | null;
           model: string;
+          provider?: AiProvider;
           status?: GenerationStatus;
           prompt_tokens?: number;
           completion_tokens?: number;
@@ -318,6 +327,7 @@ export interface Database {
           message_id?: string | null;
           user_id?: string | null;
           model?: string;
+          provider?: AiProvider;
           status?: GenerationStatus;
           prompt_tokens?: number;
           completion_tokens?: number;
@@ -341,6 +351,68 @@ export interface Database {
           },
           {
             foreignKeyName: "ai_generations_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      user_ai_settings: {
+        Row: {
+          user_id: string;
+          default_provider: AiProvider;
+          default_model: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          default_provider?: AiProvider;
+          default_model?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          default_provider?: AiProvider;
+          default_model?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_ai_settings_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      model_comparisons: {
+        Row: {
+          id: string;
+          user_id: string;
+          prompt: string;
+          results: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          prompt: string;
+          results?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          prompt?: string;
+          results?: Json;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "model_comparisons_user_id_fkey";
             columns: ["user_id"];
             referencedRelation: "users";
             referencedColumns: ["id"];

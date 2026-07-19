@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { AiSettingsPanel } from "@/components/ai/ai-settings-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +32,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="profile">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="ai">AI Models</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="danger">Danger zone</TabsTrigger>
         </TabsList>
@@ -57,6 +59,10 @@ export default function SettingsPage() {
               <Button>Save changes</Button>
             </CardFooter>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="ai" className="mt-4">
+          <AiSettingsPanel />
         </TabsContent>
 
         <TabsContent value="notifications" className="mt-4">

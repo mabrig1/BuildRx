@@ -327,6 +327,56 @@ Persists the user message, every tool call/result, and the final answer, so the 
 
 ---
 
+## Document AI
+
+> **Scoping note:** there's no blob storage configured on this deployment — upload extracts text/tables synchronously and only that extracted content is persisted; the original file bytes are discarded. Every endpoint requires Supabase (503 otherwise), same as AI Agents.
+
+Supported types: **PDF** (embedded text only — a scanned PDF with no text layer returns a `warning` instead of fabricated text; OCR-ing scanned PDFs isn't implemented yet), **DOCX**, **XLSX** (tables extracted exactly, one per sheet), and **images** (real OCR, via the NVIDIA vision pipeline — requires `NVIDIA_API_KEY`).
+
+### `GET /api/documents` / `POST /api/documents`
+
+List your documents (metadata only), or upload one — `multipart/form-data` with a `file` field (max 10MB):
+
+```json
+{
+  "document": {
+    "id": "uuid",
+    "name": "budget.xlsx",
+    "file_type": "xlsx",
+    "status": "ready",
+    "extracted_text": "…",
+    "tables": [{ "name": "Sheet1", "rows": [["Item","Cost"],["Widgets","100"]] }],
+    "summary": "…auto-generated if a provider is configured and there's enough text…",
+    "warning": null,
+    "error": null
+  }
+}
+```
+
+`status` ∈ `ready | failed` (extraction is synchronous, so a document never sits in `processing` in the response you get back). A summary auto-generates on upload when a provider is configured and the extracted text is non-trivial — best-effort, failure doesn't fail the upload.
+
+### `GET /api/documents/{documentId}` / `DELETE`
+
+Fetch the full document (including `extracted_text`, `tables`, cached `summary`/`tables_markdown`/`report_markdown`) or delete it. Owner-only (RLS).
+
+### `POST /api/documents/{documentId}/summarize`
+
+(Re)generates and caches the summary. Body (optional): `{ "provider"?, "model"? }` — defaults to the document's provider/model (whichever was configured at upload time). → `{ "summary": "…" }`.
+
+### `POST /api/documents/{documentId}/extract-tables`
+
+AI-inferred table detection over the extracted text, formatted as markdown and cached. For XLSX, real tables are already in the `tables` field from upload — this is for PDF/DOCX/image documents, where "is this a table" is a judgment call the model makes from the extracted text (best-effort, not pixel-level layout detection). → `{ "tablesMarkdown": "…" }`.
+
+### `POST /api/documents/{documentId}/report`
+
+Generates and caches a structured markdown report (executive summary, key findings, reformatted tables) grounded in the document. → `{ "report": "…" }`.
+
+### `POST /api/documents/{documentId}/ask`
+
+Single-shot Q&A over the document's extracted text — stateless, no persisted conversation (full "chat with documents" with retrieval is a later phase). Body: `{ "question", "provider"?, "model"? }` → `{ "answer": "…" }`. Shares the same per-user rate limit as the rest of `/api/ai/*`.
+
+---
+
 ## Projects
 
 ### `GET /api/projects`

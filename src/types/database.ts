@@ -56,6 +56,8 @@ export type AiProvider =
   | "grok";
 export type AgentVisibility = "private" | "unlisted" | "public";
 export type AgentMessageRole = "user" | "assistant" | "tool";
+export type DocumentFileType = "pdf" | "docx" | "xlsx" | "image";
+export type DocumentStatus = "processing" | "ready" | "failed";
 
 export interface Database {
   public: {
@@ -632,6 +634,73 @@ export interface Database {
             foreignKeyName: "agent_messages_conversation_id_fkey";
             columns: ["conversation_id"];
             referencedRelation: "agent_conversations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      documents: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          file_type: DocumentFileType;
+          size_bytes: number;
+          status: DocumentStatus;
+          extracted_text: string;
+          tables: Json;
+          summary: string | null;
+          tables_markdown: string | null;
+          report_markdown: string | null;
+          warning: string | null;
+          error: string | null;
+          provider: AiProvider;
+          model: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+          file_type: DocumentFileType;
+          size_bytes?: number;
+          status?: DocumentStatus;
+          extracted_text?: string;
+          tables?: Json;
+          summary?: string | null;
+          tables_markdown?: string | null;
+          report_markdown?: string | null;
+          warning?: string | null;
+          error?: string | null;
+          provider?: AiProvider;
+          model?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          name?: string;
+          file_type?: DocumentFileType;
+          size_bytes?: number;
+          status?: DocumentStatus;
+          extracted_text?: string;
+          tables?: Json;
+          summary?: string | null;
+          tables_markdown?: string | null;
+          report_markdown?: string | null;
+          warning?: string | null;
+          error?: string | null;
+          provider?: AiProvider;
+          model?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "documents_owner_id_fkey";
+            columns: ["owner_id"];
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
         ];

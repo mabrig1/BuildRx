@@ -1,6 +1,7 @@
 import {
   Bot,
   CreditCard,
+  FileText,
   FolderKanban,
   LayoutDashboard,
   Settings,
@@ -38,6 +39,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Projects", href: "/projects", icon: FolderKanban },
   { title: "AI Chat", href: "/chat", icon: Bot },
   { title: "Agents", href: "/agents", icon: Sparkles },
+  { title: "Documents", href: "/documents", icon: FileText },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },
   { title: "Admin", href: "/admin", icon: ShieldCheck, adminOnly: true },

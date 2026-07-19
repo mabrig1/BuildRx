@@ -81,6 +81,9 @@ export const geminiProvider: AiProvider = {
   id: "gemini",
   label: "Google Gemini",
   isConfigured: () => Boolean(apiKey()),
+  // Gemini has its own function-calling schema (functionDeclarations) —
+  // not wired up yet; a future addition, not required for this phase.
+  supportsTools: false,
   models: () => MODELS,
   defaultModel: () => process.env.GOOGLE_MODEL?.trim() || DEFAULT_MODEL,
 

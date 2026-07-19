@@ -54,6 +54,8 @@ export type AiProvider =
   | "gemini"
   | "deepseek"
   | "grok";
+export type AgentVisibility = "private" | "unlisted" | "public";
+export type AgentMessageRole = "user" | "assistant" | "tool";
 
 export interface Database {
   public: {
@@ -415,6 +417,221 @@ export interface Database {
             foreignKeyName: "model_comparisons_user_id_fkey";
             columns: ["user_id"];
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agents: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          description: string | null;
+          icon: string;
+          system_prompt: string;
+          provider: AiProvider;
+          model: string;
+          tools: Json;
+          visibility: AgentVisibility;
+          share_slug: string | null;
+          forked_from: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+          description?: string | null;
+          icon?: string;
+          system_prompt?: string;
+          provider?: AiProvider;
+          model?: string;
+          tools?: Json;
+          visibility?: AgentVisibility;
+          share_slug?: string | null;
+          forked_from?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          name?: string;
+          description?: string | null;
+          icon?: string;
+          system_prompt?: string;
+          provider?: AiProvider;
+          model?: string;
+          tools?: Json;
+          visibility?: AgentVisibility;
+          share_slug?: string | null;
+          forked_from?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agents_owner_id_fkey";
+            columns: ["owner_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agents_forked_from_fkey";
+            columns: ["forked_from"];
+            referencedRelation: "agents";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_knowledge_files: {
+        Row: {
+          id: string;
+          agent_id: string;
+          name: string;
+          content: string;
+          size_bytes: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          agent_id: string;
+          name: string;
+          content: string;
+          size_bytes?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          agent_id?: string;
+          name?: string;
+          content?: string;
+          size_bytes?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_knowledge_files_agent_id_fkey";
+            columns: ["agent_id"];
+            referencedRelation: "agents";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_memories: {
+        Row: {
+          id: string;
+          agent_id: string;
+          user_id: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          agent_id: string;
+          user_id: string;
+          content: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          agent_id?: string;
+          user_id?: string;
+          content?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_memories_agent_id_fkey";
+            columns: ["agent_id"];
+            referencedRelation: "agents";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_memories_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_conversations: {
+        Row: {
+          id: string;
+          agent_id: string;
+          user_id: string;
+          title: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          agent_id: string;
+          user_id: string;
+          title?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          agent_id?: string;
+          user_id?: string;
+          title?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_conversations_agent_id_fkey";
+            columns: ["agent_id"];
+            referencedRelation: "agents";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_conversations_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          role: AgentMessageRole;
+          content: string;
+          tool_calls: Json | null;
+          tool_name: string | null;
+          tool_call_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          role: AgentMessageRole;
+          content?: string;
+          tool_calls?: Json | null;
+          tool_name?: string | null;
+          tool_call_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          role?: AgentMessageRole;
+          content?: string;
+          tool_calls?: Json | null;
+          tool_name?: string | null;
+          tool_call_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            referencedRelation: "agent_conversations";
             referencedColumns: ["id"];
           },
         ];

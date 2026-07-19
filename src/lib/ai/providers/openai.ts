@@ -22,6 +22,7 @@ export const openaiProvider: AiProvider = {
   id: "openai",
   label: "OpenAI",
   isConfigured: () => Boolean(apiKey()),
+  supportsTools: true,
   models: () => MODELS,
   defaultModel: () => process.env.OPENAI_MODEL?.trim() || DEFAULT_MODEL,
   async createCompletion(messages, options = {}) {

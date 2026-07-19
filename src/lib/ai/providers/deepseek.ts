@@ -20,6 +20,7 @@ export const deepseekProvider: AiProvider = {
   id: "deepseek",
   label: "DeepSeek",
   isConfigured: () => Boolean(apiKey()),
+  supportsTools: true,
   models: () => MODELS,
   defaultModel: () => process.env.DEEPSEEK_MODEL?.trim() || DEFAULT_MODEL,
   async createCompletion(messages, options = {}) {

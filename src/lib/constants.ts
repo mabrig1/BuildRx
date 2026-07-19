@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Settings,
   ShieldCheck,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -36,6 +37,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Projects", href: "/projects", icon: FolderKanban },
   { title: "AI Chat", href: "/chat", icon: Bot },
+  { title: "Agents", href: "/agents", icon: Sparkles },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },
   { title: "Admin", href: "/admin", icon: ShieldCheck, adminOnly: true },

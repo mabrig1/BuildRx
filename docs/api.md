@@ -21,7 +21,7 @@ All endpoints live under `/api` and speak JSON unless noted otherwise. Errors us
 | 502 | Upstream provider (NVIDIA, GitHub, deploy host) returned a server error |
 | 503 | The relevant provider isn't configured (missing env var) |
 
-**Rate limiting** — the AI endpoints (`/api/ai/*`, `/api/agents/run`) share a per-user (per-IP in demo mode) limit of `NVIDIA_RATE_LIMIT_RPM` requests/minute (default 20). Responses carry:
+**Rate limiting** — the AI endpoints (`/api/ai/*`, `/api/agents/run`, `/api/agents/{agentId}/chat`) share a per-user (per-IP in demo mode) limit of `NVIDIA_RATE_LIMIT_RPM` requests/minute (default 20). Responses carry:
 
 ```
 X-RateLimit-Limit: 20
@@ -249,6 +249,81 @@ Event stream:
 An `{"type":"error","agent":?,"message":"..."}` event may appear at any point; the stream always ends after `workflow_complete` or `error`. Generated files are saved to the project filesystem.
 
 Model selection: Anthropic Claude when `ANTHROPIC_API_KEY` is set; otherwise the NVIDIA models — the reasoning agents (Planner, Debug) use `NVIDIA_TEXT_MODEL` and the code-producing agents (UI, Database, Coding) use `NVIDIA_CODE_MODEL`. With neither key, prompt-aware mock agents run the same pipeline. Errors before the stream starts: 400 · 401 · 402 · 404 · 429.
+
+---
+
+## AI Agents
+
+> **Naming note:** this is unrelated to the six-step build pipeline above (`/api/agents/run`) — these are user-created, reusable AI assistants ("custom GPTs") with their own system prompt, provider/model, tools, knowledge, and memory, not tied to a project. Every endpoint below **requires Supabase to be configured** (503 otherwise) — there's no demo-mode equivalent for owner-scoped agents.
+
+### `GET /api/agents` / `POST /api/agents`
+
+List your own agents, or create one:
+
+```json
+{
+  "name": "Support Bot",
+  "description": "optional",
+  "icon": "🎧",
+  "systemPrompt": "You are a friendly support agent…",
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "tools": ["remember_fact"],
+  "visibility": "private"
+}
+```
+
+`visibility` ∈ `private | unlisted | public`. `tools` ∈ `get_current_time | calculator | remember_fact` (built-in, no external API keys required — see Tool calling below).
+
+### `GET /api/agents/marketplace`
+
+Public agents anyone signed in can browse, newest first (capped at 50).
+
+### `GET /api/agents/{agentId}` / `PATCH` / `DELETE`
+
+Fetch one agent (RLS: owner, or any non-`private` agent), update it, or delete it. `PATCH`/`DELETE` are owner-only (403 otherwise). Moving `visibility` off `private` for the first time mints a `share_slug`, resolved by `GET /agents/share/{slug}` (browser route, not JSON) to the canonical `/agents/{agentId}` URL.
+
+### `POST /api/agents/{agentId}/clone`
+
+"Use this agent" — copies the config (name, prompt, provider/model, tools) into a new private agent you own. Knowledge files and memory are not copied.
+
+### Knowledge files
+
+Plain-text context the agent includes in every conversation (capped at 6,000 characters total, most recent first) — not full retrieval/RAG (a later phase), just static injection. Readable by anyone who can access the agent; writable by the owner only.
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /api/agents/{agentId}/knowledge` | List files (name, size, created_at — not content) |
+| `POST /api/agents/{agentId}/knowledge` `{ name, content }` | Add one (max 50,000 characters, 5 files per agent) |
+| `DELETE /api/agents/{agentId}/knowledge/{fileId}` | Remove one |
+
+### Conversations (memory threads)
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /api/agents/{agentId}/conversations` | Your own conversation threads with this agent |
+| `POST /api/agents/{agentId}/conversations` `{ title? }` | Start a new one |
+| `GET /api/agents/{agentId}/conversations/{conversationId}` | That conversation's messages, oldest first |
+| `DELETE /api/agents/{agentId}/conversations/{conversationId}` | Delete it |
+
+### `POST /api/agents/{agentId}/chat`
+
+Runs one turn of a conversation. Body: `{ message, conversationId? }` (omit `conversationId` to start a new one). **Non-streaming** — see "Tool calling" below for why — the full answer (plus any tool trace) comes back in one response:
+
+```json
+{
+  "conversationId": "uuid",
+  "text": "2 + 2 is 4.",
+  "steps": [
+    { "type": "tool_call", "id": "call_1", "name": "calculator", "arguments": { "expression": "2+2" }, "result": "4" }
+  ],
+  "model": "gpt-4o-mini"
+}
+```
+
+Persists the user message, every tool call/result, and the final answer, so the next turn sees the full exchange. Also injects the agent's knowledge files and any saved memories (see `remember_fact` below) into the system prompt automatically. Shares the same rate limit as the rest of `/api/ai/*`, plus the monthly AI request quota (402 when exceeded).
+
+**Tool calling**: `get_current_time`, `calculator`, and `remember_fact` (saves a fact to the agent's memory for this user, recalled in future conversations) — all built-in, zero external config. Only honored on providers with `supportsTools: true` (OpenAI, Anthropic, DeepSeek, Grok as of this phase — not NVIDIA or Gemini yet). Resolution is a server-side loop (call model → run any requested tools → call model again with the results), capped at 4 iterations; deliberately non-streaming, since reliably parsing partial tool-call JSON out of a token stream is a substantially harder problem than this needed, and a visible tool-call trace is arguably more useful than a live-typed answer anyway.
 
 ---
 

@@ -14,9 +14,29 @@ export type AiProviderId =
   | "deepseek"
   | "grok";
 
+/** A function the model can call. `parameters` is a JSON Schema object. */
+export interface AiToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+/** A single invocation of a tool, requested by the model. */
+export interface AiToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
 export interface AiMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  /** Set on an assistant message that requested one or more tool calls. */
+  toolCalls?: AiToolCall[];
+  /** Set on a "tool" message — the call this result answers. */
+  toolCallId?: string;
+  /** Set on a "tool" message — which tool produced this result. */
+  name?: string;
 }
 
 export interface AiUsage {
@@ -28,6 +48,8 @@ export interface AiCompletion {
   text: string;
   model: string;
   usage: AiUsage;
+  /** Present when the model's turn ended in a tool call instead of (or alongside) text. */
+  toolCalls?: AiToolCall[];
 }
 
 export interface AiStreamResult {
@@ -42,6 +64,8 @@ export interface AiCompletionOptions {
   maxTokens?: number;
   temperature?: number;
   topP?: number;
+  /** Ignored by providers where `supportsTools` is false. */
+  tools?: AiToolDefinition[];
 }
 
 export class AiProviderError extends Error {
@@ -69,6 +93,14 @@ export interface AiProvider {
   label: string;
   /** True when the required API key/config is present in the environment. */
   isConfigured(): boolean;
+  /**
+   * True when `createCompletion` honors `options.tools` / returns
+   * `AiCompletion.toolCalls`. False for providers where tool calling
+   * isn't wired up (their `tools` option is silently ignored) — callers
+   * that need tools (the agent runtime) should check this before relying
+   * on a tool actually being invoked.
+   */
+  supportsTools: boolean;
   /** Models this provider exposes, most capable first. */
   models(): AiModelInfo[];
   /** The model used when a call doesn't specify one. */

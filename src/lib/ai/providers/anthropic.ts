@@ -8,7 +8,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 import { AiProviderError } from "@/lib/ai/providers/types";
-import type { AiCompletion, AiMessage, AiProvider } from "@/lib/ai/providers/types";
+import type {
+  AiCompletion,
+  AiMessage,
+  AiProvider,
+  AiToolCall,
+} from "@/lib/ai/providers/types";
 
 const DEFAULT_MODEL = "claude-sonnet-5";
 
@@ -24,16 +29,62 @@ function apiKey() {
   return process.env.ANTHROPIC_API_KEY?.trim() || undefined;
 }
 
+/**
+ * Converts our provider-agnostic AiMessage[] into Anthropic's format.
+ * Anthropic has no "tool" role — a tool result is a `user` message
+ * containing a `tool_result` content block, and an assistant message
+ * that called a tool carries `tool_use` blocks alongside any text.
+ */
 function toAnthropicMessages(messages: AiMessage[]): Anthropic.MessageParam[] {
   return messages
     .filter((m) => m.role !== "system")
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+    .map((m): Anthropic.MessageParam => {
+      if (m.role === "tool") {
+        return {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: m.toolCallId ?? "",
+              content: m.content,
+            },
+          ],
+        };
+      }
+      if (m.role === "assistant" && m.toolCalls?.length) {
+        return {
+          role: "assistant",
+          content: [
+            ...(m.content ? [{ type: "text" as const, text: m.content }] : []),
+            ...m.toolCalls.map((tc) => ({
+              type: "tool_use" as const,
+              id: tc.id,
+              name: tc.name,
+              input: tc.arguments,
+            })),
+          ],
+        };
+      }
+      return { role: m.role as "user" | "assistant", content: m.content };
+    });
+}
+
+function extractToolCalls(content: Anthropic.ContentBlock[]): AiToolCall[] | undefined {
+  const calls = content
+    .filter((block): block is Anthropic.ToolUseBlock => block.type === "tool_use")
+    .map((block) => ({
+      id: block.id,
+      name: block.name,
+      arguments: (block.input ?? {}) as Record<string, unknown>,
+    }));
+  return calls.length > 0 ? calls : undefined;
 }
 
 export const anthropicProvider: AiProvider = {
   id: "anthropic",
   label: "Anthropic",
   isConfigured: () => Boolean(apiKey()),
+  supportsTools: true,
   models: () => MODELS,
   defaultModel: () => process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL,
 
@@ -51,6 +102,15 @@ export const anthropicProvider: AiProvider = {
         top_p: options.topP,
         system: options.system,
         messages: toAnthropicMessages(messages),
+        ...(options.tools?.length
+          ? {
+              tools: options.tools.map((tool) => ({
+                name: tool.name,
+                description: tool.description,
+                input_schema: tool.parameters as Anthropic.Tool["input_schema"],
+              })),
+            }
+          : {}),
       });
 
       const text = response.content
@@ -65,6 +125,7 @@ export const anthropicProvider: AiProvider = {
           promptTokens: response.usage.input_tokens,
           completionTokens: response.usage.output_tokens,
         },
+        toolCalls: extractToolCalls(response.content),
       };
     } catch (error) {
       throw mapAnthropicError(error);

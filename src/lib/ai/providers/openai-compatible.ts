@@ -13,6 +13,7 @@ import type {
   AiMessage,
   AiProviderId,
   AiStreamResult,
+  AiToolCall,
   AiUsage,
 } from "@/lib/ai/providers/types";
 
@@ -66,6 +67,31 @@ async function parseErrorDetail(response: Response): Promise<string> {
   }
 }
 
+/**
+ * Converts our provider-agnostic AiMessage[] into OpenAI's wire format —
+ * mainly relevant for assistant messages carrying tool calls and "tool"
+ * role result messages, neither of which map 1:1 onto `{role, content}`.
+ */
+function toOpenAiMessages(messages: AiMessage[]) {
+  return messages.map((m) => {
+    if (m.role === "tool") {
+      return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
+    }
+    if (m.role === "assistant" && m.toolCalls?.length) {
+      return {
+        role: "assistant",
+        content: m.content || null,
+        tool_calls: m.toolCalls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+        })),
+      };
+    }
+    return { role: m.role, content: m.content };
+  });
+}
+
 function buildBody(
   messages: AiMessage[],
   options: AiCompletionOptions,
@@ -78,13 +104,48 @@ function buildBody(
 
   return {
     model: options.model ?? config.defaultModel,
-    messages: fullMessages,
+    messages: toOpenAiMessages(fullMessages),
     max_tokens: options.maxTokens ?? 2048,
     temperature: options.temperature ?? 0.6,
     ...(options.topP !== undefined ? { top_p: options.topP } : {}),
+    ...(options.tools?.length
+      ? {
+          tools: options.tools.map((tool) => ({
+            type: "function",
+            function: {
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.parameters,
+            },
+          })),
+        }
+      : {}),
     stream,
     ...(stream ? { stream_options: { include_usage: true } } : {}),
   };
+}
+
+function parseToolCalls(
+  raw: Array<{
+    id?: string;
+    function?: { name?: string; arguments?: string };
+  }> | undefined
+): AiToolCall[] | undefined {
+  if (!raw?.length) return undefined;
+  return raw.map((call, index) => {
+    let args: Record<string, unknown> = {};
+    try {
+      args = call.function?.arguments ? JSON.parse(call.function.arguments) : {};
+    } catch {
+      // Malformed JSON from the model — surface an empty args object
+      // rather than crashing the whole completion.
+    }
+    return {
+      id: call.id ?? `call_${index}`,
+      name: call.function?.name ?? "unknown",
+      arguments: args,
+    };
+  });
 }
 
 async function request(
@@ -140,14 +201,16 @@ export async function createOpenAiCompatibleCompletion(
   const body = buildBody(messages, options, config, false);
   const response = await request(config, body);
   const data = await response.json();
+  const message = data.choices?.[0]?.message;
 
   return {
-    text: data.choices?.[0]?.message?.content ?? "",
+    text: message?.content ?? "",
     model: data.model ?? (body.model as string),
     usage: {
       promptTokens: data.usage?.prompt_tokens ?? 0,
       completionTokens: data.usage?.completion_tokens ?? 0,
     },
+    toolCalls: parseToolCalls(message?.tool_calls),
   };
 }
 

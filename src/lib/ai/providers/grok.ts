@@ -28,6 +28,7 @@ export const grokProvider: AiProvider = {
   id: "grok",
   label: "Grok (xAI)",
   isConfigured: () => Boolean(apiKey()),
+  supportsTools: true,
   models: () => MODELS,
   defaultModel: () => process.env.XAI_MODEL?.trim() || DEFAULT_MODEL,
   async createCompletion(messages, options = {}) {

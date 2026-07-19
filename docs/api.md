@@ -403,6 +403,53 @@ Body adds `filePath?` (used to suggest a conventional `*.test.ts` sibling path).
 
 ---
 
+## Content Studio
+
+Six AI writers (`blog_post`, `ebook`, `social_post`, `email`, `ad_copy`, `video_script`) sharing one generation engine. Requires sign-in (owner-scoped, RLS-backed) — no demo mode. Ebooks are generated as a chapter outline followed by one model call per chapter (up to 8), so `POST /api/content` with `type: "ebook"` can take a minute or two; the route sets `maxDuration = 180`.
+
+### `GET /api/content`
+
+List the caller's content pieces, newest first. Optional `?type=blog_post` (or any `ContentType`) filters.
+
+### `POST /api/content`
+
+```json
+{
+  "type": "blog_post",
+  "inputs": { "topic": "…", "tone": "…", "targetAudience": "…", "keywords": "…", "wordCount": "medium" },
+  "provider": "nvidia",
+  "model": "optional override"
+}
+```
+
+`inputs` fields vary by `type` — see `ContentInputs` in `src/lib/content/prompts.ts` (`topic`, `tone`, `targetAudience`, `keywords`, `wordCount`, `platform`, `includeHashtags`, `purpose`, `callToAction`, `product`, `chapterCount`, `videoLength`). Generates the piece, saves it, and records AI usage (including on failure — the row is saved with `status: "failed"` and an `error` message). → `{ "content": ContentPiece }`. Errors: 400 invalid body · 401 · 503 provider not configured.
+
+### `GET /api/content/{contentId}`
+
+Fetch one piece (owner only, 404 otherwise).
+
+### `PATCH /api/content/{contentId}`
+
+Body: `{ "title"?, "content"? }` — manual edits after generation. 400 if neither field is present.
+
+### `DELETE /api/content/{contentId}`
+
+Delete a piece.
+
+### `POST /api/content/{contentId}/regenerate`
+
+Body: `{ "inputs"?, "provider"?, "model"? }`, all optional — omitted fields reuse the piece's existing values. Re-runs generation and updates the row in place. `maxDuration = 180`.
+
+### `POST /api/content/{contentId}/cover-image`
+
+Generates a cover image via the NVIDIA image model (`generateImage`, 16:9) and saves it as a data URL on the piece. Body: `{ "prompt"? }` — defaults to a generic cover prompt built from the piece's title. 503 if NVIDIA isn't configured.
+
+### Prompt library
+
+`GET /api/prompt-library` (optional `?category=`), `POST /api/prompt-library` (`{ "title", "category", "promptText" }`, `category` is a `ContentType` or `"general"`), `PATCH /api/prompt-library/{promptId}`, `DELETE /api/prompt-library/{promptId}` — all owner-scoped saved prompts, independent of any generated content piece.
+
+---
+
 ## Projects
 
 ### `GET /api/projects`

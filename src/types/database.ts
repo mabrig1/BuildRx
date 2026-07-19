@@ -58,6 +58,14 @@ export type AgentVisibility = "private" | "unlisted" | "public";
 export type AgentMessageRole = "user" | "assistant" | "tool";
 export type DocumentFileType = "pdf" | "docx" | "xlsx" | "image";
 export type DocumentStatus = "processing" | "ready" | "failed";
+export type ContentType =
+  | "blog_post"
+  | "ebook"
+  | "social_post"
+  | "email"
+  | "ad_copy"
+  | "video_script";
+export type ContentStatus = "ready" | "failed";
 
 export interface Database {
   public: {
@@ -699,6 +707,98 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "documents_owner_id_fkey";
+            columns: ["owner_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      content_pieces: {
+        Row: {
+          id: string;
+          owner_id: string;
+          type: ContentType;
+          title: string;
+          inputs: Json;
+          content: string;
+          cover_image_data_url: string | null;
+          status: ContentStatus;
+          error: string | null;
+          provider: AiProvider;
+          model: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          type: ContentType;
+          title: string;
+          inputs?: Json;
+          content?: string;
+          cover_image_data_url?: string | null;
+          status?: ContentStatus;
+          error?: string | null;
+          provider?: AiProvider;
+          model?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          type?: ContentType;
+          title?: string;
+          inputs?: Json;
+          content?: string;
+          cover_image_data_url?: string | null;
+          status?: ContentStatus;
+          error?: string | null;
+          provider?: AiProvider;
+          model?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "content_pieces_owner_id_fkey";
+            columns: ["owner_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      prompt_library: {
+        Row: {
+          id: string;
+          owner_id: string;
+          title: string;
+          category: string;
+          prompt_text: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          title: string;
+          category?: string;
+          prompt_text: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          title?: string;
+          category?: string;
+          prompt_text?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "prompt_library_owner_id_fkey";
             columns: ["owner_id"];
             referencedRelation: "users";
             referencedColumns: ["id"];

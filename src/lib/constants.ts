@@ -1,6 +1,7 @@
 import {
   Bot,
   CreditCard,
+  Database,
   FileText,
   FolderKanban,
   LayoutDashboard,
@@ -42,6 +43,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Agents", href: "/agents", icon: Sparkles },
   { title: "Documents", href: "/documents", icon: FileText },
   { title: "Content Studio", href: "/content", icon: PenSquare },
+  { title: "Knowledge Base", href: "/knowledge", icon: Database },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },
   { title: "Admin", href: "/admin", icon: ShieldCheck, adminOnly: true },

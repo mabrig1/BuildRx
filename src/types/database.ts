@@ -66,6 +66,7 @@ export type ContentType =
   | "ad_copy"
   | "video_script";
 export type ContentStatus = "ready" | "failed";
+export type KnowledgeDocumentStatus = "processing" | "ready" | "failed";
 
 export interface Database {
   public: {
@@ -805,6 +806,145 @@ export interface Database {
           },
         ];
       };
+      knowledge_bases: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          description: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          name?: string;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_bases_owner_id_fkey";
+            columns: ["owner_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      knowledge_documents: {
+        Row: {
+          id: string;
+          knowledge_base_id: string;
+          owner_id: string;
+          name: string;
+          file_type: string;
+          size_bytes: number | null;
+          status: KnowledgeDocumentStatus;
+          chunk_count: number;
+          warning: string | null;
+          error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          knowledge_base_id: string;
+          owner_id: string;
+          name: string;
+          file_type: string;
+          size_bytes?: number | null;
+          status?: KnowledgeDocumentStatus;
+          chunk_count?: number;
+          warning?: string | null;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          knowledge_base_id?: string;
+          owner_id?: string;
+          name?: string;
+          file_type?: string;
+          size_bytes?: number | null;
+          status?: KnowledgeDocumentStatus;
+          chunk_count?: number;
+          warning?: string | null;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_documents_knowledge_base_id_fkey";
+            columns: ["knowledge_base_id"];
+            referencedRelation: "knowledge_bases";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "knowledge_documents_owner_id_fkey";
+            columns: ["owner_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      knowledge_chunks: {
+        Row: {
+          id: string;
+          document_id: string;
+          knowledge_base_id: string;
+          owner_id: string;
+          chunk_index: number;
+          content: string;
+          embedding: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          knowledge_base_id: string;
+          owner_id: string;
+          chunk_index: number;
+          content: string;
+          /** pgvector accepts either its "[0.1,0.2,...]" text form or a plain number array. */
+          embedding?: string | number[] | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          document_id?: string;
+          knowledge_base_id?: string;
+          owner_id?: string;
+          chunk_index?: number;
+          content?: string;
+          embedding?: string | number[] | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_chunks_document_id_fkey";
+            columns: ["document_id"];
+            referencedRelation: "knowledge_documents";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "knowledge_chunks_knowledge_base_id_fkey";
+            columns: ["knowledge_base_id"];
+            referencedRelation: "knowledge_bases";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       deployments: {
         Row: {
           id: string;
@@ -1105,6 +1245,21 @@ export interface Database {
       is_admin: {
         Args: Record<string, never>;
         Returns: boolean;
+      };
+      match_knowledge_chunks: {
+        Args: {
+          query_embedding: string | number[];
+          target_kb_id: string;
+          match_owner_id: string;
+          match_count?: number;
+        };
+        Returns: {
+          id: string;
+          document_id: string;
+          content: string;
+          similarity: number;
+          chunk_index: number;
+        }[];
       };
     };
     Enums: {

@@ -373,7 +373,7 @@ Generates and caches a structured markdown report (executive summary, key findin
 
 ### `POST /api/documents/{documentId}/ask`
 
-Single-shot Q&A over the document's extracted text — stateless, no persisted conversation (full "chat with documents" with retrieval is a later phase). Body: `{ "question", "provider"?, "model"? }` → `{ "answer": "…" }`. Shares the same per-user rate limit as the rest of `/api/ai/*`.
+Single-shot Q&A over one document's extracted text — stateless, no persisted conversation, no retrieval ranking (the whole document is the context). For semantic search and cited chat across a whole collection of documents, see the RAG / Knowledge Base section below. Body: `{ "question", "provider"?, "model"? }` → `{ "answer": "…" }`. Shares the same per-user rate limit as the rest of `/api/ai/*`.
 
 ---
 
@@ -447,6 +447,34 @@ Generates a cover image via the NVIDIA image model (`generateImage`, 16:9) and s
 ### Prompt library
 
 `GET /api/prompt-library` (optional `?category=`), `POST /api/prompt-library` (`{ "title", "category", "promptText" }`, `category` is a `ContentType` or `"general"`), `PATCH /api/prompt-library/{promptId}`, `DELETE /api/prompt-library/{promptId}` — all owner-scoped saved prompts, independent of any generated content piece.
+
+---
+
+## RAG (Knowledge Base)
+
+Upload documents into a knowledge base, then chat with them — answers are grounded in the retrieved chunks with inline `[n]` citations, not the model's general knowledge. Requires sign-in (owner-scoped, RLS-backed); requires `NVIDIA_API_KEY` for embeddings regardless of which provider answers the chat (embedding is NVIDIA-only, chat can use any configured provider).
+
+Pipeline: upload → extract text (reuses the Document AI extractors — PDF/DOCX/XLSX/image) → split into ~1000-character overlapping chunks → embed each chunk (`nvidia/nv-embedqa-e5-v5`, 1024 dimensions) → store in a `pgvector` column with an HNSW cosine-similarity index. All synchronous at upload time (no background job), so a large document's upload can take a while — `maxDuration = 120` on the upload route.
+
+### `GET /api/rag/knowledge-bases` / `POST /api/rag/knowledge-bases`
+
+List your knowledge bases, or create one: `{ "name", "description"? }` → `{ "knowledgeBase": {...} }`.
+
+### `GET /api/rag/knowledge-bases/{kbId}` / `PATCH` / `DELETE`
+
+Fetch one (includes `documentCount`), rename/re-describe it (`{ "name"?, "description"? }`), or delete it — deleting cascades to its documents and chunks.
+
+### `GET /api/rag/knowledge-bases/{kbId}/documents` / `POST`
+
+List documents in the KB, or upload one — `multipart/form-data` with a `file` field (max 10MB, same supported types as Document AI). → `{ "document": { "id", "name", "file_type", "status", "chunk_count", "warning", "error", ... } }`. `status` is `ready` once chunked and embedded, or `failed` with an `error` message (extraction failure, no extractable text, or an embedding-API error) — a failed upload still returns 201 with the failed-status row rather than an HTTP error, so the UI can show why.
+
+### `GET /api/rag/knowledge-bases/{kbId}/documents/{documentId}` / `DELETE`
+
+Fetch or delete one document (deleting removes its chunks).
+
+### `POST /api/rag/knowledge-bases/{kbId}/chat`
+
+Body: `{ "message", "provider", "model"? }`. Embeds the message, retrieves the most similar chunks (cosine similarity ≥ 0.3, top 6) via the `match_knowledge_chunks` Postgres function, and — only if at least one relevant chunk was found — asks the model to answer using just that context. → `{ "answer", "citations": [{ "documentId", "documentName" }], "model" }`. When nothing relevant is found, returns a fixed "couldn't find anything relevant" answer with no model call (`model: null`) rather than letting the model guess from outside knowledge. Chat history isn't persisted server-side — each call is a fresh single-turn question grounded in the KB.
 
 ---
 

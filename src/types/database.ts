@@ -67,6 +67,15 @@ export type ContentType =
   | "video_script";
 export type ContentStatus = "ready" | "failed";
 export type KnowledgeDocumentStatus = "processing" | "ready" | "failed";
+export type WorkflowTriggerType = "manual" | "webhook";
+export type WorkflowStepType =
+  | "ai_generate"
+  | "agent_run"
+  | "content_generate"
+  | "kb_chat"
+  | "webhook";
+export type WorkflowRunStatus = "running" | "completed" | "failed";
+export type WorkflowRunStepStatus = "completed" | "failed";
 
 export interface Database {
   public: {
@@ -941,6 +950,187 @@ export interface Database {
             foreignKeyName: "knowledge_chunks_knowledge_base_id_fkey";
             columns: ["knowledge_base_id"];
             referencedRelation: "knowledge_bases";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workflows: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          description: string | null;
+          enabled: boolean;
+          trigger_type: WorkflowTriggerType;
+          webhook_token: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+          description?: string | null;
+          enabled?: boolean;
+          trigger_type?: WorkflowTriggerType;
+          webhook_token?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          name?: string;
+          description?: string | null;
+          enabled?: boolean;
+          trigger_type?: WorkflowTriggerType;
+          webhook_token?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflows_owner_id_fkey";
+            columns: ["owner_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workflow_steps: {
+        Row: {
+          id: string;
+          workflow_id: string;
+          owner_id: string;
+          position: number;
+          name: string;
+          type: WorkflowStepType;
+          config: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workflow_id: string;
+          owner_id: string;
+          position: number;
+          name: string;
+          type: WorkflowStepType;
+          config?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          workflow_id?: string;
+          owner_id?: string;
+          position?: number;
+          name?: string;
+          type?: WorkflowStepType;
+          config?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_steps_workflow_id_fkey";
+            columns: ["workflow_id"];
+            referencedRelation: "workflows";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workflow_runs: {
+        Row: {
+          id: string;
+          workflow_id: string;
+          owner_id: string;
+          status: WorkflowRunStatus;
+          trigger: WorkflowTriggerType;
+          trigger_input: string | null;
+          error: string | null;
+          started_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          workflow_id: string;
+          owner_id: string;
+          status?: WorkflowRunStatus;
+          trigger?: WorkflowTriggerType;
+          trigger_input?: string | null;
+          error?: string | null;
+          started_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          workflow_id?: string;
+          owner_id?: string;
+          status?: WorkflowRunStatus;
+          trigger?: WorkflowTriggerType;
+          trigger_input?: string | null;
+          error?: string | null;
+          started_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_runs_workflow_id_fkey";
+            columns: ["workflow_id"];
+            referencedRelation: "workflows";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workflow_run_steps: {
+        Row: {
+          id: string;
+          run_id: string;
+          owner_id: string;
+          position: number;
+          step_name: string;
+          step_type: string;
+          status: WorkflowRunStepStatus;
+          input: Json | null;
+          output: Json | null;
+          error: string | null;
+          started_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          run_id: string;
+          owner_id: string;
+          position: number;
+          step_name: string;
+          step_type: string;
+          status: WorkflowRunStepStatus;
+          input?: Json | null;
+          output?: Json | null;
+          error?: string | null;
+          started_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          run_id?: string;
+          owner_id?: string;
+          position?: number;
+          step_name?: string;
+          step_type?: string;
+          status?: WorkflowRunStepStatus;
+          input?: Json | null;
+          output?: Json | null;
+          error?: string | null;
+          started_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_run_steps_run_id_fkey";
+            columns: ["run_id"];
+            referencedRelation: "workflow_runs";
             referencedColumns: ["id"];
           },
         ];

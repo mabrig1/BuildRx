@@ -478,6 +478,56 @@ Body: `{ "message", "provider", "model"? }`. Embeds the message, retrieves the m
 
 ---
 
+## Workflows
+
+Chains steps together — each step is a thin wrapper around an already-built capability (a raw AI completion, an agent turn, a Content Studio piece, a Knowledge Base question) or an outbound webhook. Runs synchronously step-by-step within one request (no queue/worker in this deployment), so a long workflow's run can take a while — `maxDuration = 180` on both run routes. Requires sign-in (owner-scoped, RLS-backed) for everything except the inbound webhook trigger.
+
+**Step types** (`config` shape per type — see `src/lib/validations/workflows.ts`):
+
+| type | config | notes |
+|---|---|---|
+| `ai_generate` | `{ system?, prompt, provider, model? }` | one raw completion |
+| `agent_run` | `{ agentId, message }` | one turn with an existing agent (knowledge/memory/tools included, no persisted conversation) |
+| `content_generate` | `{ contentType, inputs, provider, model? }` | generates and saves a Content Studio piece |
+| `kb_chat` | `{ knowledgeBaseId, question, provider, model? }` | same retrieve-then-answer flow as the Knowledge Base chat endpoint, with citations |
+| `webhook` | `{ url, payload? }` | POSTs `{ "payload": "…" }` to `url`; rejects loopback/private-network hosts |
+
+**Templating**: any string field in a step's `config` can reference an earlier step's output with `{{stepN.text}}` (1-indexed by position) or the run's trigger input with `{{trigger.text}}`. Unresolved placeholders are left as literal text rather than blanked, to make a typo obvious. Rendering happens once per run, immediately before that step executes, so it always sees the real prior output — not what was configured.
+
+### `GET /api/workflows` / `POST /api/workflows`
+
+List your workflows, or create one: `{ "name", "description"? }` → `{ "workflow": {...} }`. New workflows start `enabled: true`, `trigger_type: "manual"`, with an auto-generated `webhook_token`.
+
+### `GET /api/workflows/{workflowId}` / `PATCH` / `DELETE`
+
+Fetch one plus its ordered steps, update (`{ "name"?, "description"?, "enabled"?, "triggerType"? }`), or delete it — cascades to its steps and run history.
+
+### `GET /api/workflows/{workflowId}/steps` / `POST`
+
+List steps in order, or append one: `{ "name", "type", "config" }` — `config` is validated against the schema for `type` before saving.
+
+### `PATCH /api/workflows/{workflowId}/steps/{stepId}` / `DELETE`
+
+Rename and/or reconfigure a step (`type` itself can't change after creation — delete and re-add instead), or remove it.
+
+### `POST /api/workflows/{workflowId}/steps/reorder`
+
+Body: `{ "stepIds" }` — the workflow's step ids in the desired order (must be exactly the current set, no partial reorders).
+
+### `POST /api/workflows/{workflowId}/run`
+
+Runs the workflow now. Body (optional): `{ "input"? }` — seeds `{{trigger.text}}`. Blocks until every step finishes or one fails; response is `{ "runId", "status", "error" }`, 502 if `status` is `"failed"`. Every step's input/output is recorded to the run's history regardless of outcome.
+
+### `GET /api/workflows/{workflowId}/runs` / `GET /api/workflows/{workflowId}/runs/{runId}`
+
+Run history (last 50), or one run's full per-step input/output/error detail.
+
+### `POST /api/workflows/trigger/{token}`
+
+Inbound webhook trigger — **no authentication**, the `webhook_token` in the URL is the credential (find it via the workflow's detail page or `GET /api/workflows/{workflowId}`; regenerate exposure by switching `triggerType` off and back on isn't supported yet — the token is fixed per workflow). Only runs if the workflow's `trigger_type` is `"webhook"` and it's `enabled`. The POSTed JSON body becomes `{{trigger.text}}` for the first step. Rate-limited per token (30/min). Uses the service-role client rather than RLS, since the caller has no Supabase session.
+
+---
+
 ## Projects
 
 ### `GET /api/projects`

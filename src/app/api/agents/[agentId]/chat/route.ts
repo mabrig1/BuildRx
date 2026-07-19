@@ -4,6 +4,7 @@ import { getProvider } from "@/lib/ai/providers/registry";
 import type { AiMessage } from "@/lib/ai/providers/types";
 import { recordAiUsage } from "@/lib/ai/usage";
 import { requireAgentUser } from "@/lib/ai-agents/access";
+import { loadAgentRuntimeConfig } from "@/lib/ai-agents/context";
 import { runAgent } from "@/lib/ai-agents/runtime";
 import { rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { agentChatSchema } from "@/lib/validations/agents";
@@ -13,8 +14,6 @@ export const maxDuration = 120;
 
 type RouteParams = { params: Promise<{ agentId: string }> };
 
-const KNOWLEDGE_CHAR_BUDGET = 6000;
-const MEMORY_LIMIT = 20;
 const HISTORY_LIMIT = 30;
 
 function requestsPerMinute() {
@@ -63,15 +62,10 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
   const { message, conversationId: requestedConversationId } = parsed.data;
 
-  const agentResult = await auth.supabase
-    .from("agents")
-    .select("id, owner_id, system_prompt, provider, model, tools")
-    .eq("id", agentId)
-    .maybeSingle();
-  if (!agentResult.data) {
+  const agentConfig = await loadAgentRuntimeConfig(auth.supabase, agentId, auth.userId);
+  if (!agentConfig) {
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });
   }
-  const agent = agentResult.data;
 
   // Resolve (or create) the conversation.
   let conversationId = requestedConversationId;
@@ -118,49 +112,14 @@ export async function POST(request: Request, { params }: RouteParams) {
     name: row.tool_name ?? undefined,
   }));
 
-  // Knowledge files — capped total context, most recently added first.
-  const knowledge = await auth.supabase
-    .from("agent_knowledge_files")
-    .select("name, content")
-    .eq("agent_id", agentId)
-    .order("created_at", { ascending: false });
-  let knowledgeSection = "";
-  let remaining = KNOWLEDGE_CHAR_BUDGET;
-  for (const file of knowledge.data ?? []) {
-    if (remaining <= 0) break;
-    const chunk = `## ${file.name}\n${file.content}`.slice(0, remaining);
-    knowledgeSection += `\n\n${chunk}`;
-    remaining -= chunk.length;
-  }
-
-  // Memory — facts the agent has been told to remember about this user.
-  const memories = await auth.supabase
-    .from("agent_memories")
-    .select("content")
-    .eq("agent_id", agentId)
-    .eq("user_id", auth.userId)
-    .order("created_at", { ascending: false })
-    .limit(MEMORY_LIMIT);
-  const memorySection = (memories.data ?? [])
-    .map((m) => `- ${m.content}`)
-    .join("\n");
-
-  const systemPrompt = [
-    agent.system_prompt,
-    knowledgeSection ? `# Knowledge\n${knowledgeSection}` : "",
-    memorySection ? `# Things you remember about this user\n${memorySection}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
   const startedAt = Date.now();
 
   try {
     const result = await runAgent({
-      provider: getProvider(agent.provider),
-      model: agent.model || undefined,
-      systemPrompt,
-      toolIds: Array.isArray(agent.tools) ? (agent.tools as string[]) : [],
+      provider: getProvider(agentConfig.provider),
+      model: agentConfig.model || undefined,
+      systemPrompt: agentConfig.systemPrompt,
+      toolIds: agentConfig.tools,
       history,
       userMessage: message,
       context: { agentId, userId: auth.userId },
@@ -210,7 +169,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     await recordAiUsage({
       userId: auth.userId,
-      provider: agent.provider,
+      provider: agentConfig.provider,
       model: result.model,
       status: "completed",
       promptTokens: result.usage.promptTokens,
@@ -231,8 +190,8 @@ export async function POST(request: Request, { params }: RouteParams) {
   } catch (error) {
     await recordAiUsage({
       userId: auth.userId,
-      provider: agent.provider,
-      model: agent.model || "unknown",
+      provider: agentConfig.provider,
+      model: agentConfig.model || "unknown",
       status: "failed",
       promptTokens: 0,
       completionTokens: 0,

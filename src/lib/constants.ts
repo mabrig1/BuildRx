@@ -9,6 +9,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,6 +45,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Documents", href: "/documents", icon: FileText },
   { title: "Content Studio", href: "/content", icon: PenSquare },
   { title: "Knowledge Base", href: "/knowledge", icon: Database },
+  { title: "Workflows", href: "/workflows", icon: Workflow },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },
   { title: "Admin", href: "/admin", icon: ShieldCheck, adminOnly: true },

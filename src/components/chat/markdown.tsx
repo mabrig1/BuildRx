@@ -100,6 +100,17 @@ export const Markdown = memo(function Markdown({
               </div>
             );
           },
+          img({ src, alt }) {
+            if (typeof src !== "string") return null;
+            return (
+              // eslint-disable-next-line @next/next/no-img-element -- data: URLs (attachments/generated images) can't go through next/image
+              <img
+                src={src}
+                alt={alt ?? ""}
+                className="my-3 max-h-96 w-auto max-w-full rounded-lg border object-contain"
+              />
+            );
+          },
         }}
       >
         {content}

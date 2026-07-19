@@ -8,6 +8,7 @@ import {
   type NvidiaMessage,
 } from "@/lib/ai/nvidia";
 import { APP_BUILDER_SYSTEM_PROMPT, CHAT_MODEL } from "@/lib/ai/prompts";
+import { moderateContent } from "@/lib/ai/safety";
 import { recordAiUsage } from "@/lib/ai/usage";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
@@ -72,6 +73,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   const { projectId, content } = parsed.data;
+
+  // Content-safety gate: classify the prompt before it reaches any model
+  // or gets persisted. Fails open on the classifier's own errors (a
+  // transient NVIDIA outage shouldn't take down chat), but a confirmed
+  // "unsafe" verdict blocks the message with a friendly explanation.
+  if (isNvidiaConfigured()) {
+    try {
+      const moderation = await moderateContent(content);
+      if (!moderation.safe) {
+        const categories = moderation.categories.length
+          ? ` (${moderation.categories.join(", ")})`
+          : "";
+        return NextResponse.json(
+          {
+            error: `Your message was flagged by our content safety filter${categories}. Please rephrase and try again.`,
+          },
+          { status: 400 }
+        );
+      }
+    } catch (error) {
+      console.error("Content moderation check failed, allowing message:", error);
+    }
+  }
 
   // Demo mode: no Supabase → no persistence. Stream a real NVIDIA
   // response when a key is configured, otherwise the canned demo reply.

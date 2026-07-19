@@ -10,12 +10,22 @@ const DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1";
 const DEFAULT_TEXT_MODEL = "z-ai/glm-5.2";
 const DEFAULT_CODE_MODEL = "poolside/laguna-xs-2.1";
 const DEFAULT_CHAT_MODEL = "stepfun-ai/step-3.7-flash";
+const DEFAULT_VISION_MODEL = "nvidia/nemotron-nano-12b-v2-vl";
+const DEFAULT_SAFETY_MODEL = "nvidia/llama-3.1-nemotron-safety-guard-8b-v3";
+const DEFAULT_PLAN_MODEL = "qwen/qwen3-next-80b-a3b-instruct";
+const DEFAULT_PARSE_MODEL = "nvidia/nemotron-parse";
 
 const MAX_RETRIES = 2;
 
+/** A single part of a multimodal (text + image) chat message. */
+export type NvidiaContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export interface NvidiaMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  /** Plain text, or a multimodal array (text + image_url parts) for vision models. */
+  content: string | NvidiaContentPart[];
 }
 
 export interface NvidiaChatOptions {
@@ -51,7 +61,7 @@ export class NvidiaApiError extends Error {
 export interface NvidiaModelInfo {
   id: string;
   label: string;
-  kind: "text" | "code";
+  kind: "text" | "code" | "vision" | "safety" | "plan" | "parse";
   description: string;
 }
 
@@ -78,6 +88,32 @@ export const NVIDIA_MODELS: NvidiaModelInfo[] = [
     label: "Laguna XS 2.1",
     kind: "code",
     description: "Code-specialized model — default for code generation",
+  },
+  {
+    id: DEFAULT_VISION_MODEL,
+    label: "Nemotron Nano 12B v2 VL",
+    kind: "vision",
+    description:
+      "Vision-language model — reads screenshots/mockups for image-to-code",
+  },
+  {
+    id: DEFAULT_SAFETY_MODEL,
+    label: "Llama 3.1 Nemotron Safety Guard 8B v3",
+    kind: "safety",
+    description: "Content safety classifier — moderates prompts and output",
+  },
+  {
+    id: DEFAULT_PLAN_MODEL,
+    label: "Qwen3 Next 80B A3B Instruct",
+    kind: "plan",
+    description:
+      "Long-context agentic model — default for multi-file build planning",
+  },
+  {
+    id: DEFAULT_PARSE_MODEL,
+    label: "Nemotron Parse",
+    kind: "parse",
+    description: "Document/image parsing — extracts text and structure",
   },
 ];
 
@@ -112,6 +148,26 @@ export function nvidiaChatModel() {
   return cleanEnv(process.env.NVIDIA_CHAT_MODEL) ?? DEFAULT_CHAT_MODEL;
 }
 
+/** Vision-language model for image/screenshot understanding. */
+export function nvidiaVisionModel() {
+  return cleanEnv(process.env.NVIDIA_VISION_MODEL) ?? DEFAULT_VISION_MODEL;
+}
+
+/** Content-safety classifier used to moderate prompts and generations. */
+export function nvidiaSafetyModel() {
+  return cleanEnv(process.env.NVIDIA_SAFETY_MODEL) ?? DEFAULT_SAFETY_MODEL;
+}
+
+/** Long-context model used for the multi-file build planning step. */
+export function nvidiaPlanModel() {
+  return cleanEnv(process.env.NVIDIA_PLAN_MODEL) ?? DEFAULT_PLAN_MODEL;
+}
+
+/** Vision model used for structured document/image text extraction. */
+export function nvidiaParseModel() {
+  return cleanEnv(process.env.NVIDIA_PARSE_MODEL) ?? DEFAULT_PARSE_MODEL;
+}
+
 /** Effective API base URL (env override or the NIM default). */
 export function nvidiaBaseUrl() {
   return (
@@ -121,7 +177,8 @@ export function nvidiaBaseUrl() {
   ).replace(/\/$/, "");
 }
 
-function errorForStatus(status: number, detail: string): NvidiaApiError {
+/** Maps an NVIDIA API error response to a friendly, typed error. Shared by every service that calls a NIM endpoint, not just chat completions. */
+export function errorForStatus(status: number, detail: string): NvidiaApiError {
   switch (status) {
     case 401:
     case 403:
@@ -153,7 +210,7 @@ function errorForStatus(status: number, detail: string): NvidiaApiError {
   }
 }
 
-async function parseErrorDetail(response: Response): Promise<string> {
+export async function parseErrorDetail(response: Response): Promise<string> {
   try {
     const data = await response.json();
     return data?.error?.message ?? data?.detail ?? response.statusText;

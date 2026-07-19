@@ -4,7 +4,11 @@ import {
   isNvidiaConfigured,
   NVIDIA_MODELS,
   nvidiaCodeModel,
+  nvidiaParseModel,
+  nvidiaPlanModel,
+  nvidiaSafetyModel,
   nvidiaTextModel,
+  nvidiaVisionModel,
 } from "@/lib/ai/nvidia";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
@@ -28,6 +32,10 @@ export async function GET() {
     configured: isNvidiaConfigured(),
     textModel: nvidiaTextModel(),
     codeModel: nvidiaCodeModel(),
+    visionModel: nvidiaVisionModel(),
+    safetyModel: nvidiaSafetyModel(),
+    planModel: nvidiaPlanModel(),
+    parseModel: nvidiaParseModel(),
     models: NVIDIA_MODELS,
   });
 }

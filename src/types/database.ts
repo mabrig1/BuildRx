@@ -76,6 +76,9 @@ export type WorkflowStepType =
   | "webhook";
 export type WorkflowRunStatus = "running" | "completed" | "failed";
 export type WorkflowRunStepStatus = "completed" | "failed";
+export type TeamMemberRole = "owner" | "admin" | "member";
+export type TeamInviteRole = "admin" | "member";
+export type TeamInviteStatus = "pending" | "accepted" | "revoked";
 
 export interface Database {
   public: {
@@ -181,6 +184,7 @@ export interface Database {
           preview_url: string | null;
           github_repo: string | null;
           custom_domain: string | null;
+          team_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -196,6 +200,7 @@ export interface Database {
           preview_url?: string | null;
           github_repo?: string | null;
           custom_domain?: string | null;
+          team_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -211,6 +216,7 @@ export interface Database {
           preview_url?: string | null;
           github_repo?: string | null;
           custom_domain?: string | null;
+          team_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -225,6 +231,12 @@ export interface Database {
             foreignKeyName: "projects_template_id_fkey";
             columns: ["template_id"];
             referencedRelation: "templates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "projects_team_id_fkey";
+            columns: ["team_id"];
+            referencedRelation: "teams";
             referencedColumns: ["id"];
           },
         ];
@@ -1135,6 +1147,123 @@ export interface Database {
           },
         ];
       };
+      teams: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          name?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "teams_owner_id_fkey";
+            columns: ["owner_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      team_members: {
+        Row: {
+          id: string;
+          team_id: string;
+          user_id: string;
+          role: TeamMemberRole;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          team_id: string;
+          user_id: string;
+          role?: TeamMemberRole;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          team_id?: string;
+          user_id?: string;
+          role?: TeamMemberRole;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey";
+            columns: ["team_id"];
+            referencedRelation: "teams";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "team_members_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      team_invites: {
+        Row: {
+          id: string;
+          team_id: string;
+          email: string;
+          role: TeamInviteRole;
+          token: string;
+          invited_by: string;
+          status: TeamInviteStatus;
+          created_at: string;
+          expires_at: string;
+        };
+        Insert: {
+          id?: string;
+          team_id: string;
+          email: string;
+          role?: TeamInviteRole;
+          token?: string;
+          invited_by: string;
+          status?: TeamInviteStatus;
+          created_at?: string;
+          expires_at?: string;
+        };
+        Update: {
+          id?: string;
+          team_id?: string;
+          email?: string;
+          role?: TeamInviteRole;
+          token?: string;
+          invited_by?: string;
+          status?: TeamInviteStatus;
+          created_at?: string;
+          expires_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "team_invites_team_id_fkey";
+            columns: ["team_id"];
+            referencedRelation: "teams";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "team_invites_invited_by_fkey";
+            columns: ["invited_by"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       deployments: {
         Row: {
           id: string;
@@ -1450,6 +1579,14 @@ export interface Database {
           similarity: number;
           chunk_index: number;
         }[];
+      };
+      is_team_member: {
+        Args: { check_team_id: string };
+        Returns: boolean;
+      };
+      team_member_role: {
+        Args: { check_team_id: string };
+        Returns: string | null;
       };
     };
     Enums: {

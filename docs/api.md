@@ -528,6 +528,40 @@ Inbound webhook trigger — **no authentication**, the `webhook_token` in the UR
 
 ---
 
+## Teams
+
+Teams, membership, and invite-based collaboration. Enforcement is almost entirely at the RLS layer — every route here is a thin wrapper that lets Postgres decide who can do what, via two `security definer` helper functions (`is_team_member`, `team_member_role`) that avoid RLS self-recursion on `team_members`. All additive: no existing table's policies were narrowed, so nothing that worked before this phase changed.
+
+**Roles**: `owner` (team creator, exactly one per team, immutable via the API — no ownership transfer yet), `admin` (can invite/remove/promote-demote other non-owner members), `member` (regular collaborator). Role changes and removals can never touch the owner's row.
+
+**Project sharing**: a project gets an optional `team_id`. Only the project's actual owner can share it (set `team_id`) or unshare it (`null` it) — team members can view and edit an already-shared project (including its files, through the same RLS-scoped code path the workspace editor already uses — no editor changes were needed) and can even reassign it to a different team they're also in, but can't unshare it. `GET /api/projects` and the project workspace need no changes to surface shared projects — RLS does it automatically.
+
+### `GET /api/teams` / `POST /api/teams`
+
+List teams you belong to (owned or member), or create one: `{ "name" }` → `{ "team": {...} }`. Creating a team also adds you as its `owner`.
+
+### `GET /api/teams/{teamId}` / `PATCH` / `DELETE`
+
+Fetch the team plus its member roster (`{ "team", "members": [{ "id", "user_id", "role", "users": { "name", "email", "avatar_url" } }] }` — teammate profiles are visible to each other via an additive `users` RLS policy scoped to shared-team membership only). `PATCH` renames (`{ "name" }`, owner only). `DELETE` removes the team — cascades to members/invites, and any shared projects fall back to personal (`team_id` set to null).
+
+### `PATCH /api/teams/{teamId}/members/{userId}` / `DELETE`
+
+Change a member's role (`{ "role": "admin" | "member" }`, owner/admin only, never the owner's own row) or remove them. `DELETE` on your own row also works as "leave the team" (owner can't leave — delete the team instead).
+
+### `GET /api/teams/{teamId}/invites` / `POST` / `DELETE /api/teams/{teamId}/invites/{inviteId}`
+
+List pending/past invites (owner/admin only — a plain member sees an empty list, not an error), create one (`{ "email", "role"? }`, owner/admin only) — there's no email-sending infrastructure in this deployment, so the response includes `acceptUrl` for the inviter to send however they like — or revoke one.
+
+### `GET /api/teams/invites/{token}` / `POST`
+
+Public invite lookup (no auth — the token is the credential; `{ "invite": { "email", "role", "status", "valid", "teamName" } }`) and accept. Accepting requires sign-in with the exact email the invite was sent to (checked both in the route and by the `team_members` insert RLS policy itself) and a still-pending, unexpired invite. → `{ "teamId" }` on success.
+
+### `PATCH /api/projects/{projectId}/share`
+
+Body: `{ "teamId": "uuid" | null }`. Share or unshare a project (owner only — see the RLS note above). Sharing with a team you're not a member of is rejected (403) before the update even runs.
+
+---
+
 ## Projects
 
 ### `GET /api/projects`

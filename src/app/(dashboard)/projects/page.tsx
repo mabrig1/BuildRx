@@ -24,7 +24,7 @@ async function loadProjects(): Promise<ProjectSummary[]> {
 
   const { data } = await supabase
     .from("projects")
-    .select("id, name, description, status, preview_url, updated_at")
+    .select("id, name, description, status, preview_url, updated_at, team_id")
     .order("updated_at", { ascending: false });
 
   return (data ?? []).map((row) => ({
@@ -34,6 +34,7 @@ async function loadProjects(): Promise<ProjectSummary[]> {
     status: row.status,
     previewUrl: row.preview_url,
     updatedAt: row.updated_at,
+    teamId: row.team_id,
   }));
 }
 

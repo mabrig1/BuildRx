@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,6 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ShareProjectDialog } from "@/components/projects/share-project-dialog";
 import { cn, timeAgo } from "@/lib/utils";
 import type { ProjectStatus } from "@/types";
 
@@ -41,6 +43,7 @@ export interface ProjectSummary {
   status: ProjectStatus;
   previewUrl: string | null;
   updatedAt: string;
+  teamId?: string | null;
 }
 
 const statusStyles: Record<ProjectStatus, string> = {
@@ -72,6 +75,7 @@ function gradientFor(id: string) {
 
 export function ProjectCard({ project }: { project: ProjectSummary }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function handleDuplicate() {
@@ -157,6 +161,10 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
                   <Copy />
                   Duplicate
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setShareOpen(true)}>
+                  <Users />
+                  Share
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
@@ -214,6 +222,14 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ShareProjectDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        projectId={project.id}
+        projectName={project.name}
+        currentTeamId={project.teamId ?? null}
+      />
     </>
   );
 }

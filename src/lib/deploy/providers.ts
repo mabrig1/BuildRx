@@ -1,12 +1,19 @@
 import { createHash } from "crypto";
 
+import { detectFramework } from "@/lib/deploy/framework";
+
 /**
  * Deployment provider adapters (server-only).
  *
- * Vercel and Netlify deploy the generated static site (the project's
- * preview build) through their public APIs. Railway deploys from a
- * connected GitHub repository, so its adapter produces a guided
- * continuation rather than an API upload.
+ * Vercel deploys the project's full generated source tree (not just
+ * the static preview snapshot) and lets Vercel's own build pipeline
+ * build it — framework-detected from package.json, so a real
+ * Next.js app actually gets built rather than served as raw files.
+ * Netlify's digest-deploy API is a static-file-serving endpoint, not
+ * a "build my source" one, so it (and Railway, which deploys from a
+ * connected GitHub repo) still only receives the static preview —
+ * see run/route.ts for the provider-aware file selection this
+ * depends on.
  */
 
 export type DeployProviderName = "vercel" | "netlify" | "railway";
@@ -48,7 +55,12 @@ export async function deployToVercel(
   log: LogFn
 ): Promise<DeployOutcome> {
   const name = slugify(input.projectName);
-  log(`Creating Vercel deployment for "${name}"…`);
+  const framework = detectFramework(input.files);
+  log(
+    framework
+      ? `Creating Vercel deployment for "${name}" (${framework})…`
+      : `Creating Vercel deployment for "${name}" (static)…`
+  );
 
   const response = await fetch("https://api.vercel.com/v13/deployments", {
     method: "POST",
@@ -64,7 +76,7 @@ export async function deployToVercel(
         data: Buffer.from(file.content, "utf8").toString("base64"),
         encoding: "base64",
       })),
-      projectSettings: { framework: null },
+      projectSettings: { framework },
     }),
   });
 

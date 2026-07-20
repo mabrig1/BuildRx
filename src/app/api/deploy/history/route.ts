@@ -20,17 +20,23 @@ export async function GET(request: Request) {
   if (session.demo) {
     return NextResponse.json({
       deployments: demoHistory(projectId),
+      hasMore: false,
       simulated: true,
     });
   }
 
+  const offset = Math.max(0, Number(searchParams.get("offset") ?? 0) || 0);
+  const limit = 20;
+
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from("deployments")
-    .select("id, provider, status, url, domain, logs, created_at, completed_at")
+    .select("id, provider, status, url, domain, logs, error, created_at, completed_at", {
+      count: "exact",
+    })
     .eq("project_id", projectId)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .range(offset, offset + limit - 1);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -43,8 +49,10 @@ export async function GET(request: Request) {
       url: row.url,
       domain: row.domain,
       logs: row.logs ?? "",
+      error: row.error,
       createdAt: row.created_at,
       completedAt: row.completed_at,
     })),
+    hasMore: offset + limit < (count ?? 0),
   });
 }

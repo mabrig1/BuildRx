@@ -665,11 +665,14 @@ Errors: 400 not connected / no linked repo / no files yet · 401 · 502 GitHub A
 | `GET /api/deploy/connection` | `{ connections: { vercel, netlify, railway } }` (booleans) |
 | `POST /api/deploy/connection` `{ provider, token }` | Connect a provider token (validated against the provider's API) |
 | `DELETE /api/deploy/connection?provider=` | Disconnect |
-| `POST /api/deploy/run` `{ projectId, provider }` | One-click deploy — **NDJSON stream** of `{"type":"status","status":"building"}` and `{"type":"log","line":"…"}` events ending in `{"type":"complete","status":"live"\|"failed","url":…}`; the deployment (with logs) is recorded in history. 400 if there's no build to deploy yet. |
-| `GET /api/deploy/history?projectId=` | `{ deployments: [{ id, provider, status, url, domain, logs, createdAt, completedAt }, …] }` |
+| `POST /api/deploy/run` `{ projectId, provider }` | One-click deploy — **NDJSON stream** of `{"type":"status","status":"building"}` and `{"type":"log","line":"…"}` events ending in `{"type":"complete","status":"live"\|"failed","url":…}`; the deployment (with logs and, on failure, a structured `error`) is recorded in history. 400 if there's no build to deploy yet. |
+| `GET /api/deploy/history?projectId=&offset=` | `{ deployments: [{ id, provider, status, url, domain, logs, error, createdAt, completedAt }, …], hasMore }`. 20 per page; pass the current list length as `offset` to fetch the next page. |
+| `DELETE /api/deploy/history/{deploymentId}` | Remove one history entry (owner only; not available in demo mode). |
 | `POST /api/deploy/domain` `{ projectId, provider, domain }` | Attach a custom domain (Vercel/Netlify API; Railway domains are managed in its dashboard) → includes DNS instructions |
 
 `provider` ∈ `vercel | netlify | railway`. Errors: 400 not connected / invalid domain · 401 · 404 · 502 provider failure.
+
+**What actually gets deployed**: Vercel receives the project's full generated source tree (everything in the virtual filesystem — the same files `GET /api/projects/{id}/export` zips up), with the framework auto-detected from `package.json` (`nvidia`-generated apps are Next.js, so Vercel runs a real `next build`) rather than being forced to serve it as a static site. Netlify and Railway still only ever receive the static `preview/index.html` snapshot: Netlify's digest-deploy API is a static-file-serving endpoint, not a "build my source" one, and Railway deploys from a connected GitHub repo rather than an upload at all. See the module doc in `src/lib/deploy/providers.ts` for the reasoning.
 
 ---
 

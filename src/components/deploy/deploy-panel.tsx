@@ -11,6 +11,7 @@ import {
   Loader2,
   Rocket,
   TrainFront,
+  Trash2,
   Triangle,
   type LucideIcon,
 } from "lucide-react";
@@ -66,6 +67,7 @@ interface DeploymentEntry {
   status: string;
   url: string | null;
   logs: string;
+  error?: string | null;
   createdAt: string;
 }
 
@@ -76,33 +78,67 @@ const STATUS_STYLES: Record<string, string> = {
   failed: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
-function HistoryItem({ deployment }: { deployment: DeploymentEntry }) {
+function HistoryItem({
+  deployment,
+  onDeleted,
+}: {
+  deployment: DeploymentEntry;
+  onDeleted: (id: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete(event: React.MouseEvent) {
+    event.stopPropagation();
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/deploy/history/${deployment.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error();
+      onDeleted(deployment.id);
+    } catch {
+      toast.error("Failed to delete deployment");
+      setDeleting(false);
+    }
+  }
+
   return (
     <li className="rounded-md border">
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 px-2.5 py-2 text-left"
-        onClick={() => setExpanded((e) => !e)}
-      >
-        {expanded ? (
-          <ChevronDown className="size-3.5 shrink-0" />
-        ) : (
-          <ChevronRight className="size-3.5 shrink-0" />
-        )}
-        <span className="text-sm font-medium capitalize">
-          {deployment.provider}
-        </span>
-        <Badge
-          variant="outline"
-          className={cn("capitalize", STATUS_STYLES[deployment.status])}
+      <div className="flex items-center gap-1 px-1">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-2 text-left"
+          onClick={() => setExpanded((e) => !e)}
         >
-          {deployment.status}
-        </Badge>
-        <span className="text-muted-foreground ml-auto text-xs">
-          {timeAgo(deployment.createdAt)}
-        </span>
-      </button>
+          {expanded ? (
+            <ChevronDown className="size-3.5 shrink-0" />
+          ) : (
+            <ChevronRight className="size-3.5 shrink-0" />
+          )}
+          <span className="text-sm font-medium capitalize">
+            {deployment.provider}
+          </span>
+          <Badge
+            variant="outline"
+            className={cn("capitalize", STATUS_STYLES[deployment.status])}
+          >
+            {deployment.status}
+          </Badge>
+          <span className="text-muted-foreground ml-auto text-xs">
+            {timeAgo(deployment.createdAt)}
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Delete deployment"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="text-muted-foreground hover:text-destructive shrink-0 p-1.5"
+        >
+          {deleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+        </button>
+      </div>
       {expanded ? (
         <div className="border-t px-2.5 py-2">
           {deployment.url ? (
@@ -137,6 +173,8 @@ export function DeployPanel({ projectId }: { projectId: string }) {
   const [deploying, setDeploying] = useState(false);
   const [liveLog, setLiveLog] = useState<string[]>([]);
   const [history, setHistory] = useState<DeploymentEntry[]>([]);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [domain, setDomain] = useState("");
   const [busy, setBusy] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
@@ -154,11 +192,34 @@ export function DeployPanel({ projectId }: { projectId: string }) {
       if (histRes.ok) {
         const data = await histRes.json();
         setHistory(data.deployments ?? []);
+        setHasMoreHistory(Boolean(data.hasMore));
       }
     } catch {
       // keep current state
     }
   }, [projectId]);
+
+  async function loadMoreHistory() {
+    setLoadingMore(true);
+    try {
+      const response = await fetch(
+        `/api/deploy/history?projectId=${encodeURIComponent(projectId)}&offset=${history.length}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setHistory((prev) => [...prev, ...(data.deployments ?? [])]);
+        setHasMoreHistory(Boolean(data.hasMore));
+      }
+    } catch {
+      toast.error("Failed to load more deployments");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  function handleHistoryDeleted(id: string) {
+    setHistory((prev) => prev.filter((d) => d.id !== id));
+  }
 
   useEffect(() => {
     if (open) void load();
@@ -406,10 +467,25 @@ export function DeployPanel({ projectId }: { projectId: string }) {
               ) : (
                 <ul className="grid gap-1.5">
                   {history.map((deployment) => (
-                    <HistoryItem key={deployment.id} deployment={deployment} />
+                    <HistoryItem
+                      key={deployment.id}
+                      deployment={deployment}
+                      onDeleted={handleHistoryDeleted}
+                    />
                   ))}
                 </ul>
               )}
+              {hasMoreHistory ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void loadMoreHistory()}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? <Loader2 className="animate-spin" /> : null}
+                  Load more
+                </Button>
+              ) : null}
             </div>
           </div>
         </ScrollArea>

@@ -118,3 +118,13 @@ npm run start   # serves on PORT (default 3000)
 ```
 
 Requirements: Node 20+, HTTPS at the edge (Supabase auth cookies are `Secure`), the same env vars, and passing through the COOP/COEP headers on `/preview/:projectId/container`. Ensure your platform's request timeout allows for the long-running streaming AI routes.
+
+## Appendix: the in-product Deploy panel (deploying *users'* generated apps)
+
+Everything above is about deploying BuildRx itself. This is about the "Deploy" button inside a project's workspace — what it actually does per provider, since the three aren't equivalent:
+
+- **Vercel** ships the project's full generated source tree (the same files `GET /api/projects/{id}/export` zips up — `package.json`, `src/app`, everything) via Vercel's Deployments API, with the framework auto-detected from `package.json` so Vercel's own pipeline runs a real `next build`. A generated app with a genuine bug can fail to build on Vercel — that's surfaced as a `failed` deployment with the build error in its log, which is correct: it means the app doesn't actually build, not that deployment is broken.
+- **Netlify** only ever receives the static `preview/index.html` snapshot (a self-contained rendered preview of the home page, not the full app). Netlify's digest-deploy API — the one this integration uses — is a static-file-serving endpoint; it doesn't run an arbitrary build command the way a git-linked Netlify site or a `netlify.toml`+zip deploy would. Wiring up a real Netlify build would mean switching to zip-based deploys with a Next.js Runtime plugin — not done here.
+- **Railway** doesn't accept an upload at all through this integration — it deploys from a connected GitHub repository, so the adapter just hands back a "new service from this repo" URL for the user to finish in Railway's own UI.
+
+No rollback/redeploy-a-previous-version yet (deployment history stores metadata and logs, not a file snapshot per deployment), and no DNS verification for custom domains (the domain field is just passed to the provider's "add domain" API and stored — no TXT/CNAME/SSL-status checking).

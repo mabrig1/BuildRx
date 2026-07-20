@@ -9,6 +9,7 @@ export interface DeploymentRecord {
   url: string | null;
   domain: string | null;
   logs: string;
+  error: string | null;
   createdAt: string;
   completedAt: string | null;
 }

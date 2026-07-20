@@ -70,7 +70,10 @@ export async function POST(request: Request) {
   }
   const { projectId, provider } = parsed.data;
 
-  // Gather the static site (the generated preview build).
+  // Gather the project's files. Vercel gets the full generated source
+  // tree so its own build pipeline can build the real app
+  // (framework-detected in deployToVercel); Netlify and Railway only
+  // ever get the static preview snapshot — see providers.ts for why.
   const fs = getFileSystem(projectId);
   const preview = await fs.read("preview/index.html").catch(() => null);
   if (!preview) {
@@ -79,7 +82,18 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  const siteFiles = [{ path: "index.html", content: preview.content }];
+  const previewFiles = [{ path: "index.html", content: preview.content }];
+
+  let siteFiles = previewFiles;
+  if (provider === "vercel") {
+    const entries = await fs.list();
+    const fullTree = (
+      await Promise.all(entries.map((entry) => fs.read(entry.path)))
+    ).filter((file): file is NonNullable<typeof file> => file !== null);
+    if (fullTree.length > 0) {
+      siteFiles = fullTree.map((file) => ({ path: file.path, content: file.content }));
+    }
+  }
 
   // Project metadata.
   let projectName = "app-creator-site";
@@ -142,6 +156,7 @@ export async function POST(request: Request) {
       emit({ type: "status", status: "building" });
 
       let outcome: DeployOutcome;
+      let errorMessage: string | null = null;
       try {
         const input: DeployInput = {
           projectName,
@@ -164,11 +179,11 @@ export async function POST(request: Request) {
             : "Deployment queued."
         );
       } catch (error) {
-        const message =
+        errorMessage =
           error instanceof DeployError || error instanceof Error
             ? error.message
             : "Deployment failed";
-        log(`Error: ${message}`);
+        log(`Error: ${errorMessage}`);
         outcome = { status: "failed", url: null, providerId: null };
       }
 
@@ -180,6 +195,7 @@ export async function POST(request: Request) {
             status: outcome.status,
             url: outcome.url,
             logs: logs.join("\n"),
+            error: errorMessage,
             vercel_deployment_id: outcome.providerId,
             completed_at: completedAt,
           })
@@ -193,6 +209,7 @@ export async function POST(request: Request) {
           url: outcome.url,
           domain: null,
           logs: logs.join("\n"),
+          error: errorMessage,
           createdAt: completedAt,
           completedAt,
         };

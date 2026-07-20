@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { demoProjectIds } from "@/lib/files/manager";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { reportDbError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -34,7 +35,10 @@ export async function GET() {
     .select("id, name, description, status, preview_url, updated_at")
     .order("updated_at", { ascending: false });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: reportDbError("GET /api/projects", error) },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({
@@ -101,7 +105,11 @@ export async function POST(request: Request) {
     .single();
   if (error || !project) {
     return NextResponse.json(
-      { error: error?.message ?? "Failed to create project" },
+      {
+        error: error
+          ? reportDbError("POST /api/projects", error)
+          : "Failed to create project",
+      },
       { status: 500 }
     );
   }

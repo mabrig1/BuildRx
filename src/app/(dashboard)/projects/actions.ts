@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { reportDbError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 import {
   createProjectSchema,
@@ -49,18 +50,27 @@ export async function createProject(
     .single();
 
   if (error || !project) {
-    return { error: error?.message ?? "Failed to create project." };
+    return {
+      error: error
+        ? reportDbError("createProject", error)
+        : "Failed to create project.",
+    };
   }
 
   // Seed the conversation with the initial prompt so the workspace
   // opens with context.
   if (parsed.data.prompt) {
-    await supabase.from("chat_messages").insert({
+    const { error: chatError } = await supabase.from("chat_messages").insert({
       project_id: project.id,
       user_id: user.id,
       role: "user",
       content: parsed.data.prompt,
     });
+    // Non-fatal: the project exists; the workspace just opens without
+    // the seeded prompt. Log it rather than failing the creation.
+    if (chatError) {
+      reportDbError("createProject seed chat message", chatError);
+    }
   }
 
   revalidateProjectViews();
@@ -79,7 +89,7 @@ export async function deleteProject(id: string): Promise<ActionResult> {
   // RLS restricts the delete to rows the user owns.
   const { error } = await supabase.from("projects").delete().eq("id", id);
   if (error) {
-    return { error: error.message };
+    return { error: reportDbError("deleteProject", error) };
   }
 
   revalidateProjectViews();
@@ -123,7 +133,11 @@ export async function duplicateProject(id: string): Promise<ActionResult> {
     .single();
 
   if (copyError || !copy) {
-    return { error: copyError?.message ?? "Failed to duplicate project." };
+    return {
+      error: copyError
+        ? reportDbError("duplicateProject", copyError)
+        : "Failed to duplicate project.",
+    };
   }
 
   // Copy the generated source files across.

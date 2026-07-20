@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Bot,
   CreditCard,
   Database,
@@ -50,6 +51,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Workflows", href: "/workflows", icon: Workflow },
   { title: "Teams", href: "/teams", icon: Users },
   { title: "Marketplace", href: "/marketplace", icon: Store },
+  { title: "Analytics", href: "/analytics", icon: BarChart3 },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },
   { title: "Admin", href: "/admin", icon: ShieldCheck, adminOnly: true },

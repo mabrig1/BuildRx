@@ -52,6 +52,7 @@ export async function recordAiUsage(params: {
       action: params.action ?? "ai_generation",
       metadata: {
         model: params.model,
+        provider: params.provider ?? null,
         prompt_tokens: params.promptTokens,
         completion_tokens: params.completionTokens,
         status: params.status,

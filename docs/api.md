@@ -687,6 +687,18 @@ All subscription/invoice writes go through the service-role client — clients c
 
 ---
 
+## Analytics
+
+Personal usage analytics — the same `usage_logs` data the admin dashboard aggregates org-wide (`lib/analytics/admin-data.ts`), scoped to the signed-in user instead of requiring the `admin` role. Previously a regular user's own usage was visible only as two plain numbers on the billing page; this surfaces it properly (requests/tokens over time, broken down by feature and provider, plus recent activity).
+
+The dashboard page itself (`/analytics`) computes its data server-side via `getUserAnalytics()` directly — there's no separate JSON API for it, matching how the pre-existing billing page works. The one route below is for CSV export, which does need to be a real endpoint (the browser downloads it directly).
+
+### `GET /api/analytics/export`
+
+CSV (`text/csv`, download disposition) of the caller's own `usage_logs`, last 90 days, capped at 5,000 rows: `date, action, project_id, provider, model, prompt_tokens, completion_tokens, status`. Requires sign-in; 503 if Supabase isn't configured (no demo-mode export — the dashboard itself still renders a demo dataset when unconfigured, same as the admin dashboard does).
+
+---
+
 ## Admin
 
 ### `GET /api/admin/reports?type=users|usage|revenue`

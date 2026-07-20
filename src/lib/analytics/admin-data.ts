@@ -1,13 +1,12 @@
 import { plans } from "@/lib/constants";
+import { toCsv as sharedToCsv } from "@/lib/analytics/csv";
+import { bucketByDay, lastNDays, type DayCount } from "@/lib/analytics/time-buckets";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
 /** Aggregated analytics for the admin dashboard (server-only). */
 
-export interface DayCount {
-  date: string; // YYYY-MM-DD
-  count: number;
-}
+export type { DayCount };
 
 export interface AdminAnalytics {
   totals: {
@@ -41,30 +40,6 @@ export interface AdminAnalytics {
 const PLAN_PRICES: Record<string, number> = Object.fromEntries(
   plans.map((plan) => [plan.id, plan.price])
 );
-
-function dayKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function lastNDays(n: number): string[] {
-  const days: string[] = [];
-  const now = new Date();
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    days.push(dayKey(d));
-  }
-  return days;
-}
-
-function bucketByDay(timestamps: string[], days: string[]): DayCount[] {
-  const buckets = new Map<string, number>(days.map((d) => [d, 0]));
-  for (const ts of timestamps) {
-    const key = ts.slice(0, 10);
-    if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
-  }
-  return days.map((date) => ({ date, count: buckets.get(date) ?? 0 }));
-}
 
 // ------------------------------------------------------------------
 // Demo dataset (deterministic, so the dashboard is fully explorable)
@@ -250,16 +225,5 @@ export async function getAdminAnalytics(): Promise<AdminAnalytics> {
   };
 }
 
-/** CSV report generation for the export endpoints. */
-export function toCsv(rows: Array<Record<string, unknown>>): string {
-  if (rows.length === 0) return "";
-  const headers = Object.keys(rows[0]);
-  const escape = (value: unknown) => {
-    const s = String(value ?? "");
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  return [
-    headers.join(","),
-    ...rows.map((row) => headers.map((h) => escape(row[h])).join(",")),
-  ].join("\n");
-}
+/** Re-exported for existing callers — the implementation now lives in analytics/csv.ts, shared with the personal analytics export. */
+export const toCsv = sharedToCsv;

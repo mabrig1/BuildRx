@@ -562,6 +562,30 @@ Body: `{ "teamId": "uuid" | null }`. Share or unshare a project (owner only — 
 
 ---
 
+## Marketplace
+
+Publish a project as a reusable template (or write one from scratch), browse/search what others have published, and start a new project from one in a click. Distinct from the pre-existing Agent Marketplace (`/agents/marketplace`, `GET /api/agents/marketplace`) — that one shares public *agents*; this one shares *project starting points*. Publishing is self-service and live immediately, same as agent visibility elsewhere in the app — there's no moderation queue in this deployment.
+
+The underlying `templates` table predates this phase (admin-curated only, via the in-workspace "starter prompt" picker and `projects.template_id`); this phase adds `install_count`, `source_project_id`, and additive RLS letting any signed-in user publish/manage their own rows alongside the admin-curated ones — nothing about the existing admin/curated behavior changed.
+
+### `GET /api/templates`
+
+Query params: `category`, `q` (matches name/description), `sort` (`trending` = most-installed first, default `newest`), `mine=true` (your own templates, including ones you've unpublished — otherwise only `is_active` templates are returned). → `{ "templates": [...] }`, capped at 60.
+
+### `POST /api/templates`
+
+Publish one: `{ "name", "description"?, "category"?, "prompt", "thumbnailUrl"?, "sourceProjectId"? }` (`category` defaults to `"general"`; `sourceProjectId` is verified to be a project you own before being recorded, otherwise silently dropped). A URL-safe `slug` is generated from `name` and de-duplicated automatically. → `{ "template": {...} }`.
+
+### `GET /api/templates/{templateId}` / `PATCH` / `DELETE`
+
+Fetch one (must be active, or yours if not). `PATCH` edits your own template — `{ "name"?, "description"?, "category"?, "prompt"?, "thumbnailUrl"?, "isActive"? }` (`isActive: false` unpublishes it without deleting). `DELETE` removes it permanently.
+
+### Using a template
+
+There's no separate "install" endpoint — starting a project from a template goes through the existing project-creation flow (`createProject` server action / `POST /api/projects`) with a `templateId`, which seeds the initial AI prompt from the template's `prompt` and best-effort bumps its `install_count` via the `increment_template_installs` Postgres function (a signed-in user can call this without a general UPDATE grant on `templates`).
+
+---
+
 ## Projects
 
 ### `GET /api/projects`

@@ -52,6 +52,7 @@ export async function GET() {
 const createSchema = z.object({
   name: z.string().min(1).max(80),
   description: z.string().max(300).optional(),
+  templateId: z.string().uuid().optional(),
 });
 
 /**
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
       owner_id: user.id,
       name: parsed.data.name,
       description: parsed.data.description || null,
+      template_id: parsed.data.templateId ?? null,
     })
     .select("id, name, status")
     .single();
@@ -104,6 +106,10 @@ export async function POST(request: Request) {
       { error: error?.message ?? "Failed to create project" },
       { status: 500 }
     );
+  }
+
+  if (parsed.data.templateId) {
+    await supabase.rpc("increment_template_installs", { target_id: parsed.data.templateId });
   }
 
   return NextResponse.json({ project }, { status: 201 });

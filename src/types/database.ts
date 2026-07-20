@@ -131,6 +131,8 @@ export interface Database {
           is_featured: boolean;
           is_active: boolean;
           created_by: string | null;
+          source_project_id: string | null;
+          install_count: number;
           created_at: string;
           updated_at: string;
         };
@@ -145,6 +147,8 @@ export interface Database {
           is_featured?: boolean;
           is_active?: boolean;
           created_by?: string | null;
+          source_project_id?: string | null;
+          install_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -159,6 +163,8 @@ export interface Database {
           is_featured?: boolean;
           is_active?: boolean;
           created_by?: string | null;
+          source_project_id?: string | null;
+          install_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -167,6 +173,12 @@ export interface Database {
             foreignKeyName: "templates_created_by_fkey";
             columns: ["created_by"];
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "templates_source_project_id_fkey";
+            columns: ["source_project_id"];
+            referencedRelation: "projects";
             referencedColumns: ["id"];
           },
         ];
@@ -1587,6 +1599,10 @@ export interface Database {
       team_member_role: {
         Args: { check_team_id: string };
         Returns: string | null;
+      };
+      increment_template_installs: {
+        Args: { target_id: string };
+        Returns: undefined;
       };
     };
     Enums: {

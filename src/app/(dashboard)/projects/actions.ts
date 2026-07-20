@@ -44,6 +44,7 @@ export async function createProject(
       owner_id: user.id,
       name: parsed.data.name,
       description: parsed.data.description || null,
+      template_id: parsed.data.templateId ?? null,
     })
     .select("id")
     .single();
@@ -61,6 +62,11 @@ export async function createProject(
       role: "user",
       content: parsed.data.prompt,
     });
+  }
+
+  if (parsed.data.templateId) {
+    // Best-effort — a failed counter bump shouldn't block project creation.
+    await supabase.rpc("increment_template_installs", { target_id: parsed.data.templateId });
   }
 
   revalidateProjectViews();

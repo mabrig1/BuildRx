@@ -14,6 +14,7 @@ export const createProjectSchema = z.object({
     .min(10, "Describe your app in at least 10 characters")
     .max(4000, "Prompt must be at most 4,000 characters")
     .optional(),
+  templateId: z.string().uuid().optional(),
 });
 
 export const updateProjectSchema = createProjectSchema.partial().extend({

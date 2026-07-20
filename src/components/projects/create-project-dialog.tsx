@@ -35,15 +35,18 @@ import {
 
 export function CreateProjectDialog({
   trigger,
+  defaultValues,
 }: {
   trigger?: React.ReactNode;
+  /** Pre-fills the form — used by the marketplace's "Use this template" flow. */
+  defaultValues?: Partial<CreateProjectInput>;
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<CreateProjectInput>({
     resolver: zodResolver(createProjectSchema),
-    defaultValues: { name: "", description: "", prompt: "" },
+    defaultValues: { name: "", description: "", prompt: "", ...defaultValues },
   });
 
   function onSubmit(values: CreateProjectInput) {

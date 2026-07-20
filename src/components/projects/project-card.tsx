@@ -9,11 +9,13 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  Upload,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { deleteProject, duplicateProject } from "@/app/(dashboard)/projects/actions";
+import { PublishTemplateDialog } from "@/components/marketplace/publish-template-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -76,6 +78,7 @@ function gradientFor(id: string) {
 export function ProjectCard({ project }: { project: ProjectSummary }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function handleDuplicate() {
@@ -165,6 +168,10 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
                   <Users />
                   Share
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPublishOpen(true)}>
+                  <Upload />
+                  Publish as template
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
@@ -229,6 +236,14 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
         projectId={project.id}
         projectName={project.name}
         currentTeamId={project.teamId ?? null}
+      />
+
+      <PublishTemplateDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        sourceProjectId={project.id}
+        defaultName={project.name}
+        defaultDescription={project.description ?? ""}
       />
     </>
   );

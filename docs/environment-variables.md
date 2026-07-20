@@ -16,12 +16,15 @@ Get these from **Project Settings → API** in the [Supabase dashboard](https://
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | For connected mode | Your project URL, `https://<project-ref>.supabase.co`. Without it (and the anon key), the app runs entirely in demo mode. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | For connected mode | The `anon` public key. Safe to expose — Row Level Security governs all access. |
+| `NEXT_PUBLIC_SUPABASE_URL` | For connected mode | Your project URL, `https://<project-ref>.supabase.co`. Without it (and a public key), the app runs entirely in demo mode. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | For connected mode (preferred) | The modern `sb_publishable_...` key (Project Settings → API Keys). Safe to expose — Row Level Security governs all access. Takes precedence over the anon key. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Legacy fallback | The legacy JWT `anon` key. Used only when no publishable key is set. |
 | `SUPABASE_SERVICE_ROLE_KEY` | For billing & metering | The `service_role` key. **Server-only; never expose.** Required for subscription activation, invoices, usage accounting, and cancellation — these tables are deliberately not client-writable, so billing fails gracefully with a 503 if this is missing. |
 | `DATABASE_URL` | Tooling only | Direct Postgres connection string (Project Settings → Database). Used by migration/CLI tooling, not by the app at runtime. |
 
 **Without Supabase:** no login/signup; projects, files, chat, and billing live in memory and reset on restart; GitHub/deploy connections are simulated.
+
+**Google Sign-In** requires no extra env vars — the Google OAuth client is configured in the Supabase dashboard. See the [Google OAuth setup guide](google-oauth.md) for the required provider, redirect-URL, and callback-URL configuration.
 
 ## Anthropic (AI chat + agents)
 

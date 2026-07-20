@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { sanitizeNextPath } from "@/lib/auth/redirects";
 import { createClient } from "@/lib/supabase/server";
-
-/** Only allow same-origin relative paths as post-auth redirect targets. */
-function sanitizeNext(next: string | null) {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return "/dashboard";
-  }
-  return next;
-}
 
 /**
  * Supabase OAuth / magic-link / recovery callback.
@@ -18,7 +11,19 @@ function sanitizeNext(next: string | null) {
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = sanitizeNext(searchParams.get("next"));
+  const next = sanitizeNextPath(searchParams.get("next"));
+
+  // Behind a proxy/load balancer (Vercel included) the host the user
+  // actually visited arrives in x-forwarded-host — prefer it so the
+  // post-auth redirect lands back on the same domain the flow started
+  // on, per the current Supabase SSR guide.
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const siteOrigin = forwardedHost
+    ? `${forwardedProto ?? "https"}://${forwardedHost}`
+    : origin;
+
+  let errorDescription = searchParams.get("error_description");
 
   if (code) {
     const supabase = await createClient();
@@ -30,9 +35,17 @@ export async function GET(request: Request) {
         eventType: "login",
         properties: { method: "oauth" },
       });
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${siteOrigin}${next}`);
     }
+    errorDescription = error.message;
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  // Surface what actually failed (e.g. "provider is not enabled",
+  // user cancelled at the provider) instead of a silent generic error.
+  const loginUrl = new URL("/login", siteOrigin);
+  loginUrl.searchParams.set("error", "auth");
+  if (errorDescription) {
+    loginUrl.searchParams.set("error_description", errorDescription.slice(0, 200));
+  }
+  return NextResponse.redirect(loginUrl);
 }

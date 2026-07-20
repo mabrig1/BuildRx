@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { sanitizeNextPath } from "@/lib/auth/redirects";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -30,14 +31,6 @@ async function getOrigin() {
     process.env.NEXT_PUBLIC_APP_URL ??
     "http://localhost:3000"
   );
-}
-
-/** Only allow same-origin relative paths as post-auth redirect targets. */
-function sanitizeNext(next: string | undefined | null) {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return "/dashboard";
-  }
-  return next;
 }
 
 export async function login(
@@ -69,7 +62,7 @@ export async function login(
     properties: { method: "password" },
   });
 
-  redirect(sanitizeNext(next));
+  redirect(sanitizeNextPath(next));
 }
 
 export async function signup(input: SignupInput): Promise<ActionResult> {
@@ -118,7 +111,7 @@ export async function signInWithGoogle(next?: string): Promise<ActionResult> {
   const origin = await getOrigin();
   const supabase = await createClient();
 
-  const safeNext = sanitizeNext(next);
+  const safeNext = sanitizeNextPath(next);
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {

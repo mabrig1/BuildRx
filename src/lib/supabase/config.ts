@@ -17,8 +17,16 @@ export function supabaseUrl(): string | undefined {
   return cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
 }
 
+/**
+ * Public API key for browser/server clients. Supabase now issues
+ * `sb_publishable_...` keys (recommended, independently rotatable);
+ * the legacy JWT `anon` key remains supported as a fallback.
+ */
 export function supabaseAnonKey(): string | undefined {
-  return cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return (
+    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ??
+    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  );
 }
 
 export function supabaseServiceRoleKey(): string | undefined {

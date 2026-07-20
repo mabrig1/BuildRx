@@ -1,14 +1,17 @@
 /**
- * Plan-limit enforcement for the session-less /api/v1/* routes.
+ * Plan-limit enforcement for AI-cost requests that have no Supabase
+ * session — the API-key-authenticated /api/v1/* routes, and the
+ * inbound workflow webhook trigger (both run against the service-role
+ * client since there's no cookie to derive a session from).
  *
  * lib/billing/limits.ts's checkAiRequestLimit/checkProjectLimit call
  * createClient() (the cookie-scoped server client) and rely on RLS to
- * implicitly filter "the current user's" rows. An API-key request has
- * no Supabase session, so that client has no auth.uid() — RLS would
- * silently return zero rows regardless of an explicit .eq(user_id, …)
- * filter, making the check never trigger (a quota bypass, not just a
- * wrong number). This uses the service-role client instead, with an
- * explicit owner filter doing the scoping that RLS would otherwise do.
+ * implicitly filter "the current user's" rows. Without a session that
+ * client has no auth.uid() — RLS would silently return zero rows
+ * regardless of an explicit .eq(user_id, …) filter, making the check
+ * never trigger (a quota bypass, not just a wrong number). This uses
+ * the service-role client instead, with an explicit owner filter doing
+ * the scoping RLS would otherwise do.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -31,8 +34,8 @@ async function effectivePlanForUser(
   return "free";
 }
 
-/** Returns an error message when the key owner is at their monthly AI request limit. */
-export async function checkAiRequestLimitForApiKey(
+/** Returns an error message when the given user is at their monthly AI request limit. */
+export async function checkAiRequestLimitSessionless(
   admin: SupabaseClient<Database>,
   userId: string
 ): Promise<string | null> {

@@ -21,7 +21,7 @@ All endpoints live under `/api` and speak JSON unless noted otherwise. Errors us
 | 502 | Upstream provider (NVIDIA, GitHub, deploy host) returned a server error |
 | 503 | The relevant provider isn't configured (missing env var) |
 
-**Rate limiting** — the AI endpoints (`/api/ai/*`, `/api/agents/run`, `/api/agents/{agentId}/chat`) share a per-user (per-IP in demo mode) limit of `NVIDIA_RATE_LIMIT_RPM` requests/minute (default 20). Responses carry:
+**Rate limiting** — every endpoint that calls an AI provider (`/api/ai/*`, `/api/agents/run`, `/api/agents/{agentId}/chat`, Content Studio generation, Document upload, RAG chat, Workflow runs/triggers, and the `/api/v1/*` API-key routes) is rate-limited to `NVIDIA_RATE_LIMIT_RPM` requests/minute (default 20), per-user (per-IP in demo mode, per-API-key or per-webhook-token where there's no session). Responses carry:
 
 ```
 X-RateLimit-Limit: 20
@@ -335,7 +335,7 @@ Supported types: **PDF** (embedded text only — a scanned PDF with no text laye
 
 ### `GET /api/documents` / `POST /api/documents`
 
-List your documents (metadata only), or upload one — `multipart/form-data` with a `file` field (max 10MB):
+List your documents (metadata only), or upload one — `multipart/form-data` with a `file` field (max 10MB). `POST` is rate-limited and gated by your monthly AI request quota (402 when reached), same as the other AI-cost routes in this document.
 
 ```json
 {
@@ -422,7 +422,7 @@ List the caller's content pieces, newest first. Optional `?type=blog_post` (or a
 }
 ```
 
-`inputs` fields vary by `type` — see `ContentInputs` in `src/lib/content/prompts.ts` (`topic`, `tone`, `targetAudience`, `keywords`, `wordCount`, `platform`, `includeHashtags`, `purpose`, `callToAction`, `product`, `chapterCount`, `videoLength`). Generates the piece, saves it, and records AI usage (including on failure — the row is saved with `status: "failed"` and an `error` message). → `{ "content": ContentPiece }`. Errors: 400 invalid body · 401 · 503 provider not configured.
+`inputs` fields vary by `type` — see `ContentInputs` in `src/lib/content/prompts.ts` (`topic`, `tone`, `targetAudience`, `keywords`, `wordCount`, `platform`, `includeHashtags`, `purpose`, `callToAction`, `product`, `chapterCount`, `videoLength`). Generates the piece, saves it, and records AI usage (including on failure — the row is saved with `status: "failed"` and an `error` message). Rate-limited and gated by your monthly AI request quota (402 when reached) before generation starts. → `{ "content": ContentPiece }`. Errors: 400 invalid body · 401 · 503 provider not configured.
 
 ### `GET /api/content/{contentId}`
 
@@ -438,11 +438,11 @@ Delete a piece.
 
 ### `POST /api/content/{contentId}/regenerate`
 
-Body: `{ "inputs"?, "provider"?, "model"? }`, all optional — omitted fields reuse the piece's existing values. Re-runs generation and updates the row in place. `maxDuration = 180`.
+Body: `{ "inputs"?, "provider"?, "model"? }`, all optional — omitted fields reuse the piece's existing values. Re-runs generation and updates the row in place. Rate-limited and gated by your monthly AI request quota (402 when reached). `maxDuration = 180`.
 
 ### `POST /api/content/{contentId}/cover-image`
 
-Generates a cover image via the NVIDIA image model (`generateImage`, 16:9) and saves it as a data URL on the piece. Body: `{ "prompt"? }` — defaults to a generic cover prompt built from the piece's title. 503 if NVIDIA isn't configured.
+Generates a cover image via the NVIDIA image model (`generateImage`, 16:9) and saves it as a data URL on the piece. Body: `{ "prompt"? }` — defaults to a generic cover prompt built from the piece's title. Rate-limited and gated by your monthly AI request quota (402 when reached). 503 if NVIDIA isn't configured.
 
 ### Prompt library
 
@@ -474,7 +474,7 @@ Fetch or delete one document (deleting removes its chunks).
 
 ### `POST /api/rag/knowledge-bases/{kbId}/chat`
 
-Body: `{ "message", "provider", "model"? }`. Embeds the message, retrieves the most similar chunks (cosine similarity ≥ 0.3, top 6) via the `match_knowledge_chunks` Postgres function, and — only if at least one relevant chunk was found — asks the model to answer using just that context. → `{ "answer", "citations": [{ "documentId", "documentName" }], "model" }`. When nothing relevant is found, returns a fixed "couldn't find anything relevant" answer with no model call (`model: null`) rather than letting the model guess from outside knowledge. Chat history isn't persisted server-side — each call is a fresh single-turn question grounded in the KB.
+Body: `{ "message", "provider", "model"? }`. Embeds the message, retrieves the most similar chunks (cosine similarity ≥ 0.3, top 6) via the `match_knowledge_chunks` Postgres function, and — only if at least one relevant chunk was found — asks the model to answer using just that context. → `{ "answer", "citations": [{ "documentId", "documentName" }], "model" }`. When nothing relevant is found, returns a fixed "couldn't find anything relevant" answer with no model call (`model: null`) rather than letting the model guess from outside knowledge. Chat history isn't persisted server-side — each call is a fresh single-turn question grounded in the KB. Rate-limited and gated by your monthly AI request quota (402 when reached) before retrieval starts.
 
 ---
 
@@ -516,7 +516,7 @@ Body: `{ "stepIds" }` — the workflow's step ids in the desired order (must be 
 
 ### `POST /api/workflows/{workflowId}/run`
 
-Runs the workflow now. Body (optional): `{ "input"? }` — seeds `{{trigger.text}}`. Blocks until every step finishes or one fails; response is `{ "runId", "status", "error" }`, 502 if `status` is `"failed"`. Every step's input/output is recorded to the run's history regardless of outcome.
+Runs the workflow now. Body (optional): `{ "input"? }` — seeds `{{trigger.text}}`. Rate-limited and gated by your monthly AI request quota (402 when reached) before it starts, same as the AI-cost routes elsewhere in this document — a run can chain multiple AI-calling steps. Blocks until every step finishes or one fails; response is `{ "runId", "status", "error" }`, 502 if `status` is `"failed"`. Every step's input/output is recorded to the run's history regardless of outcome.
 
 ### `GET /api/workflows/{workflowId}/runs` / `GET /api/workflows/{workflowId}/runs/{runId}`
 
@@ -524,7 +524,7 @@ Run history (last 50), or one run's full per-step input/output/error detail.
 
 ### `POST /api/workflows/trigger/{token}`
 
-Inbound webhook trigger — **no authentication**, the `webhook_token` in the URL is the credential (find it via the workflow's detail page or `GET /api/workflows/{workflowId}`; regenerate exposure by switching `triggerType` off and back on isn't supported yet — the token is fixed per workflow). Only runs if the workflow's `trigger_type` is `"webhook"` and it's `enabled`. The POSTed JSON body becomes `{{trigger.text}}` for the first step. Rate-limited per token (30/min). Uses the service-role client rather than RLS, since the caller has no Supabase session.
+Inbound webhook trigger — **no authentication**, the `webhook_token` in the URL is the credential (find it via the workflow's detail page or `GET /api/workflows/{workflowId}`; regenerate exposure by switching `triggerType` off and back on isn't supported yet — the token is fixed per workflow). Only runs if the workflow's `trigger_type` is `"webhook"` and it's `enabled`. The POSTed JSON body becomes `{{trigger.text}}` for the first step. Rate-limited per token (30/min) and gated by the workflow owner's monthly AI request quota (402 when reached — via `checkAiRequestLimitSessionless()`, see the SaaS section above). Uses the service-role client rather than RLS, since the caller has no Supabase session.
 
 ---
 
@@ -714,7 +714,7 @@ The key owner's projects, newest-updated first (capped at 100). Rate-limited to 
 
 Same request/response shape as the session-authenticated `POST /api/ai/complete` (`{ "provider", "prompt", "system"?, "model"?, "maxTokens"?, "temperature"?, "topP"? }` → `{ "text", "model", "provider", "usage" }`), minus streaming support — a simpler contract for external HTTP clients. Enforces the key owner's plan's monthly AI request limit (402 when reached) and meters usage identically to the session-based route. Rate-limited to 20 requests/min per key.
 
-> **Why quota enforcement here is a separate code path**: `lib/billing/limits.ts`'s checks rely on the cookie-scoped Supabase client and RLS to implicitly filter to "the current user." An API-key request has no session, so that client has no `auth.uid()` — RLS would silently return zero rows even with an explicit filter, making the limit never trigger. `lib/api-keys/quota.ts` re-implements the same check against the service-role client with an explicit owner filter doing the scoping RLS would otherwise do.
+> **Why quota enforcement here is a separate code path**: `lib/billing/limits.ts`'s checks rely on the cookie-scoped Supabase client and RLS to implicitly filter to "the current user." An API-key request has no session, so that client has no `auth.uid()` — RLS would silently return zero rows even with an explicit filter, making the limit never trigger. `lib/ai/quota-sessionless.ts`'s `checkAiRequestLimitSessionless()` re-implements the same check against the service-role client with an explicit owner filter doing the scoping RLS would otherwise do — also used by the workflow webhook trigger for the same reason (see the Workflows section).
 
 ---
 

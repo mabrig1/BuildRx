@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { enforceAiUsageLimits } from "@/lib/ai/rate-guard";
 import { loadOwnedWorkflow, requireWorkflowUser } from "@/lib/workflows/access";
 import { runWorkflow } from "@/lib/workflows/engine";
 import { runWorkflowSchema } from "@/lib/validations/workflows";
@@ -17,6 +18,10 @@ type RouteParams = { params: Promise<{ workflowId: string }> };
 export async function POST(request: Request, { params }: RouteParams) {
   const auth = await requireWorkflowUser();
   if (!auth.ok) return auth.response;
+
+  const guard = await enforceAiUsageLimits(auth.userId, "workflow-run");
+  if (!guard.ok) return guard.response;
+
   const { workflowId } = await params;
 
   const workflow = await loadOwnedWorkflow(auth.supabase, auth.userId, workflowId);

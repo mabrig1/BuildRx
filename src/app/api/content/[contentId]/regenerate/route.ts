@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getProvider } from "@/lib/ai/providers/registry";
+import { enforceAiUsageLimits } from "@/lib/ai/rate-guard";
 import { recordAiUsage } from "@/lib/ai/usage";
 import { requireContentUser } from "@/lib/content/access";
 import { generateContentPiece } from "@/lib/content/ai";
@@ -27,6 +28,10 @@ const regenerateSchema = z.object({
 export async function POST(request: Request, { params }: RouteParams) {
   const auth = await requireContentUser();
   if (!auth.ok) return auth.response;
+
+  const guard = await enforceAiUsageLimits(auth.userId, "content");
+  if (!guard.ok) return guard.response;
+
   const { contentId } = await params;
 
   const existing = await auth.supabase

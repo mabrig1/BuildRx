@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { authenticateApiKey } from "@/lib/api-keys/auth";
-import { checkAiRequestLimitForApiKey } from "@/lib/api-keys/quota";
 import { getProvider } from "@/lib/ai/providers/registry";
 import { AiProviderError } from "@/lib/ai/providers/types";
+import { checkAiRequestLimitSessionless } from "@/lib/ai/quota-sessionless";
 import { recordAiUsage } from "@/lib/ai/usage";
 import { rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
-  const quotaError = await checkAiRequestLimitForApiKey(admin, identity.userId);
+  const quotaError = await checkAiRequestLimitSessionless(admin, identity.userId);
   if (quotaError) {
     return NextResponse.json({ error: quotaError }, { status: 402 });
   }

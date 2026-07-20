@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getProvider, listConfiguredProviders } from "@/lib/ai/providers/registry";
+import { enforceAiUsageLimits } from "@/lib/ai/rate-guard";
 import { summarizeDocumentText } from "@/lib/documents/ai";
 import { requireDocumentUser } from "@/lib/documents/access";
 import { detectFileType, extractDocument } from "@/lib/documents/extract";
@@ -39,6 +40,9 @@ export async function GET() {
 export async function POST(request: Request) {
   const auth = await requireDocumentUser();
   if (!auth.ok) return auth.response;
+
+  const guard = await enforceAiUsageLimits(auth.userId, "documents");
+  if (!guard.ok) return guard.response;
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");

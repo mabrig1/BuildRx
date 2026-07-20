@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { checkAiRequestLimitSessionless } from "@/lib/ai/quota-sessionless";
 import { rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -49,6 +50,11 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
   if (!workflow.data.enabled) {
     return NextResponse.json({ error: "This workflow is disabled." }, { status: 403 });
+  }
+
+  const quotaError = await checkAiRequestLimitSessionless(admin, workflow.data.owner_id);
+  if (quotaError) {
+    return NextResponse.json({ error: quotaError }, { status: 402 });
   }
 
   const { data: steps, error: stepsError } = await admin

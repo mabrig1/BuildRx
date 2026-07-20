@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { generateImage } from "@/lib/ai/image";
 import { isNvidiaConfigured, NvidiaApiError } from "@/lib/ai/nvidia";
+import { enforceAiUsageLimits } from "@/lib/ai/rate-guard";
 import { requireContentUser } from "@/lib/content/access";
 
 export const maxDuration = 90;
@@ -21,6 +22,10 @@ const coverImageSchema = z.object({
 export async function POST(request: Request, { params }: RouteParams) {
   const auth = await requireContentUser();
   if (!auth.ok) return auth.response;
+
+  const guard = await enforceAiUsageLimits(auth.userId, "content-cover-image");
+  if (!guard.ok) return guard.response;
+
   const { contentId } = await params;
 
   if (!isNvidiaConfigured()) {

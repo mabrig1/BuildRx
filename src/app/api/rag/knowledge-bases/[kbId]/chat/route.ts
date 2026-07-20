@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getProvider } from "@/lib/ai/providers/registry";
+import { enforceAiUsageLimits } from "@/lib/ai/rate-guard";
 import { answerFromKnowledgeBase } from "@/lib/rag/chat";
 import { loadOwnedKnowledgeBase, requireRagUser } from "@/lib/rag/access";
 import { ragChatSchema } from "@/lib/validations/rag";
@@ -17,6 +18,10 @@ type RouteParams = { params: Promise<{ kbId: string }> };
 export async function POST(request: Request, { params }: RouteParams) {
   const auth = await requireRagUser();
   if (!auth.ok) return auth.response;
+
+  const guard = await enforceAiUsageLimits(auth.userId, "rag-chat");
+  if (!guard.ok) return guard.response;
+
   const { kbId } = await params;
 
   const knowledgeBase = await loadOwnedKnowledgeBase(auth.supabase, auth.userId, kbId);

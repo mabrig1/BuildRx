@@ -687,6 +687,34 @@ All subscription/invoice writes go through the service-role client — clients c
 
 ---
 
+## SaaS: API Keys & Public API
+
+Self-service API keys for programmatic access to the platform under `/api/v1/*` — a separate, Bearer-token-authenticated surface from the rest of this document, which is all cookie-session-authenticated. Manage keys from **Settings → API Keys**.
+
+**Creating a key**: only the raw secret's SHA-256 hash and a short display prefix (`brx_live_a1b2c3…`) are ever stored — the full secret is returned exactly once, in the create response, and can't be retrieved again (only revoked/deleted).
+
+**Using a key**: send it as `Authorization: Bearer brx_live_...` on any `/api/v1/*` request. There's no session/cookie involved — these routes look the key up via the service-role client and treat its owner as the caller.
+
+### `GET /api/keys` / `POST /api/keys` / `PATCH /api/keys/{keyId}` / `DELETE /api/keys/{keyId}`
+
+Cookie-session-authenticated management endpoints (used by the Settings UI, not `/v1`). List your keys (never the secret), create one (`{ "name" }` → `{ "key": {...}, "secret": "brx_live_…" }`, secret shown once), revoke one (`PATCH`, stops it working immediately but keeps it listed), or delete one permanently.
+
+### `GET /api/v1/me`
+
+Verifies a key and returns the owning account: `{ "user": { "id", "email", "name", "plan" } }`. The natural first call when integrating.
+
+### `GET /api/v1/projects`
+
+The key owner's projects, newest-updated first (capped at 100). Rate-limited to 60 requests/min per key.
+
+### `POST /api/v1/ai/complete`
+
+Same request/response shape as the session-authenticated `POST /api/ai/complete` (`{ "provider", "prompt", "system"?, "model"?, "maxTokens"?, "temperature"?, "topP"? }` → `{ "text", "model", "provider", "usage" }`), minus streaming support — a simpler contract for external HTTP clients. Enforces the key owner's plan's monthly AI request limit (402 when reached) and meters usage identically to the session-based route. Rate-limited to 20 requests/min per key.
+
+> **Why quota enforcement here is a separate code path**: `lib/billing/limits.ts`'s checks rely on the cookie-scoped Supabase client and RLS to implicitly filter to "the current user." An API-key request has no session, so that client has no `auth.uid()` — RLS would silently return zero rows even with an explicit filter, making the limit never trigger. `lib/api-keys/quota.ts` re-implements the same check against the service-role client with an explicit owner filter doing the scoping RLS would otherwise do.
+
+---
+
 ## Analytics
 
 Personal usage analytics — the same `usage_logs` data the admin dashboard aggregates org-wide (`lib/analytics/admin-data.ts`), scoped to the signed-in user instead of requiring the `admin` role. Previously a regular user's own usage was visible only as two plain numbers on the billing page; this surfaces it properly (requests/tokens over time, broken down by feature and provider, plus recent activity).

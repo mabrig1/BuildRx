@@ -1276,6 +1276,46 @@ export interface Database {
           },
         ];
       };
+      api_keys: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          key_prefix: string;
+          key_hash: string;
+          last_used_at: string | null;
+          revoked_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+          key_prefix: string;
+          key_hash: string;
+          last_used_at?: string | null;
+          revoked_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_id?: string;
+          name?: string;
+          key_prefix?: string;
+          key_hash?: string;
+          last_used_at?: string | null;
+          revoked_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_owner_id_fkey";
+            columns: ["owner_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       deployments: {
         Row: {
           id: string;

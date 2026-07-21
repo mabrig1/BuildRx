@@ -13,6 +13,7 @@ import { ChatMessageItem } from "@/components/chat/chat-message-item";
 import { PromptSuggestions } from "@/components/chat/prompt-suggestions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { apiErrorFrom } from "@/lib/health/client-error";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/chat-store";
 import type { ChatMessage } from "@/types";
@@ -94,16 +95,23 @@ export function ChatPanel({
     });
     setStreaming(true);
 
+    // Backstop for the server's own timeout (270s): if the connection
+    // itself hangs (dropped response, network issue) the UI must not
+    // spin forever either.
+    const watchdog = new AbortController();
+    const watchdogTimer = setTimeout(() => watchdog.abort(), 285_000);
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, content: trimmed }),
+        signal: watchdog.signal,
       });
 
       if (!response.ok || !response.body) {
         const data = await response.json().catch(() => null);
-        throw new Error(data?.error ?? "Failed to send message");
+        throw apiErrorFrom(data, "Failed to send message");
       }
 
       const reader = response.body.getReader();
@@ -114,11 +122,23 @@ export function ChatPanel({
         appendToLastMessage(decoder.decode(value, { stream: true }));
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to send message"
+      const isWatchdogAbort = error instanceof DOMException && error.name === "AbortError";
+      const message = isWatchdogAbort
+        ? "The AI took too long to respond and the request was stopped."
+        : error instanceof Error
+          ? error.message
+          : "Failed to send message";
+      const suggestedFix = isWatchdogAbort
+        ? "Try a shorter or more specific request."
+        : error instanceof Error && "suggestedFix" in error
+          ? (error as { suggestedFix?: string }).suggestedFix
+          : undefined;
+      toast.error(message, { description: suggestedFix });
+      appendToLastMessage(
+        `*${message}${suggestedFix ? ` — ${suggestedFix}` : ""}*`
       );
-      appendToLastMessage("*Something went wrong — please try again.*");
     } finally {
+      clearTimeout(watchdogTimer);
       setStreaming(false);
       textareaRef.current?.focus();
     }

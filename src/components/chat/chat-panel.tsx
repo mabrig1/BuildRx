@@ -13,6 +13,7 @@ import { ChatMessageItem } from "@/components/chat/chat-message-item";
 import { PromptSuggestions } from "@/components/chat/prompt-suggestions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { apiErrorFrom } from "@/lib/health/client-error";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/chat-store";
 import type { ChatMessage } from "@/types";
@@ -103,7 +104,7 @@ export function ChatPanel({
 
       if (!response.ok || !response.body) {
         const data = await response.json().catch(() => null);
-        throw new Error(data?.error ?? "Failed to send message");
+        throw apiErrorFrom(data, "Failed to send message");
       }
 
       const reader = response.body.getReader();
@@ -114,10 +115,16 @@ export function ChatPanel({
         appendToLastMessage(decoder.decode(value, { stream: true }));
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to send message"
+      const message =
+        error instanceof Error ? error.message : "Failed to send message";
+      const suggestedFix =
+        error instanceof Error && "suggestedFix" in error
+          ? (error as { suggestedFix?: string }).suggestedFix
+          : undefined;
+      toast.error(message, { description: suggestedFix });
+      appendToLastMessage(
+        `*${message}${suggestedFix ? ` — ${suggestedFix}` : ""}*`
       );
-      appendToLastMessage("*Something went wrong — please try again.*");
     } finally {
       setStreaming(false);
       textareaRef.current?.focus();

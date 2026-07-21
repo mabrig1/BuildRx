@@ -137,7 +137,24 @@ export async function POST(request: Request) {
     content,
   });
   if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+    const { classifyThrown } = await import("@/lib/health/error-response");
+    const { logError } = await import("@/lib/health/logger");
+    const diagnosed = classifyThrown(insertError, "database");
+    await logError("chat", diagnosed.message, {
+      code: diagnosed.code,
+      subsystem: diagnosed.subsystem,
+      context: { projectId, cause: diagnosed.cause },
+    });
+    return NextResponse.json(
+      {
+        error: diagnosed.message,
+        code: diagnosed.code,
+        subsystem: diagnosed.subsystem,
+        cause: diagnosed.cause,
+        suggestedFix: diagnosed.suggestedFix,
+      },
+      { status: 500 }
+    );
   }
 
   // Load conversation history (including the message just inserted).
@@ -283,10 +300,17 @@ export async function POST(request: Request) {
         });
         controller.close();
       } catch (error) {
-        const message =
-          error instanceof Anthropic.APIError
-            ? `AI request failed (${error.status}): ${error.message}`
-            : "AI request failed. Please try again.";
+        const { classifyThrown } = await import("@/lib/health/error-response");
+        const { logError } = await import("@/lib/health/logger");
+        const diagnosed = classifyThrown(error, "ai");
+        const message = `${diagnosed.message} ${diagnosed.suggestedFix}`;
+
+        await logError("chat", diagnosed.message, {
+          code: diagnosed.code,
+          subsystem: diagnosed.subsystem,
+          context: { projectId, cause: diagnosed.cause },
+        });
+
         if (fullText.length === 0) {
           controller.enqueue(encoder.encode(message));
         }
@@ -295,7 +319,7 @@ export async function POST(request: Request) {
           completionTokens: 0,
           durationMs: Date.now() - startedAt,
           status: "failed",
-          error: message,
+          error: diagnosed.cause,
         });
         controller.close();
       }

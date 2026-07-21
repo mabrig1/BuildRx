@@ -68,7 +68,15 @@ export type AgentEvent =
       previewUrl: string | null;
       fileCount: number;
     }
-  | { type: "error"; agent?: AgentName; message: string };
+  | {
+      type: "error";
+      agent?: AgentName;
+      message: string;
+      /** Set when the error was classified (see lib/health/error-response) — a machine code, exact cause, and next step, instead of a generic message. */
+      code?: string;
+      cause?: string;
+      suggestedFix?: string;
+    };
 
 export type EmitFn = (event: AgentEvent) => void;
 

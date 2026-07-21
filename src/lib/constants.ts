@@ -2,6 +2,7 @@ import {
   Bot,
   CreditCard,
   FolderKanban,
+  HeartPulse,
   LayoutDashboard,
   Settings,
   ShieldCheck,
@@ -39,6 +40,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },
   { title: "Admin", href: "/admin", icon: ShieldCheck, adminOnly: true },
+  { title: "Health", href: "/admin/health", icon: HeartPulse, adminOnly: true },
 ];
 
 export interface PlanDefinition {

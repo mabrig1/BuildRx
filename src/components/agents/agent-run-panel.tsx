@@ -116,11 +116,15 @@ export function AgentRunPanel({
             ...prev,
             [event.agent as AgentName]: {
               status: "error",
-              message: event.message,
+              message: event.suggestedFix
+                ? `${event.message} — ${event.suggestedFix}`
+                : event.message,
             },
           }));
         }
-        toast.error(event.message);
+        toast.error(event.message, {
+          description: event.suggestedFix ?? event.cause,
+        });
         break;
     }
   }

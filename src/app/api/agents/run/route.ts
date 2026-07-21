@@ -65,10 +65,21 @@ export async function POST(request: Request) {
       try {
         await runWorkflow(context, emit);
       } catch (error) {
+        const { classifyThrown } = await import("@/lib/health/error-response");
+        const { logError } = await import("@/lib/health/logger");
+        const diagnosed = classifyThrown(error);
+        await logError("agents-run", diagnosed.message, {
+          code: diagnosed.code,
+          subsystem: diagnosed.subsystem,
+          stack: error instanceof Error ? error.stack : undefined,
+          context: { projectId, cause: diagnosed.cause },
+        });
         emit({
           type: "error",
-          message:
-            error instanceof Error ? error.message : "Workflow crashed",
+          message: diagnosed.message,
+          code: diagnosed.code,
+          cause: diagnosed.cause,
+          suggestedFix: diagnosed.suggestedFix,
         });
       }
       controller.close();

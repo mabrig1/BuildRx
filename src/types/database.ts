@@ -47,6 +47,14 @@ export type UsageAction =
   | "deployment"
   | "preview"
   | "export";
+export type LogLevel = "debug" | "info" | "warn" | "error";
+export type HealthStatus = "healthy" | "degraded" | "down";
+export type FixProposalStatus =
+  | "pending"
+  | "approved"
+  | "applied"
+  | "rejected"
+  | "failed";
 
 export interface Database {
   public: {
@@ -641,12 +649,137 @@ export interface Database {
           },
         ];
       };
+      system_logs: {
+        Row: {
+          id: string;
+          level: LogLevel;
+          source: string;
+          message: string;
+          code: string | null;
+          subsystem: string | null;
+          context: Json;
+          stack: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          level: LogLevel;
+          source: string;
+          message: string;
+          code?: string | null;
+          subsystem?: string | null;
+          context?: Json;
+          stack?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          level?: LogLevel;
+          source?: string;
+          message?: string;
+          code?: string | null;
+          subsystem?: string | null;
+          context?: Json;
+          stack?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      system_health_snapshots: {
+        Row: {
+          id: string;
+          overall_status: HealthStatus;
+          checks: Json;
+          taken_at: string;
+        };
+        Insert: {
+          id?: string;
+          overall_status: HealthStatus;
+          checks: Json;
+          taken_at?: string;
+        };
+        Update: {
+          id?: string;
+          overall_status?: HealthStatus;
+          checks?: Json;
+          taken_at?: string;
+        };
+        Relationships: [];
+      };
+      system_fix_proposals: {
+        Row: {
+          id: string;
+          subsystem: string;
+          code: string;
+          title: string;
+          description: string;
+          sql_fix: string | null;
+          status: FixProposalStatus;
+          created_at: string;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          applied_at: string | null;
+          result: string | null;
+        };
+        Insert: {
+          id?: string;
+          subsystem: string;
+          code: string;
+          title: string;
+          description: string;
+          sql_fix?: string | null;
+          status?: FixProposalStatus;
+          created_at?: string;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          applied_at?: string | null;
+          result?: string | null;
+        };
+        Update: {
+          id?: string;
+          subsystem?: string;
+          code?: string;
+          title?: string;
+          description?: string;
+          sql_fix?: string | null;
+          status?: FixProposalStatus;
+          created_at?: string;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          applied_at?: string | null;
+          result?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "system_fix_proposals_reviewed_by_fkey";
+            columns: ["reviewed_by"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
       is_admin: {
         Args: Record<string, never>;
         Returns: boolean;
+      };
+      admin_exec_sql: {
+        Args: { sql: string };
+        Returns: undefined;
+      };
+      health_table_status: {
+        Args: { table_names: string[] };
+        Returns: Array<{
+          table_name: string;
+          table_exists: boolean;
+          rls_enabled: boolean;
+        }>;
+      };
+      health_auth_profile_gap: {
+        Args: Record<string, never>;
+        Returns: number;
       };
     };
     Enums: {

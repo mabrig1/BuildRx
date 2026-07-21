@@ -74,9 +74,25 @@ export async function runWorkflow(
       });
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Agent workflow failed";
-    emit({ type: "error", message });
+    const { classifyThrown } = await import("@/lib/health/error-response");
+    const { logError } = await import("@/lib/health/logger");
+    const diagnosed = classifyThrown(error);
+    const message = diagnosed.message;
+
+    await logError("agent-workflow", message, {
+      code: diagnosed.code,
+      subsystem: diagnosed.subsystem,
+      stack: error instanceof Error ? error.stack : undefined,
+      context: { projectId: context.projectId, cause: diagnosed.cause },
+    });
+
+    emit({
+      type: "error",
+      message,
+      code: diagnosed.code,
+      cause: diagnosed.cause,
+      suggestedFix: diagnosed.suggestedFix,
+    });
 
     if (context.persist && isSupabaseConfigured()) {
       const { createClient } = await import("@/lib/supabase/server");

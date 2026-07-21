@@ -1,10 +1,13 @@
 -- ============================================================
--- 20260721050000 · Self-healing platform core
+-- 20260721035525 · Self-healing platform core
 --
 -- Structured error/log history, point-in-time health-check
 -- snapshots, and an approval-gated fix-proposal queue. Fixes are
 -- never auto-applied to production — an admin must approve a
 -- proposal before its SQL runs (see admin_exec_sql below).
+--
+-- Applied to the live project via MCP as version 20260721035525
+-- (the apply timestamp); this file records it in the repo.
 -- ============================================================
 
 create table public.system_logs (

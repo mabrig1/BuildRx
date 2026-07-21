@@ -95,11 +95,18 @@ export function ChatPanel({
     });
     setStreaming(true);
 
+    // Backstop for the server's own timeout (270s): if the connection
+    // itself hangs (dropped response, network issue) the UI must not
+    // spin forever either.
+    const watchdog = new AbortController();
+    const watchdogTimer = setTimeout(() => watchdog.abort(), 285_000);
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, content: trimmed }),
+        signal: watchdog.signal,
       });
 
       if (!response.ok || !response.body) {
@@ -115,10 +122,15 @@ export function ChatPanel({
         appendToLastMessage(decoder.decode(value, { stream: true }));
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to send message";
-      const suggestedFix =
-        error instanceof Error && "suggestedFix" in error
+      const isWatchdogAbort = error instanceof DOMException && error.name === "AbortError";
+      const message = isWatchdogAbort
+        ? "The AI took too long to respond and the request was stopped."
+        : error instanceof Error
+          ? error.message
+          : "Failed to send message";
+      const suggestedFix = isWatchdogAbort
+        ? "Try a shorter or more specific request."
+        : error instanceof Error && "suggestedFix" in error
           ? (error as { suggestedFix?: string }).suggestedFix
           : undefined;
       toast.error(message, { description: suggestedFix });
@@ -126,6 +138,7 @@ export function ChatPanel({
         `*${message}${suggestedFix ? ` — ${suggestedFix}` : ""}*`
       );
     } finally {
+      clearTimeout(watchdogTimer);
       setStreaming(false);
       textareaRef.current?.focus();
     }

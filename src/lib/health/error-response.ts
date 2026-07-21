@@ -107,6 +107,21 @@ export function classifyThrown(error: unknown, subsystemHint?: Subsystem): Diagn
       ? Number((error as { status?: unknown }).status)
       : undefined;
 
+  const errorName =
+    typeof error === "object" && error !== null && "name" in error
+      ? String((error as { name?: unknown }).name)
+      : undefined;
+  if (errorName === "AbortError" || /timed? ?out|deadline exceeded/i.test(message)) {
+    return {
+      message: "The AI took too long to respond and the request was stopped.",
+      code: "AI_TIMEOUT",
+      subsystem: "ai",
+      cause: message,
+      suggestedFix: "Try a shorter or more specific request — very large responses can exceed the time limit.",
+      retryable: true,
+    };
+  }
+
   if (/unauthori[sz]ed|not authenticated|jwt|no session/i.test(message)) {
     return {
       message: "You need to be signed in to do that.",

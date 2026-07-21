@@ -268,19 +268,35 @@ export async function POST(request: Request) {
   const anthropic = new Anthropic();
   const startedAt = Date.now();
 
+  // Vercel hard-kills this function at maxDuration (300s) with no
+  // chance to respond, which is exactly what left users staring at an
+  // infinite spinner. Abort with time to spare so we can always
+  // report a clear timeout instead of the platform silently killing
+  // the request.
+  const DEADLINE_MS = 270_000;
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const encoder = new TextEncoder();
       let fullText = "";
-      try {
-        const messageStream = anthropic.messages.stream({
-          model: CHAT_MODEL,
-          max_tokens: 32000,
-          thinking: { type: "adaptive" },
-          system: APP_BUILDER_SYSTEM_PROMPT,
-          messages,
-        });
+      let timedOut = false;
+      const messageStream = anthropic.messages.stream({
+        model: CHAT_MODEL,
+        // Chat replies should be conversational, not a full app dump
+        // (see APP_BUILDER_SYSTEM_PROMPT: "keep responses concise") —
+        // 32k was sized for code generation, not chat, and made a
+        // 300s timeout easy to hit.
+        max_tokens: 8192,
+        thinking: { type: "adaptive" },
+        system: APP_BUILDER_SYSTEM_PROMPT,
+        messages,
+      });
+      const deadline = setTimeout(() => {
+        timedOut = true;
+        messageStream.abort();
+      }, DEADLINE_MS);
 
+      try {
         for await (const event of messageStream) {
           if (
             event.type === "content_block_delta" &&
@@ -300,9 +316,19 @@ export async function POST(request: Request) {
         });
         controller.close();
       } catch (error) {
-        const { classifyThrown } = await import("@/lib/health/error-response");
         const { logError } = await import("@/lib/health/logger");
-        const diagnosed = classifyThrown(error, "ai");
+        const diagnosed = timedOut
+          ? {
+              message: "The AI took too long to respond and the request was stopped.",
+              code: "AI_TIMEOUT",
+              subsystem: "ai" as const,
+              cause: `Response exceeded the ${DEADLINE_MS / 1000}s time budget.`,
+              suggestedFix:
+                "Try a shorter or more specific request — very large responses can exceed the time limit.",
+            }
+          : await import("@/lib/health/error-response").then((m) =>
+              m.classifyThrown(error, "ai")
+            );
         const message = `${diagnosed.message} ${diagnosed.suggestedFix}`;
 
         await logError("chat", diagnosed.message, {
@@ -322,6 +348,8 @@ export async function POST(request: Request) {
           error: diagnosed.cause,
         });
         controller.close();
+      } finally {
+        clearTimeout(deadline);
       }
     },
   });

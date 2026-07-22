@@ -9,9 +9,19 @@ import {
 } from "@/lib/ai/nvidia";
 import { APP_BUILDER_SYSTEM_PROMPT, CHAT_MODEL } from "@/lib/ai/prompts";
 import { recordAiUsage } from "@/lib/ai/usage";
+import { withTimeout } from "@/lib/health/retry";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { chatMessageSchema } from "@/lib/validations/chat";
+
+/**
+ * Bounds every Supabase round trip made before the AI stream starts.
+ * Those calls previously had no timeout at all: a single hung one (auth,
+ * a query, an insert) burned the whole 300s function budget with no
+ * diagnosable error, even though the AI-streaming section further down
+ * already had its own deadline — this closes the gap.
+ */
+const DB_STEP_TIMEOUT_MS = 20_000;
 
 export const maxDuration = 300;
 
@@ -106,36 +116,82 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"];
+  try {
+    const auth = await withTimeout(
+      () => supabase.auth.getUser(),
+      DB_STEP_TIMEOUT_MS,
+      "auth.getUser"
+    );
+    user = auth.data.user;
+  } catch {
+    return NextResponse.json(
+      { error: "Authentication is taking too long to respond. Please try again." },
+      { status: 504 }
+    );
+  }
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { checkAiRequestLimit } = await import("@/lib/billing/limits");
-  const limitError = await checkAiRequestLimit(user.id);
+  let limitError: string | null;
+  try {
+    limitError = await withTimeout(
+      () => checkAiRequestLimit(user!.id),
+      DB_STEP_TIMEOUT_MS,
+      "checkAiRequestLimit"
+    );
+  } catch {
+    return NextResponse.json(
+      { error: "Usage check is taking too long to respond. Please try again." },
+      { status: 504 }
+    );
+  }
   if (limitError) {
     return NextResponse.json({ error: limitError }, { status: 402 });
   }
 
   // RLS also enforces this, but a explicit check gives a clean 404.
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("id", projectId)
-    .single();
+  let project: { id: string } | null;
+  try {
+    const result = await withTimeout(
+      () => supabase.from("projects").select("id").eq("id", projectId).single(),
+      DB_STEP_TIMEOUT_MS,
+      "project lookup"
+    );
+    project = result.data;
+  } catch {
+    return NextResponse.json(
+      { error: "The database is taking too long to respond. Please try again." },
+      { status: 504 }
+    );
+  }
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
   // Persist the user's message.
-  const { error: insertError } = await supabase.from("chat_messages").insert({
-    project_id: projectId,
-    user_id: user.id,
-    role: "user",
-    content,
-  });
+  let insertError: { message: string } | null;
+  try {
+    const result = await withTimeout(
+      () =>
+        supabase.from("chat_messages").insert({
+          project_id: projectId,
+          user_id: user!.id,
+          role: "user",
+          content,
+        }),
+      DB_STEP_TIMEOUT_MS,
+      "chat message insert"
+    );
+    insertError = result.error;
+  } catch {
+    return NextResponse.json(
+      { error: "The database is taking too long to respond. Please try again." },
+      { status: 504 }
+    );
+  }
   if (insertError) {
     const { classifyThrown } = await import("@/lib/health/error-response");
     const { logError } = await import("@/lib/health/logger");
@@ -158,12 +214,26 @@ export async function POST(request: Request) {
   }
 
   // Load conversation history (including the message just inserted).
-  const { data: history } = await supabase
-    .from("chat_messages")
-    .select("role, content")
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: true })
-    .limit(50);
+  let history: Array<{ role: string; content: string }> | null;
+  try {
+    const result = await withTimeout(
+      () =>
+        supabase
+          .from("chat_messages")
+          .select("role, content")
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: true })
+          .limit(50),
+      DB_STEP_TIMEOUT_MS,
+      "chat history load"
+    );
+    history = result.data;
+  } catch {
+    return NextResponse.json(
+      { error: "The database is taking too long to respond. Please try again." },
+      { status: 504 }
+    );
+  }
 
   const messages: Anthropic.MessageParam[] = (history ?? [])
     .filter((m) => m.role !== "system")

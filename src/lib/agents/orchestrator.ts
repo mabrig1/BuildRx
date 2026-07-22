@@ -33,11 +33,18 @@ const agents: Record<string, Agent> = {
  * the generated-file map), so later agents build on earlier output.
  * Progress is reported through `emit`.
  */
+/**
+ * Leaves 30s of the route's 300s maxDuration for the deployment agent's
+ * DB writes and the response flush, after six agent steps share the rest.
+ */
+const PIPELINE_BUDGET_MS = 270_000;
+
 export async function runWorkflow(
   context: WorkflowContext,
   emit: EmitFn
 ): Promise<void> {
   const startedAt = Date.now();
+  context.deadlineAt = startedAt + PIPELINE_BUDGET_MS;
   emit({ type: "workflow_start", agents: AGENT_ORDER });
 
   // Mark the project as generating while the pipeline runs.
@@ -52,6 +59,11 @@ export async function runWorkflow(
 
   try {
     for (const name of AGENT_ORDER) {
+      if (Date.now() >= context.deadlineAt!) {
+        throw new Error(
+          `Ran out of time before the ${AGENT_LABELS[name]} could start.`
+        );
+      }
       await agents[name].run(context, emit);
     }
 

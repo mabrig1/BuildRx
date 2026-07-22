@@ -54,6 +54,14 @@ export interface WorkflowContext {
   /** Accumulated generated files, keyed by path (later agents may revise). */
   files: Map<string, GeneratedFile>;
   previewUrl?: string;
+  /**
+   * Absolute timestamp (ms) the whole pipeline must finish by, set once
+   * by the orchestrator. Agents divide their remaining slice of it
+   * across their own LLM calls so six sequential steps share one
+   * Vercel function's duration budget instead of each assuming they
+   * have the whole thing to themselves.
+   */
+  deadlineAt?: number;
 }
 
 /** Events streamed to the client as NDJSON. */

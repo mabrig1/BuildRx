@@ -3,6 +3,7 @@ import {
   isLlmConfigured,
   parseFileBlocks,
   pause,
+  remainingBudgetMs,
   runAgentCompletion,
 } from "@/lib/agents/llm";
 import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
@@ -166,6 +167,7 @@ export const uiAgent: Agent = {
         system: SYSTEM,
         prompt: `Build plan:\n${JSON.stringify(plan, null, 2)}\n\nOriginal request: ${context.prompt}`,
         role: "code",
+        timeoutMs: remainingBudgetMs(context.deadlineAt),
       });
       files = parseFileBlocks(text);
     }

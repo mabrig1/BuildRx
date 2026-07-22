@@ -109,6 +109,33 @@ class CircuitBreakerRegistry {
   }
 }
 
+/**
+ * Bounds an awaitable to `ms`, throwing a clear, labeled error instead of
+ * letting the caller hang indefinitely. Does not cancel the underlying
+ * operation (not every dependency exposes an abort signal) — it only
+ * stops the caller from waiting on it forever, so a single stuck
+ * dependency can't silently burn a serverless function's whole duration
+ * budget with no diagnosable error.
+ */
+export async function withTimeout<T>(
+  fn: () => PromiseLike<T>,
+  ms: number,
+  label: string
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms
+    );
+  });
+  try {
+    return await Promise.race([Promise.resolve(fn()), timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
 export const circuitBreakers = new CircuitBreakerRegistry();
 
 export class CircuitOpenError extends Error {

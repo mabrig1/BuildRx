@@ -7,6 +7,7 @@ import {
   nvidiaCodeModel,
   nvidiaTextModel,
 } from "@/lib/ai/nvidia";
+import { withTimeout } from "@/lib/health/retry";
 
 export const AGENT_MODEL = "claude-opus-4-8";
 
@@ -21,22 +22,49 @@ export function isLlmConfigured() {
   return Boolean(process.env.ANTHROPIC_API_KEY) || isNvidiaConfigured();
 }
 
+/** Default per-call budget when the orchestrator hasn't set a tighter one. */
+const DEFAULT_TIMEOUT_MS = 90_000;
+
+/**
+ * Slices a shared pipeline deadline into a per-call budget: never less
+ * than `floorMs` (so a step always gets a fair shot) and never more than
+ * `ceilingMs` (so one step can't claim the whole remaining budget from
+ * the ones after it).
+ */
+export function remainingBudgetMs(
+  deadlineAt: number | undefined,
+  floorMs = 10_000,
+  ceilingMs = DEFAULT_TIMEOUT_MS
+): number {
+  if (!deadlineAt) return ceilingMs;
+  return Math.max(floorMs, Math.min(ceilingMs, deadlineAt - Date.now()));
+}
+
 /**
  * Runs one agent LLM call. Prefers Anthropic Claude when configured
  * (streaming under the hood so long generations don't hit HTTP
  * timeouts); falls back to the NVIDIA Inference API with a role-matched
  * model. Returns the final text.
+ *
+ * Bounded by `timeoutMs` (the orchestrator passes the remaining slice of
+ * its overall deadline): the six-agent pipeline shares one 300s Vercel
+ * function budget, so a single step with no time limit of its own could
+ * silently consume the whole thing and leave the platform to hard-kill
+ * the request with no diagnosable error — exactly the "stuck waiting
+ * indefinitely" failure this closes off.
  */
 export async function runAgentCompletion({
   system,
   prompt,
   maxTokens = 16000,
   role = "reasoning",
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 }: {
   system: string;
   prompt: string;
   maxTokens?: number;
   role?: AgentRole;
+  timeoutMs?: number;
 }): Promise<string> {
   if (process.env.ANTHROPIC_API_KEY) {
     const client = new Anthropic();
@@ -47,25 +75,48 @@ export async function runAgentCompletion({
       system,
       messages: [{ role: "user", content: prompt }],
     });
-    const message = await stream.finalMessage();
-    return message.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("");
+
+    let timedOut = false;
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      stream.abort();
+    }, timeoutMs);
+
+    try {
+      const message = await stream.finalMessage();
+      return message.content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join("");
+    } catch (error) {
+      if (timedOut) {
+        throw new Error(
+          `Agent LLM call exceeded its ${Math.round(timeoutMs / 1000)}s time budget.`
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(deadline);
+    }
   }
 
   const model = role === "code" ? nvidiaCodeModel() : nvidiaTextModel();
-  const result = await createChatCompletion(
-    [
-      { role: "system", content: system },
-      { role: "user", content: prompt },
-    ],
-    {
-      model,
-      // Stay inside each model's completion window.
-      maxTokens: Math.min(maxTokens, role === "code" ? 8192 : 16384),
-      temperature: 0.3,
-    }
+  const result = await withTimeout(
+    () =>
+      createChatCompletion(
+        [
+          { role: "system", content: system },
+          { role: "user", content: prompt },
+        ],
+        {
+          model,
+          // Stay inside each model's completion window.
+          maxTokens: Math.min(maxTokens, role === "code" ? 8192 : 16384),
+          temperature: 0.3,
+        }
+      ),
+    timeoutMs,
+    "NVIDIA agent completion"
   );
   return result.text;
 }

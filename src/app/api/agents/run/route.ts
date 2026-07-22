@@ -4,6 +4,7 @@ import { z } from "zod";
 import { runWorkflow } from "@/lib/agents/orchestrator";
 import type { AgentEvent, WorkflowContext } from "@/lib/agents/types";
 import { authorizeAiRequest } from "@/lib/ai/route-helpers";
+import { withTimeout } from "@/lib/health/retry";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -38,13 +39,20 @@ export async function POST(request: Request) {
   const persist = isSupabaseConfigured();
   if (persist) {
     const supabase = await createClient();
-    const { data: project } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("id", projectId)
-      .single();
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    try {
+      const { data: project } = await withTimeout(
+        () => supabase.from("projects").select("id").eq("id", projectId).single(),
+        20_000,
+        "project lookup"
+      );
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    } catch {
+      return NextResponse.json(
+        { error: "The database is taking too long to respond. Please try again." },
+        { status: 504 }
+      );
     }
   }
 

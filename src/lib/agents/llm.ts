@@ -1,25 +1,18 @@
-import Anthropic from "@anthropic-ai/sdk";
-
 import type { GeneratedFile } from "@/lib/agents/types";
-import {
-  createChatCompletion,
-  isNvidiaConfigured,
-  nvidiaCodeModel,
-  nvidiaTextModel,
-} from "@/lib/ai/nvidia";
-import { withTimeout } from "@/lib/health/retry";
+import { isAnyProviderConfigured, completeText } from "@/lib/ai/provider";
+import { nvidiaCodeModel } from "@/lib/ai/nvidia";
 
 export const AGENT_MODEL = "claude-opus-4-8";
 
 /**
- * What kind of work the agent call is doing. With the NVIDIA provider
- * this selects the model: reasoning → the text model (GLM 5.2),
- * code → the code-specialized model (Laguna XS 2.1).
+ * What kind of work the agent call is doing — selects the NVIDIA model
+ * used for the provider chain's "nvidia-glm" tier when that provider is
+ * reached: reasoning → GLM, code → the code-specialized Laguna model.
  */
 export type AgentRole = "reasoning" | "code";
 
 export function isLlmConfigured() {
-  return Boolean(process.env.ANTHROPIC_API_KEY) || isNvidiaConfigured();
+  return isAnyProviderConfigured();
 }
 
 /** Default per-call budget when the orchestrator hasn't set a tighter one. */
@@ -41,10 +34,9 @@ export function remainingBudgetMs(
 }
 
 /**
- * Runs one agent LLM call. Prefers Anthropic Claude when configured
- * (streaming under the hood so long generations don't hit HTTP
- * timeouts); falls back to the NVIDIA Inference API with a role-matched
- * model. Returns the final text.
+ * Runs one agent LLM call through the centralized provider chain (NVIDIA
+ * GLM → NVIDIA Llama → Anthropic Claude, whichever are configured).
+ * Returns the final text.
  *
  * Bounded by `timeoutMs` (the orchestrator passes the remaining slice of
  * its overall deadline): the six-agent pipeline shares one 300s Vercel
@@ -66,57 +58,20 @@ export async function runAgentCompletion({
   role?: AgentRole;
   timeoutMs?: number;
 }): Promise<string> {
-  if (process.env.ANTHROPIC_API_KEY) {
-    const client = new Anthropic();
-    const stream = client.messages.stream({
-      model: AGENT_MODEL,
-      max_tokens: maxTokens,
-      thinking: { type: "adaptive" },
-      system,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    let timedOut = false;
-    const deadline = setTimeout(() => {
-      timedOut = true;
-      stream.abort();
-    }, timeoutMs);
-
-    try {
-      const message = await stream.finalMessage();
-      return message.content
-        .filter((block) => block.type === "text")
-        .map((block) => block.text)
-        .join("");
-    } catch (error) {
-      if (timedOut) {
-        throw new Error(
-          `Agent LLM call exceeded its ${Math.round(timeoutMs / 1000)}s time budget.`
-        );
-      }
-      throw error;
-    } finally {
-      clearTimeout(deadline);
+  const result = await completeText(
+    [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ],
+    {
+      maxTokens,
+      temperature: 0.3,
+      timeoutMs,
+      anthropicModel: AGENT_MODEL,
+      // Keep the code-specialized NVIDIA model for code-generating
+      // agents; the GLM default covers planning/review/reasoning steps.
+      nvidiaModel: role === "code" ? nvidiaCodeModel() : undefined,
     }
-  }
-
-  const model = role === "code" ? nvidiaCodeModel() : nvidiaTextModel();
-  const result = await withTimeout(
-    () =>
-      createChatCompletion(
-        [
-          { role: "system", content: system },
-          { role: "user", content: prompt },
-        ],
-        {
-          model,
-          // Stay inside each model's completion window.
-          maxTokens: Math.min(maxTokens, role === "code" ? 8192 : 16384),
-          temperature: 0.3,
-        }
-      ),
-    timeoutMs,
-    "NVIDIA agent completion"
   );
   return result.text;
 }

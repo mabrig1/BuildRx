@@ -26,24 +26,33 @@ Get these from **Project Settings → API** in the [Supabase dashboard](https://
 
 **Google Sign-In** requires no extra env vars — the Google OAuth client is configured in the Supabase dashboard. See the [Google OAuth setup guide](google-oauth.md) for the required provider, redirect-URL, and callback-URL configuration.
 
-## Anthropic (AI chat + agents)
+## AI providers (chat + agent build pipeline)
+
+`/api/chat` and `/api/agents/run` go through a shared provider chain
+(`src/lib/ai/provider.ts`) that tries each configured provider in order
+and falls back automatically: **NVIDIA GLM → NVIDIA Llama → Anthropic
+Claude**. Configure either or both; with neither key set, both return
+well-formed **mock responses** (still persisted when Supabase is
+connected), clearly labeled as demo output.
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | For real AI | From the [Anthropic Console](https://console.anthropic.com). Powers the streaming project chat and the six-agent build pipeline. Without it, the chat falls back to the NVIDIA text model when `NVIDIA_API_KEY` is set; with neither key, both return well-formed **mock responses** (still persisted when Supabase is connected), clearly labeled as demo output. |
+| `NVIDIA_API_KEY` | For NVIDIA (primary) | Bearer token for the NIM OpenAI-compatible API. Get one at [build.nvidia.com](https://build.nvidia.com). |
+| `NVIDIA_BASE_URL` | No | API base URL (alias: `NVIDIA_API_BASE_URL`). Default: `https://integrate.api.nvidia.com/v1`. |
+| `NVIDIA_GLM_MODEL` | No | Primary provider-chain model. Default: `z-ai/glm-5.2`. |
+| `NVIDIA_LLAMA_MODEL` | No | NVIDIA's own fallback tier before the chain leaves NVIDIA entirely — a lightweight model, tried only if the GLM model fails. Default: `meta/llama-3.2-1b-instruct`. |
+| `ANTHROPIC_API_KEY` | For Anthropic (fallback) | From the [Anthropic Console](https://console.anthropic.com). Used when NVIDIA is unconfigured or every NVIDIA attempt fails. |
+| `NVIDIA_RATE_LIMIT_RPM` | No | Per-user requests/minute across the AI endpoints (also applies to `/api/agents/run`). Default: `20`. |
 
 ## NVIDIA Inference API (`/api/ai/generate`, `/api/ai/code`)
 
-Get a key at [build.nvidia.com](https://build.nvidia.com). These endpoints return `503` if `NVIDIA_API_KEY` is unset.
+These two endpoints are NVIDIA-only by design (no Anthropic fallback) and return `503` if `NVIDIA_API_KEY` is unset. They use their own role-specialized models, independent of the GLM/Llama provider-chain tiers above.
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `NVIDIA_API_KEY` | For the NVIDIA endpoints | Bearer token for the NIM OpenAI-compatible API. |
-| `NVIDIA_API_BASE_URL` | No | API base URL (alias: `NVIDIA_BASE_URL`). Default: `https://integrate.api.nvidia.com/v1`. |
-| `NVIDIA_TEXT_MODEL` | No | Reasoning model — `/api/ai/generate` and the planner/debug agents. Default: `z-ai/glm-5.2`. |
-| `NVIDIA_CODE_MODEL` | No | Code model — `/api/ai/code` and the UI/database/coding agents. Default: `poolside/laguna-xs-2.1`. |
-| `NVIDIA_CHAT_MODEL` | No | Fast chat model — `/api/chat` when no Anthropic key is set. Default: `stepfun-ai/step-3.7-flash`. |
-| `NVIDIA_RATE_LIMIT_RPM` | No | Per-user requests/minute across the AI endpoints (also applies to `/api/agents/run`). Default: `20`. |
+| `NVIDIA_TEXT_MODEL` | No | Reasoning model — `/api/ai/generate`. Default: `z-ai/glm-5.2`. |
+| `NVIDIA_CODE_MODEL` | No | Code model — `/api/ai/code`, and reused by the chat/agent pipeline's code-generating agents when their NVIDIA tier is reached. Default: `poolside/laguna-xs-2.1`. |
+| `NVIDIA_CHAT_MODEL` | No | Fast chat model, used only in demo mode (no Supabase) for the plain-NVIDIA branch. Default: `stepfun-ai/step-3.7-flash`. |
 
 ## PostHog (product analytics)
 

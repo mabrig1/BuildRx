@@ -1,13 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 
-import {
-  isNvidiaConfigured,
-  nvidiaChatModel,
-  streamChatCompletion,
-  type NvidiaMessage,
-} from "@/lib/ai/nvidia";
 import { APP_BUILDER_SYSTEM_PROMPT, CHAT_MODEL } from "@/lib/ai/prompts";
+import {
+  isAnyProviderConfigured,
+  streamText,
+  type ProviderMessage,
+} from "@/lib/ai/provider";
 import { recordAiUsage } from "@/lib/ai/usage";
 import { withTimeout } from "@/lib/health/retry";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -83,22 +81,24 @@ export async function POST(request: Request) {
   }
   const { projectId, content } = parsed.data;
 
-  // Demo mode: no Supabase → no persistence. Stream a real NVIDIA
-  // response when a key is configured, otherwise the canned demo reply.
+  // Demo mode: no Supabase → no persistence. Stream a real response
+  // through the provider chain (NVIDIA GLM → NVIDIA Llama → Anthropic,
+  // whichever are configured), otherwise the canned demo reply.
   if (!isSupabaseConfigured()) {
-    if (isNvidiaConfigured()) {
+    if (isAnyProviderConfigured()) {
       try {
-        const { stream, model } = await streamChatCompletion(
+        const { stream, model, provider } = await streamText(
           [
             { role: "system", content: APP_BUILDER_SYSTEM_PROMPT },
             { role: "user", content },
           ],
-          { model: nvidiaChatModel(), maxTokens: 4096 }
+          { maxTokens: 4096, anthropicModel: CHAT_MODEL, timeoutMs: 270_000 }
         );
         return new Response(stream, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
             "X-Model": model,
+            "X-Provider": provider,
           },
         });
       } catch {
@@ -235,12 +235,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const messages: Anthropic.MessageParam[] = (history ?? [])
-    .filter((m) => m.role !== "system")
-    .map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
+  const messages: ProviderMessage[] = [
+    { role: "system", content: APP_BUILDER_SYSTEM_PROMPT },
+    ...(history ?? [])
+      .filter((m) => m.role !== "system")
+      .map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+  ];
 
   async function persistAssistantMessage(
     text: string,
@@ -278,47 +281,8 @@ export async function POST(request: Request) {
     });
   }
 
-  // No Anthropic key → fall back to the NVIDIA endpoint (with the full
-  // conversation history), still persisting both sides of the chat.
-  if (!process.env.ANTHROPIC_API_KEY && isNvidiaConfigured()) {
-    const startedAt = Date.now();
-    try {
-      const nvidiaMessages: NvidiaMessage[] = [
-        { role: "system", content: APP_BUILDER_SYSTEM_PROMPT },
-        ...messages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content:
-            typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-        })),
-      ];
-      const { stream, completion, model } = await streamChatCompletion(
-        nvidiaMessages,
-        { model: nvidiaChatModel(), maxTokens: 4096 }
-      );
-      void completion
-        .then((result) =>
-          persistAssistantMessage(result.text, {
-            promptTokens: result.usage.promptTokens,
-            completionTokens: result.usage.completionTokens,
-            durationMs: Date.now() - startedAt,
-            status: "completed",
-            model: result.model,
-          })
-        )
-        .catch(() => undefined);
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          "X-Model": model,
-        },
-      });
-    } catch {
-      // fall through to the mock stream below
-    }
-  }
-
-  // No API key at all → mock stream, but still persist both sides.
-  if (!process.env.ANTHROPIC_API_KEY) {
+  // No provider configured at all → mock stream, but still persist both sides.
+  if (!isAnyProviderConfigured()) {
     const upstream = mockStream();
     const [toClient, toPersist] = upstream.tee();
     void (async () => {
@@ -335,96 +299,94 @@ export async function POST(request: Request) {
     });
   }
 
-  const anthropic = new Anthropic();
   const startedAt = Date.now();
 
   // Vercel hard-kills this function at maxDuration (300s) with no
   // chance to respond, which is exactly what left users staring at an
-  // infinite spinner. Abort with time to spare so we can always
-  // report a clear timeout instead of the platform silently killing
-  // the request.
+  // infinite spinner. This bounds both the time spent trying providers
+  // in the fallback chain (NVIDIA GLM → NVIDIA Llama → Anthropic) and,
+  // once one is selected, its own generation time.
   const DEADLINE_MS = 270_000;
 
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const encoder = new TextEncoder();
-      let fullText = "";
-      let timedOut = false;
-      const messageStream = anthropic.messages.stream({
-        model: CHAT_MODEL,
-        // Chat replies should be conversational, not a full app dump
-        // (see APP_BUILDER_SYSTEM_PROMPT: "keep responses concise") —
-        // 32k was sized for code generation, not chat, and made a
-        // 300s timeout easy to hit.
-        max_tokens: 8192,
-        thinking: { type: "adaptive" },
-        system: APP_BUILDER_SYSTEM_PROMPT,
-        messages,
-      });
-      const deadline = setTimeout(() => {
-        timedOut = true;
-        messageStream.abort();
-      }, DEADLINE_MS);
+  try {
+    const { stream, model, provider, completion } = await withTimeout(
+      () =>
+        streamText(messages, {
+          // Chat replies should be conversational, not a full app dump
+          // (see APP_BUILDER_SYSTEM_PROMPT: "keep responses concise").
+          maxTokens: 8192,
+          anthropicModel: CHAT_MODEL,
+          timeoutMs: DEADLINE_MS,
+        }),
+      DEADLINE_MS,
+      "AI provider selection"
+    );
 
-      try {
-        for await (const event of messageStream) {
-          if (
-            event.type === "content_block_delta" &&
-            event.delta.type === "text_delta"
-          ) {
-            fullText += event.delta.text;
-            controller.enqueue(encoder.encode(event.delta.text));
-          }
-        }
-
-        const final = await messageStream.finalMessage();
-        await persistAssistantMessage(fullText, {
-          promptTokens: final.usage.input_tokens,
-          completionTokens: final.usage.output_tokens,
+    void completion
+      .then((result) =>
+        persistAssistantMessage(result.text, {
+          promptTokens: result.usage.promptTokens,
+          completionTokens: result.usage.completionTokens,
           durationMs: Date.now() - startedAt,
           status: "completed",
-        });
-        controller.close();
-      } catch (error) {
+          model: result.model,
+        })
+      )
+      .catch(async (error) => {
+        const { classifyThrown } = await import("@/lib/health/error-response");
         const { logError } = await import("@/lib/health/logger");
-        const diagnosed = timedOut
-          ? {
-              message: "The AI took too long to respond and the request was stopped.",
-              code: "AI_TIMEOUT",
-              subsystem: "ai" as const,
-              cause: `Response exceeded the ${DEADLINE_MS / 1000}s time budget.`,
-              suggestedFix:
-                "Try a shorter or more specific request — very large responses can exceed the time limit.",
-            }
-          : await import("@/lib/health/error-response").then((m) =>
-              m.classifyThrown(error, "ai")
-            );
-        const message = `${diagnosed.message} ${diagnosed.suggestedFix}`;
-
+        const diagnosed = classifyThrown(error, "ai");
         await logError("chat", diagnosed.message, {
           code: diagnosed.code,
           subsystem: diagnosed.subsystem,
           context: { projectId, cause: diagnosed.cause },
         });
+        await persistAssistantMessage(
+          error instanceof Error ? error.message : "The AI request failed.",
+          {
+            promptTokens: 0,
+            completionTokens: 0,
+            durationMs: Date.now() - startedAt,
+            status: "failed",
+            error: diagnosed.cause,
+          }
+        );
+      });
 
-        if (fullText.length === 0) {
-          controller.enqueue(encoder.encode(message));
-        }
-        await persistAssistantMessage(fullText || message, {
-          promptTokens: 0,
-          completionTokens: 0,
-          durationMs: Date.now() - startedAt,
-          status: "failed",
-          error: diagnosed.cause,
-        });
-        controller.close();
-      } finally {
-        clearTimeout(deadline);
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "X-Model": model,
+        "X-Provider": provider,
+      },
+    });
+  } catch (error) {
+    // Every configured provider failed before any response could start.
+    const { classifyThrown } = await import("@/lib/health/error-response");
+    const { logError } = await import("@/lib/health/logger");
+    const diagnosed = classifyThrown(error, "ai");
+    await logError("chat", diagnosed.message, {
+      code: diagnosed.code,
+      subsystem: diagnosed.subsystem,
+      context: { projectId, cause: diagnosed.cause },
+    });
+    const message = `${diagnosed.message} ${diagnosed.suggestedFix ?? ""}`.trim();
+    await persistAssistantMessage(message, {
+      promptTokens: 0,
+      completionTokens: 0,
+      durationMs: Date.now() - startedAt,
+      status: "failed",
+      error: diagnosed.cause,
+    });
+    return NextResponse.json(
+      {
+        error: diagnosed.message,
+        code: diagnosed.code,
+        subsystem: diagnosed.subsystem,
+        cause: diagnosed.cause,
+        suggestedFix: diagnosed.suggestedFix,
+      },
+      { status: 500 }
+    );
+  }
 }

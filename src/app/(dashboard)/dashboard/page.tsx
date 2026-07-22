@@ -47,21 +47,28 @@ async function loadDashboardData(): Promise<DashboardData> {
 
   const [recent, projectCount, messageCount, deploymentCount, userRow] =
     await Promise.all([
+      // All stats are scoped to rows the user owns: RLS visibility also
+      // spans public/team projects (and every row, for admins), which
+      // would misstate the personal counts shown on the dashboard.
       supabase
         .from("projects")
         .select("id, name, description, status, preview_url, updated_at")
+        .eq("owner_id", user.id)
         .order("updated_at", { ascending: false })
         .limit(6),
       supabase
         .from("projects")
-        .select("*", { count: "exact", head: true }),
+        .select("*", { count: "exact", head: true })
+        .eq("owner_id", user.id),
       supabase
         .from("chat_messages")
         .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
         .gte("created_at", monthStart.toISOString()),
       supabase
         .from("deployments")
-        .select("*", { count: "exact", head: true }),
+        .select("*, projects!inner(owner_id)", { count: "exact", head: true })
+        .eq("projects.owner_id", user.id),
       supabase.from("users").select("name, plan").eq("id", user.id).single(),
     ]);
 

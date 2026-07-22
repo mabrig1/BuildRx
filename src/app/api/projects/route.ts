@@ -30,9 +30,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Owner-scoped, not merely RLS-scoped: visible rows also include
+  // public/team projects (and all rows for admins).
   const { data, error } = await supabase
     .from("projects")
     .select("id, name, description, status, preview_url, updated_at")
+    .eq("owner_id", user.id)
     .order("updated_at", { ascending: false });
   if (error) {
     return NextResponse.json(

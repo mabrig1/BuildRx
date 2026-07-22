@@ -29,10 +29,14 @@ export async function checkProjectLimit(
   const plan = planById(await effectivePlan(userId));
   if (!Number.isFinite(plan.limits.projects)) return null;
 
+  // Count only projects the user owns — RLS alone is not enough here,
+  // since users can also see public/team projects (and admins see all),
+  // which must not count against their personal quota.
   const supabase = await createClient();
   const { count } = await supabase
     .from("projects")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .eq("owner_id", userId);
   if ((count ?? 0) >= plan.limits.projects) {
     return `The ${plan.name} plan allows ${plan.limits.projects} projects — upgrade to Pro for unlimited projects.`;
   }
@@ -50,10 +54,13 @@ export async function checkAiRequestLimit(
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
+  // Same owner-scoping as above: admins can see every user's usage rows,
+  // so an unfiltered count would burn their quota on platform-wide usage.
   const supabase = await createClient();
   const { count } = await supabase
     .from("usage_logs")
     .select("*", { count: "exact", head: true })
+    .eq("user_id", userId)
     .in("action", ["ai_message", "ai_generation"])
     .gte("created_at", monthStart.toISOString());
   if ((count ?? 0) >= plan.limits.aiRequestsPerMonth) {

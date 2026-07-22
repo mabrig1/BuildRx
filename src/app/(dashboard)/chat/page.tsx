@@ -26,9 +26,13 @@ export default async function ChatPage() {
       redirect("/login?next=/chat");
     }
 
+    // "Most recent project" means the user's own — without the owner
+    // filter, admins (who can see every project) would be dropped into
+    // another user's workspace.
     const { data: latest } = await supabase
       .from("projects")
       .select("id")
+      .eq("owner_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();

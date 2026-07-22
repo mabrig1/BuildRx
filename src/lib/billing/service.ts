@@ -181,10 +181,17 @@ export async function getBillingSummary(
       )
       .eq("user_id", userId)
       .maybeSingle(),
-    supabase.from("projects").select("*", { count: "exact", head: true }),
+    // Scope to the user's own rows — visible rows under RLS also include
+    // public/team projects (and everything, for admins), which would
+    // misreport usage against the personal plan limits shown here.
+    supabase
+      .from("projects")
+      .select("*", { count: "exact", head: true })
+      .eq("owner_id", userId),
     supabase
       .from("usage_logs")
       .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
       .in("action", ["ai_message", "ai_generation"])
       .gte("created_at", monthStartIso()),
     supabase

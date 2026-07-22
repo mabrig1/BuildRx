@@ -51,7 +51,14 @@ export function ChatPanel({
 
   const [input, setInput] = useState("");
   const [stickToBottom, setStickToBottom] = useState(true);
-  const [hasBuilt, setHasBuilt] = useState(projectStatus !== "draft");
+  // Only a confirmed successful build ("ready") switches into plain
+  // conversational mode. "draft" (never attempted), "generating" (a
+  // prior attempt was killed mid-flight and never reached its own error
+  // handling), and "error" (a prior attempt failed cleanly) all leave
+  // the project eligible for the next message to (re)try a real build —
+  // otherwise a single failed attempt (e.g. a provider timeout) would
+  // strand the project in chat-only mode forever with no way to retry.
+  const [hasBuilt, setHasBuilt] = useState(projectStatus === "ready");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 

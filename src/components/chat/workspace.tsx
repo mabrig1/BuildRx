@@ -59,6 +59,13 @@ export function Workspace({
     .reverse()
     .find((m) => m.role === "user")?.content;
 
+  function handleBuildDeployed(url: string | null) {
+    if (url) setPreviewUrl(url);
+    setFilesRefreshKey((k) => k + 1);
+    setMobileView("preview");
+    router.refresh();
+  }
+
   function useTemplate(prompt: string) {
     setTemplatePrompt({ text: prompt, nonce: Date.now() });
     setMobileView("chat");
@@ -136,12 +143,7 @@ export function Workspace({
             <AgentRunPanel
               projectId={project.id}
               defaultPrompt={lastUserMessage}
-              onDeployed={(url) => {
-                if (url) setPreviewUrl(url);
-                setFilesRefreshKey((k) => k + 1);
-                setMobileView("preview");
-                router.refresh();
-              }}
+              onDeployed={handleBuildDeployed}
             />
             {/* Chat/Preview toggle — below xl the preview is a tab */}
             <Tabs
@@ -171,8 +173,10 @@ export function Workspace({
         <div className="flex min-h-0 flex-1">
           <ChatPanel
             projectId={project.id}
+            projectStatus={project.status}
             initialMessages={initialMessages}
             insertText={templatePrompt}
+            onBuildDeployed={handleBuildDeployed}
             className={cn(
               "min-w-0 flex-1",
               mobileView === "preview" && "hidden xl:flex"

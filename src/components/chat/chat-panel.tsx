@@ -14,20 +14,29 @@ import { PromptSuggestions } from "@/components/chat/prompt-suggestions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiErrorFrom } from "@/lib/health/client-error";
+import { AGENT_LABELS } from "@/lib/agents/types";
+import type { AgentEvent, AgentName } from "@/lib/agents/types";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/chat-store";
-import type { ChatMessage } from "@/types";
+import type { ChatMessage, ProjectStatus } from "@/types";
 
 export function ChatPanel({
   projectId,
+  projectStatus,
   initialMessages,
   insertText,
+  onBuildDeployed,
   className,
 }: {
   projectId: string;
+  /** "draft" means this project has never been built — the next message
+   *  (or a prompt seeded at project creation) runs the agent build
+   *  pipeline instead of a plain conversational reply. */
+  projectStatus: ProjectStatus;
   initialMessages: ChatMessage[];
   /** Text pushed into the composer from outside (e.g. template picker). */
   insertText?: { text: string; nonce: number } | null;
+  onBuildDeployed?: (previewUrl: string | null) => void;
   className?: string;
 }) {
   const {
@@ -36,17 +45,31 @@ export function ChatPanel({
     setMessages,
     addMessage,
     appendToLastMessage,
+    updateMessage,
     setStreaming,
   } = useChatStore();
 
   const [input, setInput] = useState("");
   const [stickToBottom, setStickToBottom] = useState(true);
+  const [hasBuilt, setHasBuilt] = useState(projectStatus !== "draft");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setMessages(initialMessages);
     return () => useChatStore.getState().clear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  // A project seeded with a prompt at creation lands here with exactly
+  // one user message and no reply — nothing else ever triggers the
+  // build, so it just sits there. Run it automatically, once per
+  // project, the same as pressing "Start build" would.
+  useEffect(() => {
+    if (projectStatus !== "draft") return;
+    const last = initialMessages[initialMessages.length - 1];
+    if (!last || last.role !== "user") return;
+    void runBuild(last.content, { announceUser: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
@@ -71,9 +94,139 @@ export function ChatPanel({
     setStickToBottom(distanceFromBottom < 80);
   }, []);
 
+  /**
+   * Runs the six-agent build pipeline (the same request the "Build app"
+   * panel sends) and renders its progress inline as the assistant's
+   * reply. This is what makes describing an app in chat actually build
+   * it, instead of only getting a conversational response back.
+   */
+  async function runBuild(
+    prompt: string,
+    { announceUser }: { announceUser: boolean }
+  ) {
+    if (isStreaming) return;
+    setHasBuilt(true);
+    setStickToBottom(true);
+
+    if (announceUser) {
+      addMessage({
+        id: `temp-user-${Date.now()}`,
+        projectId,
+        userId: null,
+        role: "user",
+        content: prompt,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    const assistantId = `temp-assistant-${Date.now()}`;
+    addMessage({
+      id: assistantId,
+      projectId,
+      userId: null,
+      role: "assistant",
+      content: "_Starting the build…_",
+      createdAt: new Date().toISOString(),
+    });
+    setStreaming(true);
+
+    const lineForAgent: Partial<Record<AgentName, number>> = {};
+    const lines: string[] = [];
+    const render = () => updateMessage(assistantId, lines.join("\n"));
+
+    const watchdog = new AbortController();
+    const watchdogTimer = setTimeout(() => watchdog.abort(), 285_000);
+
+    try {
+      const response = await fetch("/api/agents/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, prompt }),
+        signal: watchdog.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        const data = await response.json().catch(() => null);
+        throw apiErrorFrom(data, "Failed to start the build");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split("\n");
+        buffer = chunks.pop() ?? "";
+        for (const raw of chunks) {
+          if (!raw.trim()) continue;
+          let event: AgentEvent;
+          try {
+            event = JSON.parse(raw) as AgentEvent;
+          } catch {
+            continue;
+          }
+          switch (event.type) {
+            case "agent_start":
+            case "agent_complete": {
+              const icon = event.type === "agent_start" ? "⏳" : "✅";
+              const line = `${icon} **${AGENT_LABELS[event.agent]}** — ${event.message}`;
+              if (event.agent in lineForAgent) {
+                lines[lineForAgent[event.agent]!] = line;
+              } else {
+                lineForAgent[event.agent] = lines.length;
+                lines.push(line);
+              }
+              render();
+              break;
+            }
+            case "workflow_complete":
+              lines.push(
+                `\n🚀 **Build complete** — ${event.fileCount} files generated.`
+              );
+              render();
+              window.dispatchEvent(new CustomEvent("vfs-changed", { detail: {} }));
+              onBuildDeployed?.(event.previewUrl);
+              break;
+            case "error": {
+              const line = event.agent
+                ? `❌ **${AGENT_LABELS[event.agent]}** — ${event.message}`
+                : `❌ ${event.message}`;
+              lines.push(event.suggestedFix ? `${line} — ${event.suggestedFix}` : line);
+              render();
+              toast.error(event.message, { description: event.suggestedFix ?? event.cause });
+              break;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      const isWatchdogAbort = error instanceof DOMException && error.name === "AbortError";
+      const message = isWatchdogAbort
+        ? "The build took too long and was stopped."
+        : error instanceof Error
+          ? error.message
+          : "Failed to start the build";
+      lines.push(`❌ ${message}`);
+      render();
+      toast.error(message);
+    } finally {
+      clearTimeout(watchdogTimer);
+      setStreaming(false);
+      textareaRef.current?.focus();
+    }
+  }
+
   async function sendMessage(content: string) {
     const trimmed = content.trim();
     if (!trimmed || isStreaming) return;
+
+    if (!hasBuilt) {
+      setInput("");
+      await runBuild(trimmed, { announceUser: true });
+      return;
+    }
 
     setInput("");
     setStickToBottom(true);

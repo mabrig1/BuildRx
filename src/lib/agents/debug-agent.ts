@@ -3,6 +3,7 @@ import {
   isLlmConfigured,
   parseFileBlocks,
   pause,
+  remainingBudgetMs,
   runAgentCompletion,
 } from "@/lib/agents/llm";
 import type { Agent, GeneratedFile } from "@/lib/agents/types";
@@ -80,6 +81,7 @@ export const debugAgent: Agent = {
       system: SYSTEM,
       prompt: `Review these generated project files:\n\n${bundle}`,
       role: "reasoning",
+      timeoutMs: remainingBudgetMs(context.deadlineAt),
     });
 
     const fixes = parseFileBlocks(text);

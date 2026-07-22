@@ -1,11 +1,13 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { withTimeout } from "@/lib/health/retry";
 import { rateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
 const WINDOW_MS = 60 * 1000;
+const DB_STEP_TIMEOUT_MS = 20_000;
 
 function requestsPerMinute() {
   const configured = Number(process.env.NVIDIA_RATE_LIMIT_RPM);
@@ -25,26 +27,54 @@ export async function authorizeAiRequest(): Promise<AuthorizedRequest> {
 
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    try {
+      const {
+        data: { user },
+      } = await withTimeout(
+        () => supabase.auth.getUser(),
+        DB_STEP_TIMEOUT_MS,
+        "auth.getUser"
+      );
+      if (!user) {
+        return {
+          ok: false,
+          response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        };
+      }
+      userId = user.id;
+    } catch {
       return {
         ok: false,
-        response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        response: NextResponse.json(
+          { error: "Authentication is taking too long to respond. Please try again." },
+          { status: 504 }
+        ),
       };
     }
-    userId = user.id;
   }
 
   // Plan usage limits (monthly AI request quota).
   if (userId) {
     const { checkAiRequestLimit } = await import("@/lib/billing/limits");
-    const limitError = await checkAiRequestLimit(userId);
-    if (limitError) {
+    try {
+      const limitError = await withTimeout(
+        () => checkAiRequestLimit(userId!),
+        DB_STEP_TIMEOUT_MS,
+        "checkAiRequestLimit"
+      );
+      if (limitError) {
+        return {
+          ok: false,
+          response: NextResponse.json({ error: limitError }, { status: 402 }),
+        };
+      }
+    } catch {
       return {
         ok: false,
-        response: NextResponse.json({ error: limitError }, { status: 402 }),
+        response: NextResponse.json(
+          { error: "Usage check is taking too long to respond. Please try again." },
+          { status: 504 }
+        ),
       };
     }
   }

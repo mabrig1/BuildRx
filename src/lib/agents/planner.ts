@@ -2,6 +2,7 @@ import {
   extractJson,
   isLlmConfigured,
   pause,
+  remainingBudgetMs,
   runAgentCompletion,
 } from "@/lib/agents/llm";
 import type { Agent, AppPlan } from "@/lib/agents/types";
@@ -116,6 +117,7 @@ export const plannerAgent: Agent = {
         prompt: `Build plan for this app request:\n\n${context.prompt}`,
         maxTokens: 4096,
         role: "reasoning",
+        timeoutMs: remainingBudgetMs(context.deadlineAt),
       });
       context.plan = extractJson<AppPlan>(text);
     }

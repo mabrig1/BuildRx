@@ -3,6 +3,7 @@ import {
   isLlmConfigured,
   parseFileBlocks,
   pause,
+  remainingBudgetMs,
   runAgentCompletion,
 } from "@/lib/agents/llm";
 import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
@@ -180,6 +181,7 @@ export const codingAgent: Agent = {
           `Original request: ${context.prompt}`,
         ].join("\n\n"),
         role: "code",
+        timeoutMs: remainingBudgetMs(context.deadlineAt),
       });
       files = parseFileBlocks(text);
     }

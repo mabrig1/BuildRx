@@ -3,6 +3,7 @@ import {
   isLlmConfigured,
   parseFileBlocks,
   pause,
+  remainingBudgetMs,
   runAgentCompletion,
 } from "@/lib/agents/llm";
 import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
@@ -82,6 +83,7 @@ export const databaseAgent: Agent = {
         prompt: `Data model:\n${JSON.stringify(plan.dataModel, null, 2)}\n\nApp: ${plan.appName} — ${plan.summary}`,
         maxTokens: 8192,
         role: "code",
+        timeoutMs: remainingBudgetMs(context.deadlineAt),
       });
       files = parseFileBlocks(text);
     }

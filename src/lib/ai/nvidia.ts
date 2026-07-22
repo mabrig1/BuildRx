@@ -10,8 +10,20 @@ const DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1";
 const DEFAULT_TEXT_MODEL = "z-ai/glm-5.2";
 const DEFAULT_CODE_MODEL = "poolside/laguna-xs-2.1";
 const DEFAULT_CHAT_MODEL = "stepfun-ai/step-3.7-flash";
+const DEFAULT_GLM_MODEL = "z-ai/glm-5.2";
+const DEFAULT_LLAMA_MODEL = "meta/llama-3.2-1b-instruct";
 
 const MAX_RETRIES = 2;
+/**
+ * Per-attempt network timeout — a stuck TCP connection must not hang
+ * forever. This same signal also governs streaming responses (the fetch
+ * API ties one AbortSignal to the whole request including body reads),
+ * so it's sized generously to not cut off a legitimately long-running
+ * generation; callers layer their own tighter, context-aware deadlines
+ * on top (see chat/route.ts and lib/agents/llm.ts) — this is strictly a
+ * "never hang forever" backstop, not the primary timeout control.
+ */
+const REQUEST_TIMEOUT_MS = 120_000;
 
 export interface NvidiaMessage {
   role: "system" | "user" | "assistant";
@@ -112,6 +124,16 @@ export function nvidiaChatModel() {
   return cleanEnv(process.env.NVIDIA_CHAT_MODEL) ?? DEFAULT_CHAT_MODEL;
 }
 
+/** GLM — the primary reasoning model for the provider fallback chain. */
+export function nvidiaGlmModel() {
+  return cleanEnv(process.env.NVIDIA_GLM_MODEL) ?? DEFAULT_GLM_MODEL;
+}
+
+/** Llama — the lightweight second-tier NVIDIA model, tried before leaving NVIDIA entirely. */
+export function nvidiaLlamaModel() {
+  return cleanEnv(process.env.NVIDIA_LLAMA_MODEL) ?? DEFAULT_LLAMA_MODEL;
+}
+
 /** Effective API base URL (env override or the NIM default). */
 export function nvidiaBaseUrl() {
   return (
@@ -192,12 +214,15 @@ async function requestChatCompletion(
           Accept: body.stream ? "text/event-stream" : "application/json",
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (error) {
       // Surface the real network-level cause (DNS, TLS, timeout, invalid
       // header, …) — "fetch failed" alone is undiagnosable in prod logs.
-      const cause =
-        error instanceof Error
+      const isTimeout = error instanceof Error && error.name === "TimeoutError";
+      const cause = isTimeout
+        ? `no response within ${REQUEST_TIMEOUT_MS / 1000}s`
+        : error instanceof Error
           ? error.cause instanceof Error
             ? `${error.message}: ${error.cause.message}`
             : error.message

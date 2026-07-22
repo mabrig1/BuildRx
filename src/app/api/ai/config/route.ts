@@ -3,8 +3,11 @@ import {
   nvidiaBaseUrl,
   nvidiaChatModel,
   nvidiaCodeModel,
+  nvidiaGlmModel,
+  nvidiaLlamaModel,
   nvidiaTextModel,
 } from "@/lib/ai/nvidia";
+import { availableProviders } from "@/lib/ai/provider";
 
 /**
  * GET /api/ai/config — reports whether the NVIDIA integration is
@@ -18,5 +21,10 @@ export async function GET() {
     textModel: nvidiaTextModel(),
     codeModel: nvidiaCodeModel(),
     chatModel: nvidiaChatModel(),
+    glmModel: nvidiaGlmModel(),
+    llamaModel: nvidiaLlamaModel(),
+    // The chat/agent-pipeline fallback order, in priority: providers
+    // with no key configured are simply absent from this list.
+    providerChain: availableProviders(),
   });
 }

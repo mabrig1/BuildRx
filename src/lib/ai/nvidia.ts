@@ -36,6 +36,14 @@ export interface NvidiaChatOptions {
   temperature?: number;
   topP?: number;
   seed?: number;
+  /**
+   * Budget for the *whole* call — connect, generation, and any retries.
+   * Without it a slow generation runs to REQUEST_TIMEOUT_MS and then
+   * retries, so one call could occupy several minutes of a caller that
+   * only had seconds to spare. Callers that share a deadline (the agent
+   * pipeline, chat) must always pass this.
+   */
+  timeoutMs?: number;
 }
 
 export interface NvidiaUsage {
@@ -187,21 +195,51 @@ async function parseErrorDetail(response: Response): Promise<string> {
 /**
  * POST to /chat/completions with retries on retryable failures
  * (429 and 5xx, honoring Retry-After; network errors included).
+ *
+ * `timeoutMs` bounds the whole thing — every attempt is capped at the
+ * time still left, and no further attempt is started once the budget is
+ * gone. This is what keeps one slow generation from overrunning a
+ * caller's deadline (a six-step pipeline sharing a single serverless
+ * function's duration has no time to lend to a call that ignores it).
  */
 async function requestChatCompletion(
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  timeoutMs?: number
 ): Promise<Response> {
   const apiKey = nvidiaApiKey();
   if (!apiKey) {
     throw new NvidiaApiError("NVIDIA_API_KEY is not configured.", 503, false);
   }
 
+  const deadlineAt = Date.now() + (timeoutMs ?? REQUEST_TIMEOUT_MS);
+  /**
+   * Time left, capped by the per-request backstop. Floored to a whole
+   * millisecond: AbortSignal.timeout() throws RangeError on a fractional
+   * delay, and budgets divided across pipeline steps are fractional
+   * nearly every time — which would fail the call before it was sent.
+   */
+  const attemptTimeoutMs = () =>
+    Math.floor(Math.min(REQUEST_TIMEOUT_MS, deadlineAt - Date.now()));
+
   let lastError: NvidiaApiError | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       const backoffMs = 500 * 2 ** (attempt - 1);
+      if (deadlineAt - Date.now() <= backoffMs) break;
       await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+
+    const budgetMs = attemptTimeoutMs();
+    if (budgetMs <= 0) {
+      throw (
+        lastError ??
+        new NvidiaApiError(
+          `NVIDIA API call ran out of time (${Math.round((timeoutMs ?? REQUEST_TIMEOUT_MS) / 1000)}s budget).`,
+          504,
+          false
+        )
+      );
     }
 
     let response: Response;
@@ -214,14 +252,14 @@ async function requestChatCompletion(
           Accept: body.stream ? "text/event-stream" : "application/json",
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(budgetMs),
       });
     } catch (error) {
       // Surface the real network-level cause (DNS, TLS, timeout, invalid
       // header, …) — "fetch failed" alone is undiagnosable in prod logs.
       const isTimeout = error instanceof Error && error.name === "TimeoutError";
       const cause = isTimeout
-        ? `no response within ${REQUEST_TIMEOUT_MS / 1000}s`
+        ? `no response within ${Math.round(budgetMs / 1000)}s`
         : error instanceof Error
           ? error.cause instanceof Error
             ? `${error.message}: ${error.cause.message}`
@@ -249,7 +287,7 @@ async function requestChatCompletion(
     }
 
     const retryAfter = Number(response.headers.get("retry-after"));
-    if (retryAfter > 0 && retryAfter <= 10) {
+    if (retryAfter > 0 && retryAfter * 1000 <= Math.min(10_000, deadlineAt - Date.now())) {
       await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
     }
     lastError = error;
@@ -281,7 +319,7 @@ export async function createChatCompletion(
   options: NvidiaChatOptions = {}
 ): Promise<NvidiaCompletion> {
   const body = buildBody(messages, options, false);
-  const response = await requestChatCompletion(body);
+  const response = await requestChatCompletion(body, options.timeoutMs);
   const data = await response.json();
 
   return {
@@ -310,7 +348,7 @@ export async function streamChatCompletion(
   model: string;
 }> {
   const body = buildBody(messages, options, true);
-  const response = await requestChatCompletion(body);
+  const response = await requestChatCompletion(body, options.timeoutMs);
   if (!response.body) {
     throw new NvidiaApiError("NVIDIA API returned an empty stream.", 502, true);
   }

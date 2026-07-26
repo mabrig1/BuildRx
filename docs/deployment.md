@@ -36,7 +36,7 @@ The recommended host is [Vercel](https://vercel.com); any Node 20+ host that run
 
 ### Function duration limits
 
-The AI routes declare `maxDuration` of 120–300 seconds (`/api/chat` and `/api/agents/run` are 300s). On Vercel's free (Hobby) tier functions cap lower, so long agent builds may be cut off — Pro is recommended for production use, or trim `maxDuration` to your plan's ceiling.
+The AI routes declare `maxDuration` of 120–300 seconds (`/api/chat` and `/api/agents/run` are 300s). On Vercel's free (Hobby) tier functions can cap lower than that. The build pipeline budgets itself against `AGENT_PIPELINE_BUDGET_MS` (default 270s) and hands each step a slice of it, so a slow model degrades that step to its built-in scaffold rather than stalling the run — but the budget still has to fit inside the platform's ceiling. If your plan caps functions below 300s, set `AGENT_PIPELINE_BUDGET_MS` to roughly (cap − 30s) so the pipeline finishes and saves its files before the platform kills the function.
 
 ### Cross-origin isolation (WebContainers)
 

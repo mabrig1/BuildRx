@@ -1,9 +1,11 @@
 import {
+  canCallModel,
   extractJson,
-  isLlmConfigured,
+  fallbackReason,
+  outOfTimeNote,
   pause,
-  remainingBudgetMs,
   runAgentCompletion,
+  stepBudgetMs,
 } from "@/lib/agents/llm";
 import type { Agent, AppPlan } from "@/lib/agents/types";
 
@@ -19,9 +21,16 @@ Respond with ONLY a JSON object, no prose, matching:
   "features": [string]
 }
 
-Keep the plan small and buildable: at most 4 pages, 6 components, 4 tables.`;
+Keep the plan small and buildable: at most 4 pages, 6 components, 4 tables.
 
-function mockPlan(prompt: string): AppPlan {
+Output the JSON object and nothing else — no code fence, no commentary, and no reasoning before or after it. Finish the object: a complete small plan beats a detailed one that gets cut off.`;
+
+/**
+ * Deterministic plan derived from the prompt. Used in mock mode, and as
+ * the planner's fallback — every later step reads `context.plan`, so the
+ * pipeline can survive anything except having no plan at all.
+ */
+export function fallbackPlan(prompt: string): AppPlan {
   const lower = prompt.toLowerCase();
 
   if (lower.includes("church")) {
@@ -99,6 +108,62 @@ function mockPlan(prompt: string): AppPlan {
   };
 }
 
+/**
+ * The model's JSON is only as well-shaped as the model felt like making
+ * it — a missing `pages` array or a 30-component plan both break the
+ * steps downstream (one throws, the other can't finish in its time
+ * slice). Fill what's missing from the deterministic plan and enforce
+ * the size limits the prompt asks for.
+ */
+function normalizePlan(plan: Partial<AppPlan> | null, prompt: string): AppPlan {
+  const base = fallbackPlan(prompt);
+  const list = <T>(
+    value: unknown,
+    fallback: T[],
+    limit: number,
+    isValid: (item: T) => boolean = () => true
+  ): T[] => {
+    if (!Array.isArray(value)) return fallback;
+    const kept = (value as T[]).filter(isValid).slice(0, limit);
+    return kept.length > 0 ? kept : fallback;
+  };
+
+  return {
+    appName:
+      typeof plan?.appName === "string" && plan.appName.trim()
+        ? plan.appName.trim()
+        : base.appName,
+    summary:
+      typeof plan?.summary === "string" && plan.summary.trim()
+        ? plan.summary.trim()
+        : base.summary,
+    pages: list(
+      plan?.pages,
+      base.pages,
+      4,
+      (page) => typeof page?.path === "string" && page.path.startsWith("/")
+    ),
+    components: list(
+      plan?.components,
+      base.components,
+      6,
+      (component) => typeof component?.name === "string" && /^\w+$/.test(component.name)
+    ),
+    dataModel: list(
+      plan?.dataModel,
+      base.dataModel,
+      4,
+      (table) => typeof table?.table === "string" && Array.isArray(table?.columns)
+    ),
+    features: list(
+      plan?.features,
+      base.features,
+      8,
+      (feature) => typeof feature === "string"
+    ),
+  };
+}
+
 export const plannerAgent: Agent = {
   name: "planner",
   async run(context, emit) {
@@ -108,18 +173,26 @@ export const plannerAgent: Agent = {
       message: "Analyzing requirements…",
     });
 
-    if (!isLlmConfigured()) {
-      await pause(600);
-      context.plan = mockPlan(context.prompt);
+    let note = "";
+    if (!canCallModel(context)) {
+      const reason = outOfTimeNote(context);
+      if (reason) note = ` (${reason} — planned from a built-in template instead)`;
+      else await pause(600);
+      context.plan = fallbackPlan(context.prompt);
     } else {
-      const text = await runAgentCompletion({
-        system: SYSTEM,
-        prompt: `Build plan for this app request:\n\n${context.prompt}`,
-        maxTokens: 4096,
-        role: "reasoning",
-        timeoutMs: remainingBudgetMs(context.deadlineAt),
-      });
-      context.plan = extractJson<AppPlan>(text);
+      try {
+        const text = await runAgentCompletion({
+          system: SYSTEM,
+          prompt: `Build plan for this app request:\n\n${context.prompt}`,
+          maxTokens: 6000,
+          role: "reasoning",
+          timeoutMs: stepBudgetMs(context),
+        });
+        context.plan = normalizePlan(extractJson<AppPlan>(text), context.prompt);
+      } catch (error) {
+        note = ` (${fallbackReason(error)} — planned from a built-in template instead)`;
+        context.plan = fallbackPlan(context.prompt);
+      }
     }
 
     const plan = context.plan;
@@ -131,7 +204,7 @@ export const plannerAgent: Agent = {
     emit({
       type: "agent_complete",
       agent: "planner",
-      message: plan.summary,
+      message: `${plan.summary}${note}`,
     });
   },
 };

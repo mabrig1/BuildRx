@@ -44,6 +44,7 @@ Supabase is connected), clearly labeled as demo output.
 | `NVIDIA_CHAT_MODEL` | No | Second chain tier, and the model chat starts on. Default: `stepfun-ai/step-3.7-flash`. |
 | `NVIDIA_LLAMA_MODEL` | No | Last chain tier — a lightweight model, tried only if the two above fail. Default: `meta/llama-3.2-1b-instruct`. |
 | `NVIDIA_RATE_LIMIT_RPM` | No | Per-user requests/minute across the AI endpoints (also applies to `/api/agents/run`). Default: `20`. |
+| `AGENT_PIPELINE_BUDGET_MS` | No | Total time the six-step build pipeline may use, split across the steps by weight. Default: `270000` (270s, leaving 30s of the route's 300s `maxDuration` for saving files). Lower it if your host caps function duration below 300s — steps that run out of budget finish on their built-in scaffolds instead of being cut off mid-build. |
 
 ### Optional Anthropic tier (off by default)
 

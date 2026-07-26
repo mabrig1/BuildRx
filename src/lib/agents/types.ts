@@ -62,6 +62,13 @@ export interface WorkflowContext {
    * have the whole thing to themselves.
    */
   deadlineAt?: number;
+  /**
+   * Deadline for the step currently running — the orchestrator's split
+   * of `deadlineAt` across the steps that remain. Agents bound their LLM
+   * calls by this, so a slow step can't eat the budget of the ones after
+   * it (which is what used to strand a build mid-pipeline).
+   */
+  stepDeadlineAt?: number;
 }
 
 /** Events streamed to the client as NDJSON. */

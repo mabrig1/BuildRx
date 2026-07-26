@@ -141,8 +141,19 @@ export function ChatPanel({
     const lines: string[] = [];
     const render = () => updateMessage(assistantId, lines.join("\n"));
 
+    // Idle watchdog, not a total-time limit. The build streams an event
+    // at every step boundary, so silence is what indicates a dead
+    // connection — elapsed time doesn't. A build that is still reporting
+    // progress must never be cut off by its own client: that is what
+    // turned a working build into "The build took too long and was
+    // stopped" while the server was still generating files.
+    const IDLE_LIMIT_MS = 120_000;
     const watchdog = new AbortController();
-    const watchdogTimer = setTimeout(() => watchdog.abort(), 285_000);
+    let watchdogTimer = setTimeout(() => watchdog.abort(), IDLE_LIMIT_MS);
+    const keepAlive = () => {
+      clearTimeout(watchdogTimer);
+      watchdogTimer = setTimeout(() => watchdog.abort(), IDLE_LIMIT_MS);
+    };
 
     try {
       const response = await fetch("/api/agents/run", {
@@ -163,6 +174,7 @@ export function ChatPanel({
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        keepAlive();
         buffer += decoder.decode(value, { stream: true });
         const chunks = buffer.split("\n");
         buffer = chunks.pop() ?? "";
@@ -210,8 +222,10 @@ export function ChatPanel({
       }
     } catch (error) {
       const isWatchdogAbort = error instanceof DOMException && error.name === "AbortError";
+      // The build keeps running on the server even after this connection
+      // drops, so this reports a lost connection — not a lost build.
       const message = isWatchdogAbort
-        ? "The build took too long and was stopped."
+        ? "Lost contact with the build (no progress for two minutes). It may still be finishing — refresh in a moment to see the files."
         : error instanceof Error
           ? error.message
           : "Failed to start the build";
@@ -255,11 +269,16 @@ export function ChatPanel({
     });
     setStreaming(true);
 
-    // Backstop for the server's own timeout (270s): if the connection
-    // itself hangs (dropped response, network issue) the UI must not
-    // spin forever either.
+    // Idle backstop: a reply that is still streaming tokens is alive, so
+    // only silence should end it. Without this, a long answer was cut
+    // off mid-sentence purely for taking a while.
+    const IDLE_LIMIT_MS = 120_000;
     const watchdog = new AbortController();
-    const watchdogTimer = setTimeout(() => watchdog.abort(), 285_000);
+    let watchdogTimer = setTimeout(() => watchdog.abort(), IDLE_LIMIT_MS);
+    const keepAlive = () => {
+      clearTimeout(watchdogTimer);
+      watchdogTimer = setTimeout(() => watchdog.abort(), IDLE_LIMIT_MS);
+    };
 
     try {
       const response = await fetch("/api/chat", {
@@ -279,12 +298,13 @@ export function ChatPanel({
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        keepAlive();
         appendToLastMessage(decoder.decode(value, { stream: true }));
       }
     } catch (error) {
       const isWatchdogAbort = error instanceof DOMException && error.name === "AbortError";
       const message = isWatchdogAbort
-        ? "The AI took too long to respond and the request was stopped."
+        ? "The AI stopped responding and the request was ended."
         : error instanceof Error
           ? error.message
           : "Failed to send message";

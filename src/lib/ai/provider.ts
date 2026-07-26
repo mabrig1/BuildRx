@@ -175,7 +175,7 @@ function attemptBudgetMs(
   deadlineAt: number,
   attemptsLeft: number
 ): number {
-  const remaining = deadlineAt - Date.now();
+  const remaining = Math.floor(deadlineAt - Date.now());
   if (attemptsLeft <= 1) return remaining;
   // Never more than what's left: the floor keeps an attempt viable, it
   // does not entitle a tier to time the caller doesn't have.

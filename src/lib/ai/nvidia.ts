@@ -212,9 +212,14 @@ async function requestChatCompletion(
   }
 
   const deadlineAt = Date.now() + (timeoutMs ?? REQUEST_TIMEOUT_MS);
-  /** Time left, capped by the per-request backstop. */
+  /**
+   * Time left, capped by the per-request backstop. Floored to a whole
+   * millisecond: AbortSignal.timeout() throws RangeError on a fractional
+   * delay, and budgets divided across pipeline steps are fractional
+   * nearly every time — which would fail the call before it was sent.
+   */
   const attemptTimeoutMs = () =>
-    Math.min(REQUEST_TIMEOUT_MS, deadlineAt - Date.now());
+    Math.floor(Math.min(REQUEST_TIMEOUT_MS, deadlineAt - Date.now()));
 
   let lastError: NvidiaApiError | null = null;
 

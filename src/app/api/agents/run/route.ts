@@ -67,8 +67,19 @@ export async function POST(request: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      // A disconnected client must not abort a build in progress: once
+      // the browser is gone, enqueue throws, and that exception would
+      // otherwise propagate up through the pipeline and cancel it before
+      // the files were ever saved. Closing the tab now just means nobody
+      // is watching — the build finishes and persists either way.
+      let clientGone = false;
       const emit = (event: AgentEvent) => {
-        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        if (clientGone) return;
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        } catch {
+          clientGone = true;
+        }
       };
       try {
         await runWorkflow(context, emit);
@@ -90,7 +101,11 @@ export async function POST(request: Request) {
           suggestedFix: diagnosed.suggestedFix,
         });
       }
-      controller.close();
+      try {
+        controller.close();
+      } catch {
+        // Already closed by the client disconnecting — nothing to do.
+      }
     },
   });
 

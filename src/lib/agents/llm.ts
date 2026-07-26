@@ -40,7 +40,7 @@ export function remainingBudgetMs(
   ceilingMs = DEFAULT_TIMEOUT_MS
 ): number {
   if (!deadlineAt) return ceilingMs;
-  return Math.max(floorMs, Math.min(ceilingMs, deadlineAt - Date.now()));
+  return Math.floor(Math.max(floorMs, Math.min(ceilingMs, deadlineAt - Date.now())));
 }
 
 /**
@@ -56,7 +56,7 @@ export function stepBudgetMs(context: {
 }): number {
   const deadlineAt = context.stepDeadlineAt ?? context.deadlineAt;
   if (!deadlineAt) return DEFAULT_TIMEOUT_MS;
-  return Math.max(0, Math.min(DEFAULT_TIMEOUT_MS, deadlineAt - Date.now()));
+  return Math.floor(Math.max(0, Math.min(DEFAULT_TIMEOUT_MS, deadlineAt - Date.now())));
 }
 
 /** Below this, no model call can realistically return in time. */

@@ -61,12 +61,24 @@ const AGENT_WEIGHTS: Record<AgentName, number> = {
   deployment: 0.25,
 };
 
+/**
+ * Held back from every generating step for the deployment step, which
+ * has to write every file and publish the preview. A build that
+ * generated 25 files and saved none of them is a failed build, so this
+ * time is not available to be spent on models no matter how slow they
+ * are.
+ */
+const DEPLOY_RESERVE_MS = 30_000;
+
 /** Absolute deadline for one step, from what the pipeline has left. */
 function stepDeadline(context: WorkflowContext, remaining: AgentName[]): number {
+  const pipelineEnd = context.deadlineAt ?? Date.now();
+  const usableEnd =
+    remaining[0] === "deployment" ? pipelineEnd : pipelineEnd - DEPLOY_RESERVE_MS;
   const totalWeight = remaining.reduce((sum, name) => sum + AGENT_WEIGHTS[name], 0);
-  const timeLeft = Math.max(0, (context.deadlineAt ?? Date.now()) - Date.now());
+  const timeLeft = Math.max(0, usableEnd - Date.now());
   const share = (AGENT_WEIGHTS[remaining[0]] / totalWeight) * timeLeft;
-  return Date.now() + share;
+  return Math.floor(Date.now() + share);
 }
 
 export async function runWorkflow(

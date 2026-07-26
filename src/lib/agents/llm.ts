@@ -1,5 +1,9 @@
 import type { GeneratedFile } from "@/lib/agents/types";
-import { generalFallbackModel, modelForRole, type ModelRole } from "@/lib/ai/models";
+import {
+  resolveGeneralFallbackModel,
+  resolveModelForRole,
+  type ModelRole,
+} from "@/lib/ai/models";
 import { isAnyProviderConfigured, completeText } from "@/lib/ai/provider";
 import { isNvidiaConfigured, nvidiaGlmModel } from "@/lib/ai/nvidia";
 
@@ -138,6 +142,14 @@ export async function runAgentCompletion({
   role?: AgentRole;
   timeoutMs?: number;
 }): Promise<string> {
+  // Route by task complexity (see lib/ai/models.ts): the strongest
+  // model for this role that the configured key can actually call,
+  // with a general-purpose model as the chain's second tier.
+  const [nvidiaModel, nvidiaFallbackModel] = await Promise.all([
+    resolveModelForRole(role),
+    resolveGeneralFallbackModel(),
+  ]);
+
   const result = await completeText(
     [
       { role: "system", content: system },
@@ -148,10 +160,8 @@ export async function runAgentCompletion({
       temperature: 0.3,
       timeoutMs,
       anthropicModel: ANTHROPIC_AGENT_MODEL,
-      // Route by task complexity (see lib/ai/models.ts), with the
-      // general-purpose model as the chain's second tier.
-      nvidiaModel: modelForRole(role),
-      nvidiaFallbackModel: generalFallbackModel(),
+      nvidiaModel,
+      nvidiaFallbackModel,
     }
   );
   return result.text;

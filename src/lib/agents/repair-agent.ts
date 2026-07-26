@@ -202,6 +202,27 @@ export default ${name};
       return `created ${path}`;
     }
 
+    case "missing-schema": {
+      const sql = plan.dataModel
+        .map((table) => {
+          const columns = table.columns
+            .map((column) => {
+              if (column.name === "id") {
+                return "  id uuid primary key default gen_random_uuid()";
+              }
+              if (column.name === "created_at") {
+                return "  created_at timestamptz not null default now()";
+              }
+              return `  ${column.name} ${column.type}`;
+            })
+            .join(",\n");
+          return `-- ${table.description}\ncreate table public.${table.table} (\n${columns}\n);\n\nalter table public.${table.table} enable row level security;`;
+        })
+        .join("\n\n");
+      writeFile(context, "supabase/schema.sql", `${sql}\n`);
+      return `generated supabase/schema.sql (${plan.dataModel.length} table(s))`;
+    }
+
     case "missing-api-route": {
       const table = finding.message.match(/table "([^"]+)"/)?.[1];
       if (!table) return null;

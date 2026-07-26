@@ -164,28 +164,45 @@ function plannedAttempts(options: ProviderCallOptions): Attempt[] {
 }
 
 /**
- * Smallest slice worth starting an attempt with. Below this the call
- * would be aborted mid-generation anyway, so the chain stops instead and
- * lets the caller fall back.
+ * Smallest slice worth starting an attempt with.
+ *
+ * Sized for time-to-first-token on a free inference tier, where a large
+ * model can take 20s+ just to start streaming. Splitting a step's budget
+ * into 8-second slices produced the worst possible outcome in
+ * production: three models each given too little time to answer, so all
+ * three "failed" and the step fell back to a scaffold — while every one
+ * of them was working normally.
  */
-const MIN_ATTEMPT_MS = 8_000;
+const MIN_ATTEMPT_MS = 25_000;
 
 /**
- * Splits one call's budget across the tiers still to try. `timeoutMs` is
- * the budget for the *whole* chain, not per tier — an agent given 60s
- * must not be able to spend 60s on each of three models. The first tier
- * gets the larger share (it's the one expected to answer); the rest
- * divide what actually remains after it returns or fails.
+ * The budget for the next attempt.
+ *
+ * The first tier gets the *whole* remaining budget rather than a share
+ * of it. Reserving time for later tiers only pays off when failures are
+ * fast (a 404 for a retired model, a 401), and those cost no time at
+ * all — they return immediately and leave the budget intact for the
+ * next tier. The expensive failure is a slow model, and holding time
+ * back from the first attempt is precisely what turns "slow" into
+ * "failed".
  */
-function attemptBudgetMs(
-  deadlineAt: number,
-  attemptsLeft: number
-): number {
-  const remaining = Math.floor(deadlineAt - Date.now());
-  if (attemptsLeft <= 1) return remaining;
-  // Never more than what's left: the floor keeps an attempt viable, it
-  // does not entitle a tier to time the caller doesn't have.
-  return Math.min(remaining, Math.max(MIN_ATTEMPT_MS, Math.round(remaining * 0.6)));
+function attemptBudgetMs(deadlineAt: number): number {
+  return Math.floor(deadlineAt - Date.now());
+}
+
+/**
+ * Whether a failure leaves any point trying another model.
+ *
+ * A timeout means this endpoint is slower than the budget allows;
+ * another model on the same endpoint will be too. Falling back to the
+ * caller's scaffold immediately beats burning the rest of the step on a
+ * second and third model that cannot answer any faster either.
+ */
+function isTimeoutFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /timeout|timed out|aborted|returned nothing|ran out of time|no response within/i.test(
+    message
+  );
 }
 
 function noProviderError(): Error {
@@ -252,10 +269,21 @@ async function collectStreamed(
     nvidiaOptions
   );
   // The completion promise is the streaming API's own bookkeeping; we
-  // read the stream directly, so make sure its rejection is never
-  // unhandled when we cancel early.
+  // read the stream directly, so its rejection must be swallowed at the
+  // moment it is created. Attaching the handler in two steps
+  // (`then(...).catch(...)`) leaves the promise returned by `then`
+  // unhandled if `completion` rejects first — which is exactly what
+  // happened when a request aborted mid-body, crashing the function
+  // with "Unhandled Rejection: TimeoutError" and killing the build.
   let usage: ProviderUsage = { promptTokens: 0, completionTokens: 0 };
-  void completion.then((done) => (usage = done.usage)).catch(() => {});
+  completion.then(
+    (done) => {
+      usage = done.usage;
+    },
+    () => {
+      /* aborted or errored — the text we already collected still counts */
+    }
+  );
 
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -343,7 +371,7 @@ export async function completeText(
   const deadlineAt = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let lastError: unknown;
   for (const [index, attempt] of attempts.entries()) {
-    const budgetMs = attemptBudgetMs(deadlineAt, attempts.length - index);
+    const budgetMs = attemptBudgetMs(deadlineAt);
     if (budgetMs < MIN_ATTEMPT_MS && index > 0) {
       lastError ??= new Error("Ran out of time before any model could answer.");
       break;
@@ -359,6 +387,8 @@ export async function completeText(
         error instanceof Error ? error.message : error
       );
       lastError = error;
+      // A slow endpoint won't get faster for the next model on it.
+      if (isTimeoutFailure(error)) break;
     }
   }
   throw allFailedError(attempts, lastError);
@@ -465,7 +495,7 @@ export async function streamText(
   const deadlineAt = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let lastError: unknown;
   for (const [index, attempt] of attempts.entries()) {
-    const budgetMs = attemptBudgetMs(deadlineAt, attempts.length - index);
+    const budgetMs = attemptBudgetMs(deadlineAt);
     if (budgetMs < MIN_ATTEMPT_MS && index > 0) {
       lastError ??= new Error("Ran out of time before any model could answer.");
       break;
@@ -504,6 +534,8 @@ export async function streamText(
         error instanceof Error ? error.message : error
       );
       lastError = error;
+      // A slow endpoint won't get faster for the next model on it.
+      if (isTimeoutFailure(error)) break;
     }
   }
   throw allFailedError(attempts, lastError);

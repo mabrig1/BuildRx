@@ -67,14 +67,21 @@ function pipelineBudgetMs(): number {
  * time saved by a fast step is handed to the ones after it.
  */
 const AGENT_WEIGHTS: Record<AgentName, number> = {
-  planner: 1,
-  architect: 0.6,
-  ui: 2.5,
-  database: 1,
-  coding: 2.5,
-  debug: 1,
-  security: 0.15, // deterministic scan — near-free
-  qa: 0.15, // deterministic checks — near-free
+  // A free inference tier can take 20s+ just to start streaming, so a
+  // step's slice has to clear that floor to get any output at all.
+  // Spreading the budget evenly across ten steps gave each ~24s and
+  // every one of them timed out; the fix is to concentrate it on the
+  // three steps that actually write the app and let the rest be
+  // deterministic (architect, security, qa and repair all have full
+  // non-model paths, and debug is a review pass the build can skip).
+  planner: 2,
+  architect: 0.05, // deterministic file map — no model call needed
+  ui: 3.5,
+  database: 1.25,
+  coding: 3.5,
+  debug: 0.5,
+  security: 0.05, // deterministic scan
+  qa: 0.05, // deterministic checks
   repair: 1, // one bounded model pass when findings need it
   deployment: 0.3,
 };

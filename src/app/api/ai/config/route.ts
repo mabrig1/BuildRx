@@ -33,9 +33,13 @@ export async function GET() {
     chatModelIsDefault: isDefault(nvidiaChatModel(), "stepfun-ai/step-3.7-flash"),
     glmModelIsDefault: isDefault(nvidiaGlmModel(), "z-ai/glm-5.2"),
     llamaModelIsDefault: isDefault(nvidiaLlamaModel(), "meta/llama-3.2-1b-instruct"),
-    // The chat/agent-pipeline fallback order, in priority: providers
-    // with no key configured are simply absent from this list. Fixed,
-    // known-safe literal strings only — never derived from env content.
+    // The chat/agent-pipeline fallback order, in priority: tiers that
+    // aren't usable (no NVIDIA key, Anthropic not explicitly enabled)
+    // are simply absent from this list. Fixed, known-safe literal
+    // strings only — never derived from env content.
     providerChain: availableProviders(),
+    // True only when ANTHROPIC_ENABLED=true *and* a key is present;
+    // otherwise the app is NVIDIA-only and cannot incur Anthropic spend.
+    anthropicEnabled: availableProviders().includes("anthropic"),
   });
 }

@@ -122,6 +122,21 @@ export function classifyThrown(error: unknown, subsystemHint?: Subsystem): Diagn
     };
   }
 
+  // Anthropic billing errors arrive as a 400, so they'd otherwise fall
+  // through to the generic bad-request branch. Only reachable when the
+  // opt-in Anthropic tier is enabled — the fix is to turn it back off.
+  if (/credit balance is too low|billing|insufficient_quota/i.test(message)) {
+    return {
+      message: "The optional Anthropic fallback has no credit left.",
+      code: "AI_PROVIDER_BILLING",
+      subsystem: "ai",
+      cause: message,
+      suggestedFix:
+        "Remove ANTHROPIC_ENABLED (or set it to false) to run on NVIDIA's free models only, or top up the Anthropic account.",
+      retryable: false,
+    };
+  }
+
   if (/unauthori[sz]ed|not authenticated|jwt|no session/i.test(message)) {
     return {
       message: "You need to be signed in to do that.",
@@ -149,7 +164,7 @@ export function classifyThrown(error: unknown, subsystemHint?: Subsystem): Diagn
       code: "AI_PROVIDER_AUTH",
       subsystem: "api",
       cause: message,
-      suggestedFix: "Verify ANTHROPIC_API_KEY / NVIDIA_API_KEY are set and valid in the deployment environment.",
+      suggestedFix: "Verify NVIDIA_API_KEY is set and valid in the deployment environment (get a free key at https://build.nvidia.com).",
       retryable: false,
     };
   }

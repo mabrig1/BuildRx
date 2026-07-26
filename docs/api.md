@@ -42,8 +42,8 @@ Streaming project chat (Claude). Persists the user message, streams the assistan
 { "projectId": "uuid-or-demo-id", "content": "Add a pricing page" }
 ```
 
-- No `ANTHROPIC_API_KEY` but `NVIDIA_API_KEY` set: streams from the NVIDIA text model instead (`X-Model` header names it).
-- Neither key: streams a labeled mock response.
+- `NVIDIA_API_KEY` set: streams from the NVIDIA chat model, falling back through the remaining NVIDIA models if it is unavailable (`X-Model` and `X-Provider` headers name the one used).
+- No key: streams a labeled mock response.
 - Errors: 400 invalid body · 401 · 402 quota · 404 unknown project.
 
 ### `POST /api/ai/generate`
@@ -133,7 +133,7 @@ Event stream:
 
 An `{"type":"error","agent":?,"message":"..."}` event may appear at any point; the stream always ends after `workflow_complete` or `error`. Generated files are saved to the project filesystem.
 
-Model selection: Anthropic Claude when `ANTHROPIC_API_KEY` is set; otherwise the NVIDIA models — the reasoning agents (Planner, Debug) use `NVIDIA_TEXT_MODEL` and the code-producing agents (UI, Database, Coding) use `NVIDIA_CODE_MODEL`. With neither key, prompt-aware mock agents run the same pipeline. Errors before the stream starts: 400 · 401 · 402 · 404 · 429.
+Model selection: NVIDIA throughout — the reasoning agents (Planner, Debug) use `NVIDIA_GLM_MODEL` and the code-producing agents (UI, Database, Coding) use `NVIDIA_CODE_MODEL`, each falling back to the remaining NVIDIA models on failure. Anthropic Claude is appended as a last tier only when `ANTHROPIC_ENABLED=true`. With no key at all, prompt-aware mock agents run the same pipeline. Errors before the stream starts: 400 · 401 · 402 · 404 · 429.
 
 ---
 

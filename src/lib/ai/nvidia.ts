@@ -145,9 +145,32 @@ export function validModelId(
   return trimmed;
 }
 
-/** Names of model env vars rejected as malformed. Names only, no values. */
+/** Every env var that is meant to hold a model id. */
+export const MODEL_ENV_VARS = [
+  "NVIDIA_TEXT_MODEL",
+  "NVIDIA_CODE_MODEL",
+  "NVIDIA_CHAT_MODEL",
+  "NVIDIA_GLM_MODEL",
+  "NVIDIA_LLAMA_MODEL",
+  "NVIDIA_MODEL_DEEPSEEK_PRO",
+  "NVIDIA_MODEL_DEEPSEEK_FLASH",
+  "NVIDIA_MODEL_MISTRAL_LARGE",
+  "NVIDIA_MODEL_MISTRAL_MEDIUM",
+  "NVIDIA_MODEL_KIMI",
+] as const;
+
+/**
+ * Names of model env vars that are set but malformed. Names only, never
+ * values — the value is exactly what must not be echoed.
+ *
+ * Evaluated fresh rather than read from the warn-once set, so the answer
+ * doesn't depend on which models happen to have been resolved first.
+ */
 export function rejectedModelVars(): string[] {
-  return [...REJECTED_MODEL_VARS].sort();
+  return MODEL_ENV_VARS.filter((name) => {
+    const raw = process.env[name]?.trim();
+    return Boolean(raw) && !validModelId(raw, name);
+  });
 }
 
 export function nvidiaApiKey(): string | undefined {
@@ -179,6 +202,38 @@ export function nvidiaGlmModel() {
 /** Llama — the lightweight second-tier NVIDIA model, tried before leaving NVIDIA entirely. */
 export function nvidiaLlamaModel() {
   return validModelId(process.env.NVIDIA_LLAMA_MODEL, "NVIDIA_LLAMA_MODEL") ?? DEFAULT_LLAMA_MODEL;
+}
+
+/**
+ * Every model id this deployment's key can actually call, straight from
+ * NVIDIA's catalog.
+ *
+ * This is the authoritative answer to "what do I put in the model env
+ * vars" — guessing from the website is what put API keys in those
+ * variables in the first place. Ids only; no key material is returned
+ * or logged.
+ */
+export async function listAvailableModels(): Promise<string[]> {
+  const apiKey = nvidiaApiKey();
+  if (!apiKey) return [];
+  try {
+    const response = await fetch(`${nvidiaBaseUrl()}/models`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const models: unknown = data?.data ?? data?.models;
+    if (!Array.isArray(models)) return [];
+    return models
+      .map((model: { id?: unknown }) =>
+        typeof model?.id === "string" ? model.id : null
+      )
+      .filter((id): id is string => Boolean(id))
+      .sort();
+  } catch {
+    return [];
+  }
 }
 
 /** Effective API base URL (env override or the NIM default). */

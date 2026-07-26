@@ -26,7 +26,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 import {
-  createChatCompletion,
   isNvidiaConfigured,
   nvidiaChatModel,
   nvidiaGlmModel,
@@ -207,6 +206,79 @@ function toNvidiaMessages(messages: ProviderMessage[]): NvidiaMessage[] {
 }
 
 /**
+ * Runs a completion as a *stream* and keeps whatever arrives before the
+ * budget runs out.
+ *
+ * A non-streaming request holds the connection until the whole
+ * generation is finished, so a large answer on a slow endpoint produces
+ * nothing at all when the deadline hits — "no response within 54s" even
+ * though the model was working the entire time. Streaming turns that
+ * same call into partial output: the file blocks that did finish, or a
+ * plan object that can be repaired. Partial beats empty every time, and
+ * the callers are all built to handle short output (the agents fill the
+ * remainder from their scaffolds).
+ */
+async function collectStreamed(
+  messages: ProviderMessage[],
+  nvidiaOptions: {
+    model: string;
+    maxTokens?: number;
+    temperature?: number;
+    timeoutMs: number;
+  }
+): Promise<{ text: string; model: string; usage: ProviderUsage; truncated: boolean }> {
+  const { stream, completion, model } = await streamChatCompletion(
+    toNvidiaMessages(messages),
+    nvidiaOptions
+  );
+  // The completion promise is the streaming API's own bookkeeping; we
+  // read the stream directly, so make sure its rejection is never
+  // unhandled when we cancel early.
+  let usage: ProviderUsage = { promptTokens: 0, completionTokens: 0 };
+  void completion.then((done) => (usage = done.usage)).catch(() => {});
+
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  const deadlineAt = Date.now() + nvidiaOptions.timeoutMs;
+
+  let text = "";
+  let truncated = false;
+  let expiry: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<"expired">((resolve) => {
+    expiry = setTimeout(() => resolve("expired"), nvidiaOptions.timeoutMs);
+  });
+
+  try {
+    for (;;) {
+      if (Date.now() >= deadlineAt) {
+        truncated = true;
+        break;
+      }
+      const next = await Promise.race([reader.read(), expired]);
+      if (next === "expired") {
+        truncated = true;
+        break;
+      }
+      if (next.done) break;
+      text += decoder.decode(next.value, { stream: true });
+    }
+  } catch (error) {
+    // The request's own abort signal covers the body read, so a
+    // generation that outruns the budget surfaces here as "aborted due
+    // to timeout" rather than through the race above. Either way the
+    // bytes already received are still good — only an empty result is a
+    // real failure worth passing to the next model.
+    truncated = true;
+    if (text.length === 0) throw error;
+  } finally {
+    clearTimeout(expiry);
+    void reader.cancel().catch(() => {});
+  }
+
+  return { text, model, usage, truncated };
+}
+
+/**
  * Caps requested output tokens to each NVIDIA model's realistic
  * completion window — GLM and Step (and the code-model override) handle
  * large generations, but Llama here is a lightweight 1B model that
@@ -279,12 +351,25 @@ async function completeWithProvider(
 ): Promise<CompletionResult> {
   const { provider } = attempt;
   if (isNvidiaProvider(provider)) {
-    const result = await createChatCompletion(toNvidiaMessages(messages), {
+    const result = await collectStreamed(messages, {
       model: attempt.model,
       maxTokens: nvidiaMaxTokens(provider, options.maxTokens),
       temperature: options.temperature,
       timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     });
+    // Nothing at all means this model never started answering — that is
+    // a real failure and the next tier should get a turn. Anything else,
+    // even cut short, is usable output.
+    if (result.text.trim().length === 0) {
+      throw new Error(
+        `${attempt.model} returned nothing within ${Math.round((options.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000)}s.`
+      );
+    }
+    if (result.truncated) {
+      console.warn(
+        `AI provider ${provider} (${result.model}) hit its time budget — keeping ${result.text.length} chars of partial output.`
+      );
+    }
     return { text: result.text, provider, model: result.model, usage: result.usage };
   }
 

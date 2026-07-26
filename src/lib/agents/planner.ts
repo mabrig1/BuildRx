@@ -21,7 +21,9 @@ Respond with ONLY a JSON object, no prose, matching:
   "features": [string]
 }
 
-Keep the plan small and buildable: at most 4 pages, 6 components, 4 tables.`;
+Keep the plan small and buildable: at most 4 pages, 6 components, 4 tables.
+
+Output the JSON object and nothing else — no code fence, no commentary, and no reasoning before or after it. Finish the object: a complete small plan beats a detailed one that gets cut off.`;
 
 /**
  * Deterministic plan derived from the prompt. Used in mock mode, and as
@@ -182,7 +184,7 @@ export const plannerAgent: Agent = {
         const text = await runAgentCompletion({
           system: SYSTEM,
           prompt: `Build plan for this app request:\n\n${context.prompt}`,
-          maxTokens: 4096,
+          maxTokens: 6000,
           role: "reasoning",
           timeoutMs: stepBudgetMs(context),
         });

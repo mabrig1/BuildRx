@@ -156,18 +156,99 @@ export async function runAgentCompletion({
 }
 
 /**
- * Extracts the first JSON object from LLM output (tolerates fencing
- * and surrounding prose).
+ * Closers still owed by a partial JSON string, outermost last. Quotes
+ * and escapes are tracked so braces inside string values don't count.
+ */
+function pendingClosers(json: string): string[] {
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+
+  for (const char of json) {
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === "{") stack.push("}");
+    else if (char === "[") stack.push("]");
+    else if (char === "}" || char === "]") stack.pop();
+  }
+  if (inString) stack.push('"');
+  return stack;
+}
+
+/**
+ * Rebuilds a JSON object that was cut off mid-generation (the model hit
+ * its token ceiling). Drops back to the last completed element and
+ * closes what's still open, which turns "Expected ',' or ']' after array
+ * element at position 1301" into a slightly shorter but usable plan.
+ * Returns null when there's no complete element to fall back to.
+ */
+function repairTruncatedJson(json: string): string | null {
+  let inString = false;
+  let escaped = false;
+  let lastComplete = -1;
+
+  for (let i = 0; i < json.length; i++) {
+    const char = json[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    // A closing bracket or a comma marks a point the value before it was
+    // whole — the furthest such point is the most content we can keep.
+    else if (char === "}" || char === "]") lastComplete = i + 1;
+    else if (char === ",") lastComplete = i;
+  }
+
+  if (lastComplete <= 0) return null;
+  const head = json.slice(0, lastComplete).replace(/,\s*$/, "");
+  const closers = pendingClosers(head).reverse().join("");
+  return closers ? head + closers : head;
+}
+
+/**
+ * Extracts the first JSON object from LLM output (tolerates fencing,
+ * surrounding prose, reasoning-model <think> blocks, and a response
+ * truncated by the token ceiling).
  */
 export function extractJson<T>(text: string): T {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced ? fenced[1] : text;
+  // Reasoning models emit their scratchpad first; it routinely contains
+  // braces and draft JSON that would otherwise be parsed as the answer.
+  const withoutThinking = text.replace(/<(think|thinking|reasoning)>[\s\S]*?<\/\1>/gi, "");
+  const fenced = withoutThinking.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const candidate = fenced ? fenced[1] : withoutThinking;
   const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
+  if (start === -1) {
     throw new Error("No JSON object found in agent output");
   }
-  return JSON.parse(candidate.slice(start, end + 1)) as T;
+
+  const end = candidate.lastIndexOf("}");
+  if (end > start) {
+    try {
+      return JSON.parse(candidate.slice(start, end + 1)) as T;
+    } catch {
+      // fall through to the repair attempt
+    }
+  }
+
+  const repaired = repairTruncatedJson(candidate.slice(start));
+  if (repaired) {
+    try {
+      return JSON.parse(repaired) as T;
+    } catch {
+      // fall through to the shared error below
+    }
+  }
+  throw new Error(
+    "The model's response was not valid JSON and could not be repaired (it was most likely cut off mid-answer)."
+  );
 }
 
 /**

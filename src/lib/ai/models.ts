@@ -17,6 +17,7 @@
  * routing is an upgrade, not a new requirement.
  */
 import {
+  listAvailableModels,
   nvidiaChatModel,
   nvidiaCodeModel,
   nvidiaGlmModel,
@@ -80,4 +81,143 @@ export function modelForRole(role: ModelRole): string {
  */
 export function generalFallbackModel(): string {
   return kimiModel() ?? nvidiaChatModel();
+}
+
+/**
+ * Preferred models per role, strongest first.
+ *
+ * These are candidates, not commitments: at call time the list is
+ * filtered against the models this deployment's key can actually call
+ * (see `resolveModelForRole`), so an id that is retired, renamed, or
+ * simply not available on this account is skipped rather than 404ing.
+ * That is what makes it safe to name more models than any one account
+ * is guaranteed to have — the ladder gets stronger as the catalog does,
+ * and never weaker than the built-in defaults at the end of each list.
+ *
+ * Ordering rationale: reasoning-grade models lead the roles that plan
+ * and write application code; small fast models lead the roles that
+ * review, diagnose, and classify, where latency matters more than depth
+ * and every step shares one time budget.
+ */
+export const MODEL_CANDIDATES: Record<ModelRole, readonly string[]> = {
+  "deep-reasoning": [
+    "openai/gpt-oss-120b",
+    "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    "qwen/qwen3-next-80b-a3b-instruct",
+    "deepseek-ai/deepseek-r1",
+    "z-ai/glm-5.2",
+  ],
+  "primary-coding": [
+    "qwen/qwen3-next-80b-a3b-instruct",
+    "openai/gpt-oss-120b",
+    "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    "qwen/qwen2.5-coder-32b-instruct",
+    "poolside/laguna-xs-2.1",
+  ],
+  codegen: [
+    "qwen/qwen2.5-coder-32b-instruct",
+    "mistralai/ministral-14b-instruct-2512",
+    "qwen/qwen3-next-80b-a3b-instruct",
+    "openai/gpt-oss-20b",
+    "poolside/laguna-xs-2.1",
+  ],
+  diagnostics: [
+    "openai/gpt-oss-20b",
+    "mistralai/ministral-14b-instruct-2512",
+    "meta/llama-3.1-8b-instruct",
+    "stepfun-ai/step-3.7-flash",
+  ],
+  light: [
+    "mistralai/ministral-14b-instruct-2512",
+    "openai/gpt-oss-20b",
+    "meta/llama-3.1-8b-instruct",
+    "stepfun-ai/step-3.7-flash",
+  ],
+};
+
+/** General-purpose models for the chain's second tier, strongest first. */
+const GENERAL_CANDIDATES: readonly string[] = [
+  "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+  "mistralai/ministral-14b-instruct-2512",
+  "openai/gpt-oss-20b",
+  "stepfun-ai/step-3.7-flash",
+];
+
+/**
+ * The catalog is fetched once and reused: it changes on the scale of
+ * weeks, a build makes a dozen model calls, and a lookup that cost a
+ * round trip every time would eat budget the agents need. A failed
+ * fetch caches nothing, so the next call retries.
+ */
+const CATALOG_TTL_MS = 10 * 60_000;
+let catalogCache: { fetchedAt: number; ids: Set<string> } | null = null;
+let catalogInFlight: Promise<Set<string> | null> | null = null;
+
+async function availableModelIds(): Promise<Set<string> | null> {
+  if (catalogCache && Date.now() - catalogCache.fetchedAt < CATALOG_TTL_MS) {
+    return catalogCache.ids;
+  }
+  // Single-flight: ten agents starting at once must not each fetch it.
+  catalogInFlight ??= (async () => {
+    try {
+      const ids = await listAvailableModels();
+      if (ids.length === 0) return null;
+      catalogCache = { fetchedAt: Date.now(), ids: new Set(ids) };
+      return catalogCache.ids;
+    } finally {
+      catalogInFlight = null;
+    }
+  })();
+  return catalogInFlight;
+}
+
+/**
+ * The model this role should actually run on, resolved against the live
+ * catalog.
+ *
+ * Precedence: a valid env override wins; otherwise the strongest
+ * candidate this key can call; otherwise the built-in default. The
+ * catalog being unreachable is not a failure — it just means the static
+ * answer stands.
+ */
+export async function resolveModelForRole(role: ModelRole): Promise<string> {
+  const fallback = modelForRole(role);
+  // An explicit, valid override is a deliberate choice — never overrule it.
+  const overrides: Record<ModelRole, string | undefined> = {
+    "deep-reasoning": deepseekProModel(),
+    "primary-coding": deepseekProModel(),
+    codegen: mistralLargeModel(),
+    diagnostics: deepseekFlashModel(),
+    light: mistralMediumModel(),
+  };
+  if (overrides[role]) return overrides[role]!;
+
+  const available = await availableModelIds();
+  if (!available) return fallback;
+  return MODEL_CANDIDATES[role].find((id) => available.has(id)) ?? fallback;
+}
+
+/** Same resolution for the chain's general-purpose second tier. */
+export async function resolveGeneralFallbackModel(): Promise<string> {
+  const override = kimiModel();
+  if (override) return override;
+  const available = await availableModelIds();
+  if (!available) return generalFallbackModel();
+  return (
+    GENERAL_CANDIDATES.find((id) => available.has(id)) ?? generalFallbackModel()
+  );
+}
+
+/** Which candidate each role resolves to right now, for diagnostics. */
+export async function resolvedModelPlan(): Promise<Record<string, string>> {
+  const [deepReasoning, primaryCoding, codegen, diagnostics, light, general] =
+    await Promise.all([
+      resolveModelForRole("deep-reasoning"),
+      resolveModelForRole("primary-coding"),
+      resolveModelForRole("codegen"),
+      resolveModelForRole("diagnostics"),
+      resolveModelForRole("light"),
+      resolveGeneralFallbackModel(),
+    ]);
+  return { deepReasoning, primaryCoding, codegen, diagnostics, light, general };
 }

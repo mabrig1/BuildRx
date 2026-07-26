@@ -11,7 +11,7 @@ import {
   nvidiaTextModel,
   rejectedModelVars,
 } from "@/lib/ai/nvidia";
-import { modelForRole } from "@/lib/ai/models";
+import { MODEL_CANDIDATES, resolvedModelPlan } from "@/lib/ai/models";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -42,6 +42,8 @@ export async function GET() {
 
   const available = await listAvailableModels();
   const invalidVars = rejectedModelVars();
+  const resolved = await resolvedModelPlan();
+  const availableSet = new Set(available);
 
   return NextResponse.json({
     configured: isNvidiaConfigured(),
@@ -50,11 +52,7 @@ export async function GET() {
     availableCount: available.length,
     /** What each pipeline role resolves to right now. */
     inUse: {
-      deepReasoning: modelForRole("deep-reasoning"),
-      primaryCoding: modelForRole("primary-coding"),
-      codegen: modelForRole("codegen"),
-      diagnostics: modelForRole("diagnostics"),
-      light: modelForRole("light"),
+      ...resolved,
       chainPrimary: nvidiaGlmModel(),
       chainFast: nvidiaChatModel(),
       chainLite: nvidiaLlamaModel(),
@@ -63,16 +61,21 @@ export async function GET() {
     },
     /** Model env vars rejected as malformed — fix or delete these. */
     invalidVars,
-    /** Whether each in-use model is one the key can actually call. */
+    /** Whether every routed model is one the key can actually call. */
     inUseAreAvailable:
       available.length === 0
         ? null
-        : [
-            modelForRole("deep-reasoning"),
-            modelForRole("primary-coding"),
-            modelForRole("codegen"),
-            modelForRole("diagnostics"),
-          ].every((model) => available.includes(model)),
+        : Object.values(resolved).every((model) => availableSet.has(model)),
+    /**
+     * The preference ladder per role, annotated with what this key can
+     * call — shows why each role resolved the way it did.
+     */
+    candidates: Object.fromEntries(
+      Object.entries(MODEL_CANDIDATES).map(([role, ids]) => [
+        role,
+        ids.map((id) => ({ id, available: availableSet.has(id) })),
+      ])
+    ),
     models: NVIDIA_MODELS,
   });
 }

@@ -292,6 +292,19 @@ export function runStaticChecks(
       });
     }
   }
+  // The deployment checklist verifies the schema exists, so QA has to
+  // find it missing first — otherwise the repair loop never gets the
+  // chance to write it and the build fails verification for something
+  // that was trivially fixable.
+  if (plan.dataModel.length > 0 && !paths.has("supabase/schema.sql")) {
+    findings.push({
+      rule: "missing-schema",
+      severity: "error",
+      message: "supabase/schema.sql is missing but the plan defines tables",
+      fix: "auto",
+    });
+  }
+
   const schemaTables = new Set(inspectSchema(context));
   for (const table of plan.dataModel) {
     if (!paths.has(`src/app/api/${table.table}/route.ts`)) {

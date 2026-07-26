@@ -20,6 +20,7 @@ import {
   nvidiaChatModel,
   nvidiaCodeModel,
   nvidiaGlmModel,
+  validModelId,
 } from "@/lib/ai/nvidia";
 
 /** What kind of work a model call is doing. */
@@ -30,9 +31,15 @@ export type ModelRole =
   | "diagnostics" // fast debugging, log analysis
   | "light"; // small classification/review tasks
 
+/**
+ * A routed model id, or undefined when the variable is unset *or*
+ * malformed. Validation matters most here: these five variables were
+ * found holding API keys in a live deployment, which turned every
+ * routed call into a 404 for a model named "nvapi-…" while the pipeline
+ * silently fell back to scaffolds.
+ */
 function env(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-  return value ? value : undefined;
+  return validModelId(process.env[name], name);
 }
 
 export function deepseekProModel(): string | undefined {

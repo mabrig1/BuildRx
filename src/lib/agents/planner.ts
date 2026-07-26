@@ -25,16 +25,164 @@ Keep the plan small and buildable: at most 4 pages, 6 components, 4 tables.
 
 Output the JSON object and nothing else — no code fence, no commentary, and no reasoning before or after it. Finish the object: a complete small plan beats a detailed one that gets cut off.`;
 
+function toKebabPath(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return slug === "home" || slug === "" ? "/" : `/${slug}`;
+}
+
+function toPascalName(value: string): string {
+  return value
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join("");
+}
+
+/**
+ * Strips markdown emphasis from a fragment. Underscores are deliberately
+ * kept: column and table names are snake_case, and stripping them turned
+ * "user_id" into "userid" — a silently wrong schema.
+ */
+function clean(value: string): string {
+  return value.replace(/[*`#]+/g, "").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Reads the structure the user actually wrote.
+ *
+ * The guide tells people to name their pages, components, and tables —
+ * so when the model is unavailable, that structure is still right there
+ * in the prompt and parsing it beats ignoring it. A prompt written to
+ * the documented shape produces a real plan with no model at all.
+ */
+export function parsePromptStructure(prompt: string): Partial<AppPlan> {
+  const lines = prompt.split(/\r?\n/);
+  const result: Partial<AppPlan> = {};
+  let section: "pages" | "components" | "tables" | null = null;
+
+  const pages: AppPlan["pages"] = [];
+  const components: AppPlan["components"] = [];
+  const dataModel: AppPlan["dataModel"] = [];
+
+  const inlineList = (value: string) =>
+    value
+      .split(/[,;]/)
+      .map(clean)
+      .filter(Boolean);
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const heading = line.match(/^\**\s*(pages?|components?|tables?|data\s*model)\s*\**\s*:?\s*(.*)$/i);
+    if (heading && !line.startsWith("-")) {
+      const kind = heading[1].toLowerCase();
+      section = kind.startsWith("page")
+        ? "pages"
+        : kind.startsWith("component")
+          ? "components"
+          : "tables";
+      // "Components: UploadZone, ToolCard" — inline form.
+      const rest = heading[2]?.trim();
+      if (rest) {
+        for (const item of inlineList(rest)) {
+          if (section === "components") {
+            components.push({ name: toPascalName(item), description: item });
+          } else if (section === "tables") {
+            const name = item.split(/[\s(]/)[0];
+            if (name) {
+              dataModel.push({
+                table: name.toLowerCase(),
+                description: item,
+                columns: [{ name: "id", type: "uuid" }],
+              });
+            }
+          }
+        }
+      }
+      continue;
+    }
+
+    const bullet = line.match(/^[-*•]\s+(.*)$/);
+    if (!bullet || !section) continue;
+    const body = bullet[1];
+
+    if (section === "pages") {
+      const [namePart, ...descParts] = body.split(":");
+      const name = clean(namePart);
+      if (!name) continue;
+      pages.push({
+        name,
+        path: toKebabPath(name),
+        description: clean(descParts.join(":")) || name,
+      });
+    } else if (section === "components") {
+      for (const item of inlineList(body)) {
+        components.push({ name: toPascalName(item), description: item });
+      }
+    } else {
+      // "- documents (id, user_id, filename, created_at)"
+      const match = body.match(/^([a-zA-Z_][\w]*)\s*\(([^)]*)\)/);
+      if (!match) continue;
+      const columns = match[2]
+        .split(",")
+        .map((column) => clean(column))
+        .filter(Boolean)
+        .map((column) => {
+          const name = column.split(/\s+/)[0];
+          const type = /_at$/.test(name)
+            ? "timestamptz"
+            : name === "id"
+              ? "uuid"
+              : /_id$/.test(name)
+                ? "uuid"
+                : /count|size|price|quantity|_cents$/.test(name)
+                  ? "integer"
+                  : /^is_|^has_|done|active|enabled/.test(name)
+                    ? "boolean"
+                    : "text";
+          return { name, type };
+        });
+      dataModel.push({
+        table: match[1].toLowerCase(),
+        description: `Records for ${match[1]}`,
+        columns: columns.length > 0 ? columns : [{ name: "id", type: "uuid" }],
+      });
+    }
+  }
+
+  if (pages.length > 0) result.pages = pages.slice(0, 4);
+  if (components.length > 0) result.components = components.slice(0, 6);
+  if (dataModel.length > 0) result.dataModel = dataModel.slice(0, 4);
+  return result;
+}
+
+/** First sentence of the request, cleaned up for use as a summary. */
+function summaryFromPrompt(prompt: string): string {
+  const firstLine = clean(prompt.split(/\r?\n/)[0] ?? "");
+  const sentence = firstLine.split(/(?<=[.!?])\s/)[0] ?? firstLine;
+  const trimmed = sentence.length > 140 ? `${sentence.slice(0, 137)}…` : sentence;
+  return trimmed || "A web app built from your description.";
+}
+
 /**
  * Deterministic plan derived from the prompt. Used in mock mode, and as
  * the planner's fallback — every later step reads `context.plan`, so the
  * pipeline can survive anything except having no plan at all.
+ *
+ * Structure the user wrote explicitly (Pages / Components / Tables) is
+ * parsed out and used; only what's missing is filled from a template.
  */
 export function fallbackPlan(prompt: string): AppPlan {
   const lower = prompt.toLowerCase();
+  const parsed = parsePromptStructure(prompt);
 
   if (lower.includes("church")) {
-    return {
+    const church: AppPlan = {
       appName: "Grace Community Church",
       summary:
         "A welcoming church website with service times, sermons, and upcoming events.",
@@ -75,6 +223,7 @@ export function fallbackPlan(prompt: string): AppPlan {
       ],
       features: ["Service times", "Sermon archive", "Events calendar"],
     };
+    return { ...church, ...parsed };
   }
 
   const appName = lower.includes("coffee")
@@ -82,9 +231,10 @@ export function fallbackPlan(prompt: string): AppPlan {
     : lower.includes("task")
       ? "TaskFlow"
       : "My App";
-  return {
+
+  const base: AppPlan = {
     appName,
-    summary: `A web app for: ${prompt.slice(0, 80)}`,
+    summary: summaryFromPrompt(prompt),
     pages: [
       { name: "Home", path: "/", description: "Landing page with hero and features" },
       { name: "About", path: "/about", description: "About page" },
@@ -106,6 +256,9 @@ export function fallbackPlan(prompt: string): AppPlan {
     ],
     features: ["Responsive layout", "Modern design", "Fast page loads"],
   };
+
+  // Anything the user spelled out wins over the template.
+  return { ...base, ...parsed };
 }
 
 /**

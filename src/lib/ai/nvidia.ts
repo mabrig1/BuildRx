@@ -111,6 +111,45 @@ function cleanEnv(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+/**
+ * A NIM model id is "vendor/model-name". Anything else is a
+ * misconfiguration, and the dangerous case is real: an API key pasted
+ * into a model variable makes every request ask for a model named
+ * "nvapi-…", which 404s forever while looking like an outage. Rejected
+ * values fall back to the built-in default, and the variable's *name*
+ * (never its value) is reported through /api/ai/config.
+ */
+const REJECTED_MODEL_VARS = new Set<string>();
+
+export function validModelId(
+  value: string | undefined,
+  varName?: string
+): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+
+  const looksLikeSecret =
+    /^nvapi-/i.test(trimmed) || /bearer\s/i.test(trimmed) || trimmed.length > 120;
+  const wellFormed = /^[A-Za-z0-9][\w.-]*\/[\w.:-]+$/.test(trimmed);
+
+  if (looksLikeSecret || !wellFormed) {
+    if (varName && !REJECTED_MODEL_VARS.has(varName)) {
+      REJECTED_MODEL_VARS.add(varName);
+      // Never log the value — it may be key material.
+      console.error(
+        `${varName} is not a valid NVIDIA model id (expected "vendor/model-name"); using the built-in default instead.`
+      );
+    }
+    return undefined;
+  }
+  return trimmed;
+}
+
+/** Names of model env vars rejected as malformed. Names only, no values. */
+export function rejectedModelVars(): string[] {
+  return [...REJECTED_MODEL_VARS].sort();
+}
+
 export function nvidiaApiKey(): string | undefined {
   return cleanEnv(process.env.NVIDIA_API_KEY);
 }
@@ -120,26 +159,26 @@ export function isNvidiaConfigured() {
 }
 
 export function nvidiaTextModel() {
-  return cleanEnv(process.env.NVIDIA_TEXT_MODEL) ?? DEFAULT_TEXT_MODEL;
+  return validModelId(process.env.NVIDIA_TEXT_MODEL, "NVIDIA_TEXT_MODEL") ?? DEFAULT_TEXT_MODEL;
 }
 
 export function nvidiaCodeModel() {
-  return cleanEnv(process.env.NVIDIA_CODE_MODEL) ?? DEFAULT_CODE_MODEL;
+  return validModelId(process.env.NVIDIA_CODE_MODEL, "NVIDIA_CODE_MODEL") ?? DEFAULT_CODE_MODEL;
 }
 
 /** Fast model for interactive chat (low latency beats depth there). */
 export function nvidiaChatModel() {
-  return cleanEnv(process.env.NVIDIA_CHAT_MODEL) ?? DEFAULT_CHAT_MODEL;
+  return validModelId(process.env.NVIDIA_CHAT_MODEL, "NVIDIA_CHAT_MODEL") ?? DEFAULT_CHAT_MODEL;
 }
 
 /** GLM — the primary reasoning model for the provider fallback chain. */
 export function nvidiaGlmModel() {
-  return cleanEnv(process.env.NVIDIA_GLM_MODEL) ?? DEFAULT_GLM_MODEL;
+  return validModelId(process.env.NVIDIA_GLM_MODEL, "NVIDIA_GLM_MODEL") ?? DEFAULT_GLM_MODEL;
 }
 
 /** Llama — the lightweight second-tier NVIDIA model, tried before leaving NVIDIA entirely. */
 export function nvidiaLlamaModel() {
-  return cleanEnv(process.env.NVIDIA_LLAMA_MODEL) ?? DEFAULT_LLAMA_MODEL;
+  return validModelId(process.env.NVIDIA_LLAMA_MODEL, "NVIDIA_LLAMA_MODEL") ?? DEFAULT_LLAMA_MODEL;
 }
 
 /** Effective API base URL (env override or the NIM default). */

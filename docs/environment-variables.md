@@ -29,30 +29,43 @@ Get these from **Project Settings → API** in the [Supabase dashboard](https://
 ## AI providers (chat + agent build pipeline)
 
 `/api/chat` and `/api/agents/run` go through a shared provider chain
-(`src/lib/ai/provider.ts`) that tries each configured provider in order
-and falls back automatically: **NVIDIA GLM → NVIDIA Llama → Anthropic
-Claude**. Configure either or both; with neither key set, both return
-well-formed **mock responses** (still persisted when Supabase is
-connected), clearly labeled as demo output.
+(`src/lib/ai/provider.ts`) built entirely on NVIDIA's Inference API, so
+no AI request depends on a paid balance. The chain tries the NVIDIA
+models in order and falls back automatically: **NVIDIA GLM → NVIDIA Step
+→ NVIDIA Llama**. `NVIDIA_API_KEY` is the only AI key needed; without it
+both return well-formed **mock responses** (still persisted when
+Supabase is connected), clearly labeled as demo output.
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `NVIDIA_API_KEY` | For NVIDIA (primary) | Bearer token for the NIM OpenAI-compatible API. Get one at [build.nvidia.com](https://build.nvidia.com). |
+| `NVIDIA_API_KEY` | **Yes, for real AI** | Bearer token for the NIM OpenAI-compatible API. Get a free one at [build.nvidia.com](https://build.nvidia.com). |
 | `NVIDIA_BASE_URL` | No | API base URL (alias: `NVIDIA_API_BASE_URL`). Default: `https://integrate.api.nvidia.com/v1`. |
 | `NVIDIA_GLM_MODEL` | No | Primary provider-chain model. Default: `z-ai/glm-5.2`. |
-| `NVIDIA_LLAMA_MODEL` | No | NVIDIA's own fallback tier before the chain leaves NVIDIA entirely — a lightweight model, tried only if the GLM model fails. Default: `meta/llama-3.2-1b-instruct`. |
-| `ANTHROPIC_API_KEY` | For Anthropic (fallback) | From the [Anthropic Console](https://console.anthropic.com). Used when NVIDIA is unconfigured or every NVIDIA attempt fails. |
+| `NVIDIA_CHAT_MODEL` | No | Second chain tier, and the model chat starts on. Default: `stepfun-ai/step-3.7-flash`. |
+| `NVIDIA_LLAMA_MODEL` | No | Last chain tier — a lightweight model, tried only if the two above fail. Default: `meta/llama-3.2-1b-instruct`. |
 | `NVIDIA_RATE_LIMIT_RPM` | No | Per-user requests/minute across the AI endpoints (also applies to `/api/agents/run`). Default: `20`. |
+
+### Optional Anthropic tier (off by default)
+
+Anthropic Claude is available as an extra last-resort tier but is
+**disabled unless you explicitly turn it on**. A key on its own does
+nothing: an unfunded Claude account returns `400 — "Your credit balance
+is too low"`, and that error would surface to users instead of a working
+NVIDIA answer, so both variables below are required to enable it.
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `ANTHROPIC_ENABLED` | To enable Anthropic | Set to `true` to append the Anthropic tier to the chain. Unset/`false` (the default) keeps the app NVIDIA-only and unable to incur Anthropic spend. |
+| `ANTHROPIC_API_KEY` | To enable Anthropic | From the [Anthropic Console](https://console.anthropic.com). Must be on a funded account. Ignored entirely unless `ANTHROPIC_ENABLED=true`. |
 
 ## NVIDIA Inference API (`/api/ai/generate`, `/api/ai/code`)
 
-These two endpoints are NVIDIA-only by design (no Anthropic fallback) and return `503` if `NVIDIA_API_KEY` is unset. They use their own role-specialized models, independent of the GLM/Llama provider-chain tiers above.
+These two endpoints return `503` if `NVIDIA_API_KEY` is unset. They use their own role-specialized models, independent of the provider-chain tiers above.
 
 | Variable | Required | Description |
 | --- | --- | --- |
 | `NVIDIA_TEXT_MODEL` | No | Reasoning model — `/api/ai/generate`. Default: `z-ai/glm-5.2`. |
-| `NVIDIA_CODE_MODEL` | No | Code model — `/api/ai/code`, and reused by the chat/agent pipeline's code-generating agents when their NVIDIA tier is reached. Default: `poolside/laguna-xs-2.1`. |
-| `NVIDIA_CHAT_MODEL` | No | Fast chat model, used only in demo mode (no Supabase) for the plain-NVIDIA branch. Default: `stepfun-ai/step-3.7-flash`. |
+| `NVIDIA_CODE_MODEL` | No | Code model — `/api/ai/code`, and reused by the chat/agent pipeline's code-generating agents. Default: `poolside/laguna-xs-2.1`. |
 
 ## PostHog (product analytics)
 
@@ -90,7 +103,7 @@ GitHub personal access tokens and Vercel / Netlify / Railway API tokens are **no
 | --- | --- |
 | Just explore | nothing |
 | Real accounts + persistence | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| Real AI chat + agent builds | `ANTHROPIC_API_KEY` |
+| Real AI chat + agent builds | `NVIDIA_API_KEY` |
 | Billing/subscriptions | `SUPABASE_SERVICE_ROLE_KEY` + Paystack and/or Flutterwave keys |
 | NVIDIA text/code endpoints | `NVIDIA_API_KEY` |
 | Product analytics | `NEXT_PUBLIC_POSTHOG_KEY` |

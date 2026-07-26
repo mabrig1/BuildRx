@@ -1,13 +1,23 @@
 import type { GeneratedFile } from "@/lib/agents/types";
 import { isAnyProviderConfigured, completeText } from "@/lib/ai/provider";
-import { nvidiaCodeModel } from "@/lib/ai/nvidia";
+import { isNvidiaConfigured, nvidiaCodeModel, nvidiaGlmModel } from "@/lib/ai/nvidia";
 
-export const AGENT_MODEL = "claude-opus-4-8";
+/** Model used only if the opt-in Anthropic tier is ever reached. */
+export const ANTHROPIC_AGENT_MODEL = "claude-opus-4-8";
+
+/**
+ * Label recorded against a build's usage row: the model the pipeline
+ * actually starts on. NVIDIA is the default provider, so hardcoding a
+ * Claude model here would have mislabelled every build.
+ */
+export function agentModel(): string {
+  return isNvidiaConfigured() ? nvidiaGlmModel() : ANTHROPIC_AGENT_MODEL;
+}
 
 /**
  * What kind of work the agent call is doing — selects the NVIDIA model
- * used for the provider chain's "nvidia-glm" tier when that provider is
- * reached: reasoning → GLM, code → the code-specialized Laguna model.
+ * used for the provider chain's primary tier: reasoning → GLM, code →
+ * the code-specialized Laguna model.
  */
 export type AgentRole = "reasoning" | "code";
 
@@ -34,9 +44,9 @@ export function remainingBudgetMs(
 }
 
 /**
- * Runs one agent LLM call through the centralized provider chain (NVIDIA
- * GLM → NVIDIA Llama → Anthropic Claude, whichever are configured).
- * Returns the final text.
+ * Runs one agent LLM call through the centralized provider chain
+ * (NVIDIA GLM → NVIDIA Step → NVIDIA Llama, plus Anthropic only when
+ * explicitly enabled). Returns the final text.
  *
  * Bounded by `timeoutMs` (the orchestrator passes the remaining slice of
  * its overall deadline): the six-agent pipeline shares one 300s Vercel
@@ -67,7 +77,7 @@ export async function runAgentCompletion({
       maxTokens,
       temperature: 0.3,
       timeoutMs,
-      anthropicModel: AGENT_MODEL,
+      anthropicModel: ANTHROPIC_AGENT_MODEL,
       // Keep the code-specialized NVIDIA model for code-generating
       // agents; the GLM default covers planning/review/reasoning steps.
       nvidiaModel: role === "code" ? nvidiaCodeModel() : undefined,

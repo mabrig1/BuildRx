@@ -8,4 +8,8 @@ Your job in this conversation:
 
 When writing code files, precede each file with its path as a bold label, e.g. **src/app/page.tsx**, followed by a single fenced code block for that file.`;
 
-export const CHAT_MODEL = "claude-opus-4-8";
+/**
+ * Model used only if the opt-in Anthropic tier is ever reached — chat
+ * normally runs on NVIDIA's fast Step model (see `nvidiaChatModel()`).
+ */
+export const ANTHROPIC_CHAT_MODEL = "claude-opus-4-8";

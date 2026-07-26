@@ -28,10 +28,10 @@ The recommended host is [Vercel](https://vercel.com); any Node 20+ host that run
    NEXT_PUBLIC_SUPABASE_URL=...
    NEXT_PUBLIC_SUPABASE_ANON_KEY=...
    SUPABASE_SERVICE_ROLE_KEY=...        ← required for billing to activate
-   ANTHROPIC_API_KEY=...
+   NVIDIA_API_KEY=...                   ← required for real AI (free key at build.nvidia.com)
    ```
 
-   Add the optional groups (NVIDIA, PostHog, Paystack, Flutterwave) as needed — the [environment variable reference](environment-variables.md) explains each one. `NEXT_PUBLIC_*` values are baked in at build time, so **redeploy after changing them**.
+   Add the optional groups (PostHog, Paystack, Flutterwave) as needed — the [environment variable reference](environment-variables.md) explains each one. `NEXT_PUBLIC_*` values are baked in at build time, so **redeploy after changing them**.
 3. Deploy. Preview deployments work too, but OAuth and payment callbacks will only round-trip cleanly on domains listed in your Supabase redirect allow list.
 
 ### Function duration limits

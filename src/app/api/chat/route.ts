@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { APP_BUILDER_SYSTEM_PROMPT, CHAT_MODEL } from "@/lib/ai/prompts";
+import { nvidiaChatModel } from "@/lib/ai/nvidia";
+import { APP_BUILDER_SYSTEM_PROMPT, ANTHROPIC_CHAT_MODEL } from "@/lib/ai/prompts";
 import {
   isAnyProviderConfigured,
   streamText,
@@ -23,7 +24,7 @@ const DB_STEP_TIMEOUT_MS = 20_000;
 
 export const maxDuration = 300;
 
-/** Demo response streamed when no ANTHROPIC_API_KEY is configured. */
+/** Demo response streamed when no NVIDIA_API_KEY is configured. */
 const MOCK_RESPONSE = `I'd love to help you build that! Here's how I'd approach it:
 
 1. **Layout** — a clean page shell with a header and content area
@@ -42,7 +43,7 @@ export default function Page() {
 }
 \`\`\`
 
-*(This is a demo response — add your \`ANTHROPIC_API_KEY\` to .env.local for real AI generation.)*
+*(This is a demo response — add your free \`NVIDIA_API_KEY\` from https://build.nvidia.com to .env.local for real AI generation.)*
 
 What should we build first?`;
 
@@ -82,8 +83,7 @@ export async function POST(request: Request) {
   const { projectId, content } = parsed.data;
 
   // Demo mode: no Supabase → no persistence. Stream a real response
-  // through the provider chain (NVIDIA GLM → NVIDIA Llama → Anthropic,
-  // whichever are configured), otherwise the canned demo reply.
+  // through the NVIDIA provider chain, otherwise the canned demo reply.
   if (!isSupabaseConfigured()) {
     if (isAnyProviderConfigured()) {
       try {
@@ -92,7 +92,14 @@ export async function POST(request: Request) {
             { role: "system", content: APP_BUILDER_SYSTEM_PROMPT },
             { role: "user", content },
           ],
-          { maxTokens: 4096, anthropicModel: CHAT_MODEL, timeoutMs: 270_000 }
+          {
+            maxTokens: 4096,
+            // Chat wants low latency over depth — start on NVIDIA's fast
+            // model rather than the heavier reasoning default.
+            nvidiaModel: nvidiaChatModel(),
+            anthropicModel: ANTHROPIC_CHAT_MODEL,
+            timeoutMs: 270_000,
+          }
         );
         return new Response(stream, {
           headers: {
@@ -271,7 +278,7 @@ export async function POST(request: Request) {
       userId: user!.id,
       projectId,
       messageId: message?.id ?? null,
-      model: generation.model ?? CHAT_MODEL,
+      model: generation.model ?? nvidiaChatModel(),
       status: generation.status,
       promptTokens: generation.promptTokens,
       completionTokens: generation.completionTokens,
@@ -303,9 +310,9 @@ export async function POST(request: Request) {
 
   // Vercel hard-kills this function at maxDuration (300s) with no
   // chance to respond, which is exactly what left users staring at an
-  // infinite spinner. This bounds both the time spent trying providers
-  // in the fallback chain (NVIDIA GLM → NVIDIA Llama → Anthropic) and,
-  // once one is selected, its own generation time.
+  // infinite spinner. This bounds both the time spent trying models in
+  // the NVIDIA fallback chain and, once one is selected, its own
+  // generation time.
   const DEADLINE_MS = 270_000;
 
   try {
@@ -315,7 +322,8 @@ export async function POST(request: Request) {
           // Chat replies should be conversational, not a full app dump
           // (see APP_BUILDER_SYSTEM_PROMPT: "keep responses concise").
           maxTokens: 8192,
-          anthropicModel: CHAT_MODEL,
+          nvidiaModel: nvidiaChatModel(),
+          anthropicModel: ANTHROPIC_CHAT_MODEL,
           timeoutMs: DEADLINE_MS,
         }),
       DEADLINE_MS,

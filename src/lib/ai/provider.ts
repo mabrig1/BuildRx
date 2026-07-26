@@ -1,14 +1,21 @@
 /**
  * Centralized AI provider selection.
  *
- * Detects which providers are actually configured (by API key presence)
- * and tries them in priority order, falling through to the next one on
- * failure. Never throws unless every configured provider has failed —
- * and if none are configured at all, callers are expected to fall back
- * to their own demo/mock response (see chat/route.ts), not treat that
- * as a crash.
+ * NVIDIA's Inference API (NIM) is the only provider used by default —
+ * every tier of the chain is an NVIDIA model, so a build or a chat reply
+ * never depends on a paid Anthropic balance. If one NVIDIA model is
+ * unavailable (404 for a retired model id, a 429, a 5xx), the next
+ * NVIDIA model is tried instead.
  *
- * Priority: NVIDIA GLM → NVIDIA Llama → Anthropic Claude.
+ * Priority: NVIDIA primary (GLM, or the caller's role-specialized model)
+ * → NVIDIA fast (Step) → NVIDIA lightweight (Llama).
+ *
+ * Anthropic Claude is opt-in and OFF unless `ANTHROPIC_ENABLED=true` is
+ * set alongside a funded `ANTHROPIC_API_KEY`. Merely having the key in
+ * the environment is deliberately not enough: a stale key with no
+ * credit used to end every run with Anthropic's "credit balance is too
+ * low" 400 instead of a real NVIDIA result.
+ *
  * (OpenAI/Gemini/xAI are intentionally not wired in — nothing in this
  * app holds keys for them today; adding untested, unkeyed providers
  * would just be dead code paths.)
@@ -18,13 +25,27 @@ import Anthropic from "@anthropic-ai/sdk";
 import {
   createChatCompletion,
   isNvidiaConfigured,
+  nvidiaChatModel,
   nvidiaGlmModel,
   nvidiaLlamaModel,
   streamChatCompletion,
   type NvidiaMessage,
 } from "@/lib/ai/nvidia";
 
-export type ProviderName = "nvidia-glm" | "nvidia-llama" | "anthropic";
+export type ProviderName =
+  | "nvidia-glm"
+  | "nvidia-step"
+  | "nvidia-llama"
+  | "anthropic";
+
+/** The NVIDIA tiers, in the order they are attempted. */
+const NVIDIA_PROVIDERS = ["nvidia-glm", "nvidia-step", "nvidia-llama"] as const;
+
+type NvidiaProviderName = (typeof NVIDIA_PROVIDERS)[number];
+
+function isNvidiaProvider(provider: ProviderName): provider is NvidiaProviderName {
+  return (NVIDIA_PROVIDERS as readonly string[]).includes(provider);
+}
 
 export interface ProviderMessage {
   role: "system" | "user" | "assistant";
@@ -48,15 +69,16 @@ export interface ProviderCallOptions {
   temperature?: number;
   /** Budget for a single provider attempt, not the whole fallback chain. */
   timeoutMs?: number;
+  /** Only used when Anthropic is explicitly enabled (see module header). */
   anthropicModel?: string;
   /**
-   * Overrides the model used for the "nvidia-glm" tier — lets callers
+   * Overrides the model used for the primary NVIDIA tier — lets callers
    * that need a role-specialized NVIDIA model (e.g. the code-generation
-   * agents, which use the Laguna code model) keep that specialization
-   * while still going through the same priority chain. The "nvidia-llama"
-   * tier always uses the lightweight Llama model regardless of role —
-   * it exists purely as NVIDIA's own fallback before leaving the
-   * provider entirely, not a second specialized slot.
+   * agents, which use the Laguna code model, or chat, which uses the
+   * fast Step model) keep that specialization while still going through
+   * the same fallback chain. The remaining tiers always use their fixed
+   * models; they exist as NVIDIA's own safety net, not as extra
+   * specialized slots.
    */
   nvidiaModel?: string;
 }
@@ -64,20 +86,92 @@ export interface ProviderCallOptions {
 const DEFAULT_TIMEOUT_MS = 90_000;
 const DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-8";
 
-function isAnthropicConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+/**
+ * Anthropic is opt-in: the key alone does not enable it. This is what
+ * keeps a keyed-but-unfunded account from surfacing billing errors to
+ * users instead of an NVIDIA answer.
+ */
+function isAnthropicEnabled(): boolean {
+  const flag = process.env.ANTHROPIC_ENABLED?.trim().toLowerCase();
+  const enabled = flag === "true" || flag === "1";
+  return enabled && Boolean(process.env.ANTHROPIC_API_KEY?.trim());
 }
 
-/** Providers with a key present, in priority order. */
+/** Providers usable right now, in priority order. */
 export function availableProviders(): ProviderName[] {
   const providers: ProviderName[] = [];
-  if (isNvidiaConfigured()) providers.push("nvidia-glm", "nvidia-llama");
-  if (isAnthropicConfigured()) providers.push("anthropic");
+  if (isNvidiaConfigured()) providers.push(...NVIDIA_PROVIDERS);
+  if (isAnthropicEnabled()) providers.push("anthropic");
   return providers;
 }
 
 export function isAnyProviderConfigured(): boolean {
-  return isNvidiaConfigured() || isAnthropicConfigured();
+  return availableProviders().length > 0;
+}
+
+/** The concrete model each NVIDIA tier resolves to for this call. */
+function nvidiaModelFor(
+  provider: NvidiaProviderName,
+  options: ProviderCallOptions
+): string {
+  switch (provider) {
+    case "nvidia-glm":
+      return options.nvidiaModel ?? nvidiaGlmModel();
+    case "nvidia-step":
+      return nvidiaChatModel();
+    case "nvidia-llama":
+      return nvidiaLlamaModel();
+  }
+}
+
+interface Attempt {
+  provider: ProviderName;
+  /** Empty for Anthropic — resolved separately from `anthropicModel`. */
+  model: string;
+}
+
+/**
+ * The ordered attempts for one call: every configured provider tier,
+ * with duplicate NVIDIA models collapsed (a caller overriding the
+ * primary tier with the Step model shouldn't cause the identical
+ * request to be retried under a second tier name).
+ */
+function plannedAttempts(options: ProviderCallOptions): Attempt[] {
+  const attempts: Attempt[] = [];
+  const seenModels = new Set<string>();
+
+  for (const provider of availableProviders()) {
+    if (isNvidiaProvider(provider)) {
+      const model = nvidiaModelFor(provider, options);
+      if (seenModels.has(model)) continue;
+      seenModels.add(model);
+      attempts.push({ provider, model });
+      continue;
+    }
+    attempts.push({ provider, model: "" });
+  }
+
+  return attempts;
+}
+
+function noProviderError(): Error {
+  return new Error(
+    "No AI provider is configured — set NVIDIA_API_KEY (free at https://build.nvidia.com)."
+  );
+}
+
+/**
+ * Every attempt failed. Names the models actually tried so production
+ * logs point at the real cause (bad key vs. retired model id) instead of
+ * whichever error happened to be last.
+ */
+function allFailedError(attempts: Attempt[], lastError: unknown): Error {
+  const tried = attempts
+    .map((a) => (a.model ? `${a.provider} (${a.model})` : a.provider))
+    .join(", ");
+  const detail =
+    lastError instanceof Error ? lastError.message : String(lastError ?? "unknown error");
+  return new Error(`All AI providers failed. Tried: ${tried}. Last error: ${detail}`);
 }
 
 function toNvidiaMessages(messages: ProviderMessage[]): NvidiaMessage[] {
@@ -86,13 +180,16 @@ function toNvidiaMessages(messages: ProviderMessage[]): NvidiaMessage[] {
 
 /**
  * Caps requested output tokens to each NVIDIA model's realistic
- * completion window — GLM (and its code-model override) handles large
- * generations, but Llama here is a lightweight 1B model that exists
- * purely as NVIDIA's own fallback tier, not a second full-size slot.
+ * completion window — GLM and Step (and the code-model override) handle
+ * large generations, but Llama here is a lightweight 1B model that
+ * exists purely as NVIDIA's last-resort tier.
  */
-function nvidiaMaxTokens(provider: "nvidia-glm" | "nvidia-llama", requested?: number): number | undefined {
+function nvidiaMaxTokens(
+  provider: NvidiaProviderName,
+  requested?: number
+): number | undefined {
   if (requested === undefined) return undefined;
-  const ceiling = provider === "nvidia-glm" ? 16384 : 4096;
+  const ceiling = provider === "nvidia-llama" ? 4096 : 16384;
   return Math.min(requested, ceiling);
 }
 
@@ -118,36 +215,35 @@ export async function completeText(
   messages: ProviderMessage[],
   options: ProviderCallOptions = {}
 ): Promise<CompletionResult> {
-  const providers = availableProviders();
-  if (providers.length === 0) {
-    throw new Error(
-      "No AI provider is configured — set NVIDIA_API_KEY or ANTHROPIC_API_KEY."
-    );
+  const attempts = plannedAttempts(options);
+  if (attempts.length === 0) {
+    throw noProviderError();
   }
 
   let lastError: unknown;
-  for (const provider of providers) {
+  for (const attempt of attempts) {
     try {
-      return await completeWithProvider(provider, messages, options);
+      return await completeWithProvider(attempt, messages, options);
     } catch (error) {
+      console.error(
+        `AI provider ${attempt.provider}${attempt.model ? ` (${attempt.model})` : ""} failed:`,
+        error instanceof Error ? error.message : error
+      );
       lastError = error;
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("All configured AI providers failed.");
+  throw allFailedError(attempts, lastError);
 }
 
 async function completeWithProvider(
-  provider: ProviderName,
+  attempt: Attempt,
   messages: ProviderMessage[],
   options: ProviderCallOptions
 ): Promise<CompletionResult> {
-  if (provider === "nvidia-glm" || provider === "nvidia-llama") {
-    const model =
-      provider === "nvidia-glm" ? options.nvidiaModel ?? nvidiaGlmModel() : nvidiaLlamaModel();
+  const { provider } = attempt;
+  if (isNvidiaProvider(provider)) {
     const result = await createChatCompletion(toNvidiaMessages(messages), {
-      model,
+      model: attempt.model,
       maxTokens: nvidiaMaxTokens(provider, options.maxTokens),
       temperature: options.temperature,
     });
@@ -218,23 +314,20 @@ export async function streamText(
   messages: ProviderMessage[],
   options: ProviderCallOptions = {}
 ): Promise<StreamResult> {
-  const providers = availableProviders();
-  if (providers.length === 0) {
-    throw new Error(
-      "No AI provider is configured — set NVIDIA_API_KEY or ANTHROPIC_API_KEY."
-    );
+  const attempts = plannedAttempts(options);
+  if (attempts.length === 0) {
+    throw noProviderError();
   }
 
   let lastError: unknown;
-  for (const provider of providers) {
+  for (const attempt of attempts) {
     try {
-      if (provider === "nvidia-glm" || provider === "nvidia-llama") {
-        const model =
-          provider === "nvidia-glm" ? options.nvidiaModel ?? nvidiaGlmModel() : nvidiaLlamaModel();
+      const { provider } = attempt;
+      if (isNvidiaProvider(provider)) {
         const { stream, completion, model: resolvedModel } = await streamChatCompletion(
           toNvidiaMessages(messages),
           {
-            model,
+            model: attempt.model,
             maxTokens: nvidiaMaxTokens(provider, options.maxTokens),
             temperature: options.temperature,
           }
@@ -253,12 +346,14 @@ export async function streamText(
       }
       return streamAnthropic(messages, options);
     } catch (error) {
+      console.error(
+        `AI provider ${attempt.provider}${attempt.model ? ` (${attempt.model})` : ""} failed:`,
+        error instanceof Error ? error.message : error
+      );
       lastError = error;
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("All configured AI providers failed.");
+  throw allFailedError(attempts, lastError);
 }
 
 function streamAnthropic(

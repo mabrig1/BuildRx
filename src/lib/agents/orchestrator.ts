@@ -2,7 +2,7 @@ import { codingAgent } from "@/lib/agents/coding-agent";
 import { databaseAgent } from "@/lib/agents/database-agent";
 import { debugAgent } from "@/lib/agents/debug-agent";
 import { deploymentAgent } from "@/lib/agents/deployment-agent";
-import { AGENT_MODEL } from "@/lib/agents/llm";
+import { agentModel } from "@/lib/agents/llm";
 import { plannerAgent } from "@/lib/agents/planner";
 import {
   AGENT_LABELS,
@@ -77,7 +77,7 @@ export async function runWorkflow(
       await recordAiUsage({
         userId: context.userId,
         projectId: context.persist ? context.projectId : undefined,
-        model: AGENT_MODEL,
+        model: agentModel(),
         status: "completed",
         promptTokens: 0,
         completionTokens: 0,
@@ -118,7 +118,7 @@ export async function runWorkflow(
       await recordAiUsage({
         userId: context.userId,
         projectId: context.persist ? context.projectId : undefined,
-        model: AGENT_MODEL,
+        model: agentModel(),
         status: "failed",
         promptTokens: 0,
         completionTokens: 0,

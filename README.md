@@ -24,7 +24,7 @@ An AI app builder in the spirit of Lovable: describe the app you want in plain E
 | Framework | [Next.js 15](https://nextjs.org) (App Router, Turbopack) + React 19 + TypeScript |
 | Styling | Tailwind CSS v4 + [Shadcn UI](https://ui.shadcn.com) (Radix primitives) |
 | Auth & database | [Supabase](https://supabase.com) (PostgreSQL, RLS, Auth) |
-| AI | Anthropic Claude (chat + agents) · NVIDIA Inference API (GLM 5.2 reasoning · Laguna XS 2.1 code · Step 3.7 Flash chat) |
+| AI | NVIDIA Inference API (GLM 5.2 reasoning · Step 3.7 Flash chat · Laguna XS 2.1 code) — free tier, no paid balance required. Anthropic Claude is an optional off-by-default tier. |
 | Editor & preview | Monaco · Sandpack · WebContainers |
 | State / forms | Zustand · React Hook Form + Zod |
 | Payments | Paystack · Flutterwave |

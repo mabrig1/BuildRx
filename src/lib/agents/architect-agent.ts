@@ -1,22 +1,5 @@
-import {
-  canCallModel,
-  extractJson,
-  fallbackReason,
-  pause,
-  runAgentCompletion,
-  stepBudgetMs,
-} from "@/lib/agents/llm";
+import { pause } from "@/lib/agents/llm";
 import type { Agent, AppPlan } from "@/lib/agents/types";
-
-const SYSTEM = `You are the Architect Agent in an automated app-building pipeline. Given a build plan, you decide how the app is structured so the generating agents produce code that fits together.
-
-Respond with ONLY a JSON object, no prose:
-{
-  "conventions": [string]   // 3-6 concrete rules, e.g. naming, state handling, where data access lives
-  "fileMap": [{ "path": string, "purpose": string }]  // every file the app needs, Next.js App Router layout
-}
-
-Rules: paths are relative (src/app/..., src/components/..., src/lib/..., supabase/...). Keep it minimal — no test scaffolding, no config beyond package.json. Finish the object; a complete small answer beats a detailed one that gets cut off.`;
 
 interface Architecture {
   conventions: string[];
@@ -81,44 +64,20 @@ export const architectAgent: Agent = {
     });
     const plan = context.plan!;
 
-    let architecture = fallbackArchitecture(plan);
-    let note = "";
-    if (canCallModel(context)) {
-      try {
-        const text = await runAgentCompletion({
-          system: SYSTEM,
-          prompt: `Build plan:\n${JSON.stringify(plan, null, 2)}`,
-          maxTokens: 3000,
-          role: "deep-reasoning",
-          timeoutMs: stepBudgetMs(context),
-        });
-        const parsed = extractJson<Partial<Architecture>>(text);
-        // Merge over the deterministic base: the model refines the file
-        // map, it can't remove the structure later checks require.
-        const base = fallbackArchitecture(plan);
-        const paths = new Set(base.fileMap.map((file) => file.path));
-        const extra = (parsed.fileMap ?? []).filter(
-          (file) => typeof file?.path === "string" && !paths.has(file.path)
-        );
-        architecture = {
-          conventions:
-            Array.isArray(parsed.conventions) && parsed.conventions.length > 0
-              ? parsed.conventions.slice(0, 6).filter((c) => typeof c === "string")
-              : base.conventions,
-          fileMap: [...base.fileMap, ...extra.slice(0, 20)],
-        };
-      } catch (error) {
-        note = ` (${fallbackReason(error)} — used the standard architecture)`;
-      }
-    } else {
-      await pause(400);
-    }
-
+    // Deterministic by design. The architecture is fully derived from
+    // the plan — pages, components and tables each imply their file —
+    // so a model call here would only add files the checks don't need,
+    // at the cost of a slice of budget the UI and Coding steps do need.
+    // On a free inference tier that trade is decisive: those two steps
+    // are the ones that actually write the app.
+    const architecture = fallbackArchitecture(plan);
     context.architecture = formatArchitecture(architecture);
+
+    await pause(200);
     emit({
       type: "agent_complete",
       agent: "architect",
-      message: `Architecture set: ${architecture.fileMap.length} files, ${architecture.conventions.length} conventions${note}`,
+      message: `Architecture set: ${architecture.fileMap.length} files, ${architecture.conventions.length} conventions`,
     });
   },
 };

@@ -13,7 +13,7 @@ import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
 const SYSTEM = `You are the UI Agent in an automated app-building pipeline. Given a build plan, you generate the visual layer.
 
 Requirements:
-1. FIRST generate "preview/index.html" — a complete, SELF-CONTAINED static HTML preview of the app's home page: inline <style> only (no external stylesheets, fonts, scripts, or images), modern polished design, responsive, with a nav linking the plan's pages.
+1. FIRST generate "preview/index.html" — a SELF-CONTAINED, WORKING PROTOTYPE of the app, not a landing page. It must show the app's primary interface (the board, list, dashboard, editor or form the app is actually for), seeded with 3-5 realistic sample records, and it must RESPOND to interaction: inline <script> so buttons, forms, filters, checkboxes and tabs actually work against in-memory data. Inline <style> and <script> only — no external stylesheets, fonts, scripts, or images. Modern, polished, responsive. Include a nav linking the plan's pages.
 2. Generate EVERY page from the plan as a Next.js App Router page (TypeScript, Tailwind classes): "/" → "src/app/page.tsx", "/about" → "src/app/about/page.tsx", etc.
 3. Generate EVERY component from the plan under "src/components" (kebab-case filenames).
 4. Generate "src/app/globals.css" with Tailwind directives and any custom design tokens the app needs.
@@ -37,6 +37,71 @@ function mockFiles(plan: AppPlan): GeneratedFile[] {
     .map((p) => `<a href="${p.path}">${p.name}</a>`)
     .join("\n      ");
 
+  // The scaffold preview is a working prototype, not a poster. When a
+  // model is unavailable this is the whole app the user sees, and a
+  // static hero page reads as "nothing was built" — so it renders the
+  // plan's primary table as a real list with working add/toggle/delete
+  // against in-memory sample rows.
+  const table = plan.dataModel[0];
+  const labelColumn =
+    table?.columns.find((c) => /title|name|label|subject/.test(c.name))?.name ??
+    table?.columns.find((c) => c.type === "text" && c.name !== "id")?.name ??
+    "title";
+  const statusColumn = table?.columns.find(
+    (c) => c.type === "boolean" || /status|state|done|complete/.test(c.name)
+  )?.name;
+  const samples = [
+    `First ${table?.table ?? "item"}`,
+    `Second ${table?.table ?? "item"}`,
+    `Third ${table?.table ?? "item"}`,
+  ];
+
+  const appScript = `
+  const rows = ${JSON.stringify(
+    samples.map((value, index) => ({ id: index + 1, label: value, done: index === 0 }))
+  )};
+  let nextId = rows.length + 1;
+  const list = document.getElementById("rows");
+  const input = document.getElementById("new-item");
+  const empty = document.getElementById("empty");
+
+  function render() {
+    list.innerHTML = "";
+    empty.hidden = rows.length > 0;
+    for (const row of rows) {
+      const li = document.createElement("li");
+      li.className = "row" + (row.done ? " done" : "");
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.checked = row.done;
+      check.addEventListener("change", () => { row.done = check.checked; render(); });
+      const span = document.createElement("span");
+      span.textContent = row.label;
+      const del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "Delete";
+      del.addEventListener("click", () => {
+        rows.splice(rows.indexOf(row), 1);
+        render();
+      });
+      ${statusColumn ? "li.append(check, span, del);" : "li.append(span, del);"}
+      list.append(li);
+    }
+    document.getElementById("count").textContent =
+      rows.length + " ${table?.table ?? "item"}" + (rows.length === 1 ? "" : "s");
+  }
+
+  document.getElementById("add").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const value = input.value.trim();
+    if (!value) return;
+    rows.push({ id: nextId++, label: value, done: false });
+    input.value = "";
+    render();
+  });
+
+  render();`;
+
   const previewHtml = `<!doctype html>
 <html lang="en">
 <head>
@@ -45,20 +110,28 @@ function mockFiles(plan: AppPlan): GeneratedFile[] {
 <title>${plan.appName}</title>
 <style>
   * { margin: 0; box-sizing: border-box; }
-  body { font-family: Georgia, 'Times New Roman', serif; color: #1c1917; background: #fafaf9; }
-  .nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 32px; background: #fff; border-bottom: 1px solid #e7e5e4; }
-  .brand { font-weight: 700; font-size: 18px; }
-  .nav .links { display: flex; gap: 20px; }
-  .nav a { color: #57534e; text-decoration: none; font-family: system-ui, sans-serif; font-size: 14px; }
-  .btn { background: #8b5cf6; color: #fff; border: 0; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; font-family: system-ui, sans-serif; }
-  .hero { text-align: center; padding: 96px 24px 72px; background: radial-gradient(ellipse at top, rgba(139,92,246,.10), transparent 60%); }
-  .hero h1 { font-size: clamp(32px, 6vw, 56px); letter-spacing: -0.02em; }
-  .hero p { color: #57534e; max-width: 560px; margin: 16px auto 32px; font-size: 18px; font-family: system-ui, sans-serif; }
-  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; max-width: 960px; margin: 0 auto; padding: 0 24px 96px; }
-  .card { background: #fff; border: 1px solid #e7e5e4; border-radius: 12px; padding: 24px; text-align: left; display: block; color: inherit; text-decoration: none; }
-  .card h3 { margin-bottom: 8px; font-size: 16px; }
-  .card p { color: #78716c; font-size: 14px; line-height: 1.5; font-family: system-ui, sans-serif; }
-  footer { border-top: 1px solid #e7e5e4; padding: 24px; text-align: center; color: #a8a29e; font-size: 13px; font-family: system-ui, sans-serif; }
+  body { font-family: system-ui, -apple-system, sans-serif; color: #18181b; background: #fafafa; }
+  .nav { display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; background: #fff; border-bottom: 1px solid #e4e4e7; position: sticky; top: 0; }
+  .brand { font-weight: 700; }
+  .nav .links { display: flex; gap: 18px; }
+  .nav a { color: #52525b; text-decoration: none; font-size: 14px; }
+  .nav a:hover { color: #18181b; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 26px; letter-spacing: -0.02em; }
+  .sub { color: #71717a; margin-top: 6px; font-size: 15px; }
+  form { display: flex; gap: 8px; margin: 24px 0 16px; }
+  input[type=text] { flex: 1; padding: 10px 12px; border: 1px solid #d4d4d8; border-radius: 8px; font-size: 14px; }
+  button { border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 600; font-size: 14px; cursor: pointer; }
+  #add button { background: #6d28d9; color: #fff; }
+  ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .row { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #e4e4e7; border-radius: 10px; padding: 12px 14px; }
+  .row span { flex: 1; font-size: 14px; }
+  .row.done span { text-decoration: line-through; color: #a1a1aa; }
+  .del { background: transparent; color: #a1a1aa; font-size: 13px; padding: 4px 8px; }
+  .del:hover { color: #dc2626; }
+  #count { color: #71717a; font-size: 13px; }
+  #empty { color: #a1a1aa; font-size: 14px; padding: 24px; text-align: center; border: 1px dashed #d4d4d8; border-radius: 10px; }
+  footer { border-top: 1px solid #e4e4e7; padding: 20px 24px; text-align: center; color: #a1a1aa; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -67,28 +140,20 @@ function mockFiles(plan: AppPlan): GeneratedFile[] {
     <div class="links">
       ${nav}
     </div>
-    <a class="btn" href="${plan.pages[1]?.path ?? "/"}">${plan.pages[1]?.name ?? "Get started"}</a>
   </nav>
-  <section class="hero">
-    <h1>${plan.appName}</h1>
-    <p>${plan.summary}</p>
-    <a class="btn" href="${plan.pages[0]?.path ?? "/"}">Open ${plan.pages[0]?.name ?? "the app"}</a>
-  </section>
-  <section class="features">
-    ${plan.pages
-      .map(
-        (page) =>
-          `<a class="card" href="${page.path}"><h3>${page.name}</h3><p>${page.description}</p></a>`
-      )
-      .join("\n    ")}
-  </section>
-  <section class="features">
-    ${plan.features
-      .slice(0, 3)
-      .map((f) => `<div class="card"><h3>${f}</h3></div>`)
-      .join("\n    ")}
-  </section>
-  <footer>${plan.appName} · ${plan.dataModel.map((t) => t.table).join(" · ")}</footer>
+  <main>
+    <h1>${plan.pages[0]?.name ?? "Home"}</h1>
+    <p class="sub">${plan.summary}</p>
+    <form id="add">
+      <input id="new-item" type="text" placeholder="Add ${labelColumn}…" aria-label="Add ${labelColumn}" />
+      <button type="submit">Add</button>
+    </form>
+    <p id="count"></p>
+    <ul id="rows"></ul>
+    <p id="empty" hidden>Nothing yet — add your first ${labelColumn}.</p>
+  </main>
+  <footer>${plan.appName} · ${plan.features.slice(0, 3).join(" · ")}</footer>
+  <script>${appScript}</script>
 </body>
 </html>`;
 

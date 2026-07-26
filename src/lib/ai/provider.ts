@@ -195,13 +195,26 @@ function noProviderError(): Error {
 }
 
 /**
+ * Model names reach logs and user-facing errors, and a misconfigured
+ * deployment can put key material in a model variable — so anything
+ * secret-shaped is masked before it is ever written down. Validation
+ * upstream should prevent this; masking makes a leak impossible rather
+ * than unlikely.
+ */
+function safeModelName(model: string): string {
+  return /^nvapi-|bearer\s/i.test(model) || model.length > 120
+    ? "<redacted: not a valid model id>"
+    : model;
+}
+
+/**
  * Every attempt failed. Names the models actually tried so production
  * logs point at the real cause (bad key vs. retired model id) instead of
  * whichever error happened to be last.
  */
 function allFailedError(attempts: Attempt[], lastError: unknown): Error {
   const tried = attempts
-    .map((a) => (a.model ? `${a.provider} (${a.model})` : a.provider))
+    .map((a) => (a.model ? `${a.provider} (${safeModelName(a.model)})` : a.provider))
     .join(", ");
   const detail =
     lastError instanceof Error ? lastError.message : String(lastError ?? "unknown error");
@@ -342,7 +355,7 @@ export async function completeText(
       });
     } catch (error) {
       console.error(
-        `AI provider ${attempt.provider}${attempt.model ? ` (${attempt.model})` : ""} failed:`,
+        `AI provider ${attempt.provider}${attempt.model ? ` (${safeModelName(attempt.model)})` : ""} failed:`,
         error instanceof Error ? error.message : error
       );
       lastError = error;
@@ -369,12 +382,12 @@ async function completeWithProvider(
     // even cut short, is usable output.
     if (result.text.trim().length === 0) {
       throw new Error(
-        `${attempt.model} returned nothing within ${Math.round((options.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000)}s.`
+        `${safeModelName(attempt.model)} returned nothing within ${Math.round((options.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000)}s.`
       );
     }
     if (result.truncated) {
       console.warn(
-        `AI provider ${provider} (${result.model}) hit its time budget — keeping ${result.text.length} chars of partial output.`
+        `AI provider ${provider} (${safeModelName(result.model)}) hit its time budget — keeping ${result.text.length} chars of partial output.`
       );
     }
     return { text: result.text, provider, model: result.model, usage: result.usage };
@@ -487,7 +500,7 @@ export async function streamText(
       return streamAnthropic(messages, { ...options, timeoutMs: budgetMs });
     } catch (error) {
       console.error(
-        `AI provider ${attempt.provider}${attempt.model ? ` (${attempt.model})` : ""} failed:`,
+        `AI provider ${attempt.provider}${attempt.model ? ` (${safeModelName(attempt.model)})` : ""} failed:`,
         error instanceof Error ? error.message : error
       );
       lastError = error;

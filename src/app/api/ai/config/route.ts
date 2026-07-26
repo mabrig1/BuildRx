@@ -6,6 +6,7 @@ import {
   nvidiaGlmModel,
   nvidiaLlamaModel,
   nvidiaTextModel,
+  rejectedModelVars,
 } from "@/lib/ai/nvidia";
 import { availableProviders } from "@/lib/ai/provider";
 
@@ -41,5 +42,9 @@ export async function GET() {
     // True only when ANTHROPIC_ENABLED=true *and* a key is present;
     // otherwise the app is NVIDIA-only and cannot incur Anthropic spend.
     anthropicEnabled: availableProviders().includes("anthropic"),
+    // Names of model env vars rejected as malformed (e.g. an API key
+    // pasted into a model variable). Names only — never the values,
+    // which is precisely the content that would be sensitive.
+    invalidModelVars: rejectedModelVars(),
   });
 }

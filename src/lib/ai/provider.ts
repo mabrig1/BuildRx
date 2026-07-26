@@ -83,6 +83,13 @@ export interface ProviderCallOptions {
    * specialized slots.
    */
   nvidiaModel?: string;
+  /**
+   * Overrides the model used for the "nvidia-fast" fallback tier — the
+   * agent pipeline points this at the general-purpose model (Kimi when
+   * configured) so a failed role-specialized call falls back to a
+   * capable generalist before dropping to the lite tier.
+   */
+  nvidiaFallbackModel?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 90_000;
@@ -120,7 +127,7 @@ function nvidiaModelFor(
     case "nvidia-primary":
       return options.nvidiaModel ?? nvidiaGlmModel();
     case "nvidia-fast":
-      return nvidiaChatModel();
+      return options.nvidiaFallbackModel ?? nvidiaChatModel();
     case "nvidia-lite":
       return nvidiaLlamaModel();
   }

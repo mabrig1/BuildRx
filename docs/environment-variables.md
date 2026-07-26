@@ -44,7 +44,14 @@ Supabase is connected), clearly labeled as demo output.
 | `NVIDIA_CHAT_MODEL` | No | Second chain tier, and the model chat starts on. Default: `stepfun-ai/step-3.7-flash`. |
 | `NVIDIA_LLAMA_MODEL` | No | Last chain tier — a lightweight model, tried only if the two above fail. Default: `meta/llama-3.2-1b-instruct`. |
 | `NVIDIA_RATE_LIMIT_RPM` | No | Per-user requests/minute across the AI endpoints (also applies to `/api/agents/run`). Default: `20`. |
-| `AGENT_PIPELINE_BUDGET_MS` | No | Total time the six-step build pipeline may use, split across the steps by weight. Default: `270000` (270s, leaving 30s of the route's 300s `maxDuration` for saving files). Lower it if your host caps function duration below 300s — steps that run out of budget finish on their built-in scaffolds instead of being cut off mid-build. |
+| `NVIDIA_MODEL_DEEPSEEK_PRO` | No | Deep reasoning / architecture / primary coding model for the agent pipeline (Planner, Architect, Coding). Falls back to `NVIDIA_GLM_MODEL` / `NVIDIA_CODE_MODEL`. |
+| `NVIDIA_MODEL_DEEPSEEK_FLASH` | No | Fast diagnostics model (Debugging Agent). Falls back to `NVIDIA_CHAT_MODEL`. |
+| `NVIDIA_MODEL_MISTRAL_LARGE` | No | Code generation/review model (UI, Database, Repair). Falls back to `NVIDIA_CODE_MODEL`. |
+| `NVIDIA_MODEL_MISTRAL_MEDIUM` | No | Lightweight-task model (Security Agent judgment calls). Falls back to `NVIDIA_CHAT_MODEL`. |
+| `NVIDIA_MODEL_KIMI` | No | General-purpose model used as the fallback tier for every agent call. Falls back to `NVIDIA_CHAT_MODEL`. |
+| `AGENT_PIPELINE_BUDGET_MS` | No | Total time the ten-step build pipeline may use, split across the steps by weight. Default: `270000` (270s, leaving 30s of the route's 300s `maxDuration` for saving files). Lower it if your host caps function duration below 300s — steps that run out of budget finish on their built-in scaffolds instead of being cut off mid-build. |
+
+All model routing is server-side only — `NVIDIA_API_KEY` and every model id are read in server code and never shipped to the browser.
 
 ### Optional Anthropic tier (off by default)
 

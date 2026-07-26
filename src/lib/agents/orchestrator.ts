@@ -1,9 +1,13 @@
+import { architectAgent } from "@/lib/agents/architect-agent";
 import { codingAgent } from "@/lib/agents/coding-agent";
 import { databaseAgent } from "@/lib/agents/database-agent";
 import { debugAgent } from "@/lib/agents/debug-agent";
 import { deploymentAgent } from "@/lib/agents/deployment-agent";
 import { agentModel } from "@/lib/agents/llm";
 import { fallbackPlan, plannerAgent } from "@/lib/agents/planner";
+import { qaAgent } from "@/lib/agents/qa-agent";
+import { repairAgent } from "@/lib/agents/repair-agent";
+import { securityAgent } from "@/lib/agents/security-agent";
 import {
   AGENT_LABELS,
   AGENT_ORDER,
@@ -18,21 +22,31 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const agents: Record<string, Agent> = {
   planner: plannerAgent,
+  architect: architectAgent,
   ui: uiAgent,
   database: databaseAgent,
   coding: codingAgent,
   debug: debugAgent,
+  security: securityAgent,
+  qa: qaAgent,
+  repair: repairAgent,
   deployment: deploymentAgent,
 };
 
 /**
- * Runs the full agent pipeline:
+ * The Orchestrator Agent — runs the full pipeline:
  *
- *   Planner → UI → Database → Coding → Debug → Deployment
+ *   Planner → Architect → UI → Database → Coding   (generate)
+ *   → Debug → Security                              (review)
+ *   → QA → Repair                                   (test → fix → retest)
+ *   → Deployment                                    (persist + verify)
  *
- * Each agent reads and writes the shared WorkflowContext (the plan and
- * the generated-file map), so later agents build on earlier output.
- * Progress is reported through `emit`.
+ * Each agent reads and writes the shared WorkflowContext (the plan, the
+ * architecture, the generated-file map, and open findings), so later
+ * agents build on earlier output. The Repair Agent runs the bounded
+ * autonomous loop internally (fix → re-run checks, at most
+ * TOOL_LIMITS.maxRepairRounds rounds); recoverable errors are fixed
+ * without user involvement and only what remains is reported.
  */
 /**
  * Leaves 30s of the route's 300s maxDuration for the deployment agent's
@@ -54,11 +68,15 @@ function pipelineBudgetMs(): number {
  */
 const AGENT_WEIGHTS: Record<AgentName, number> = {
   planner: 1,
+  architect: 0.6,
   ui: 2.5,
   database: 1,
   coding: 2.5,
-  debug: 1.25,
-  deployment: 0.25,
+  debug: 1,
+  security: 0.15, // deterministic scan — near-free
+  qa: 0.15, // deterministic checks — near-free
+  repair: 1, // one bounded model pass when findings need it
+  deployment: 0.3,
 };
 
 /**

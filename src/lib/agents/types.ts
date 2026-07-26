@@ -1,26 +1,45 @@
 export type AgentName =
   | "planner"
+  | "architect"
   | "ui"
   | "database"
   | "coding"
   | "debug"
+  | "security"
+  | "qa"
+  | "repair"
   | "deployment";
 
+/**
+ * Pipeline order. The orchestrator (runWorkflow) coordinates these ten:
+ * generation (planner → architect → ui → database → coding), review
+ * (debug → security), then verification with an autonomous repair loop
+ * (qa finds issues → repair fixes → qa retests, bounded), and finally
+ * deployment, which persists files and verifies the preview.
+ */
 export const AGENT_ORDER: AgentName[] = [
   "planner",
+  "architect",
   "ui",
   "database",
   "coding",
   "debug",
+  "security",
+  "qa",
+  "repair",
   "deployment",
 ];
 
 export const AGENT_LABELS: Record<AgentName, string> = {
   planner: "Planner Agent",
+  architect: "Architect Agent",
   ui: "UI Agent",
   database: "Database Agent",
   coding: "Coding Agent",
-  debug: "Debug Agent",
+  debug: "Debugging Agent",
+  security: "Security Agent",
+  qa: "QA/Test Agent",
+  repair: "Repair Agent",
   deployment: "Deployment Agent",
 };
 
@@ -69,11 +88,40 @@ export interface WorkflowContext {
    * it (which is what used to strand a build mid-pipeline).
    */
   stepDeadlineAt?: number;
+  /**
+   * Architect Agent's notes: stack decisions and a file map the
+   * generating agents follow so their output fits together.
+   */
+  architecture?: string;
+  /** Open findings from the QA Agent, consumed by the Repair Agent. */
+  findings?: CheckFinding[];
+}
+
+/** One issue found by the QA/Security check suite. */
+export interface CheckFinding {
+  /** Stable id of the rule that fired, e.g. "missing-import". */
+  rule: string;
+  severity: "error" | "warning";
+  file?: string;
+  message: string;
+  /**
+   * How the Repair Agent can act on it: "auto" (deterministic fix),
+   * "llm" (needs a model rewrite of the file), "none" (report only).
+   */
+  fix: "auto" | "llm" | "none";
+}
+
+/** One line of the final verification checklist. */
+export interface VerificationItem {
+  label: string;
+  status: "pass" | "warn" | "fail";
+  detail?: string;
 }
 
 /** Events streamed to the client as NDJSON. */
 export type AgentEvent =
   | { type: "workflow_start"; agents: AgentName[] }
+  | { type: "verification"; agent: AgentName; items: VerificationItem[] }
   | { type: "agent_start"; agent: AgentName; message: string }
   | { type: "agent_log"; agent: AgentName; message: string }
   | { type: "file"; agent: AgentName; path: string }

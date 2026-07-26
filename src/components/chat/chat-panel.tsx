@@ -200,6 +200,20 @@ export function ChatPanel({
               render();
               break;
             }
+            case "verification": {
+              const icons = { pass: "✅", warn: "⚠️", fail: "❌" } as const;
+              lines.push(
+                [
+                  "\n**Verification**",
+                  ...event.items.map(
+                    (item) =>
+                      `${icons[item.status]} ${item.label}${item.detail ? ` — ${item.detail}` : ""}`
+                  ),
+                ].join("\n")
+              );
+              render();
+              break;
+            }
             case "workflow_complete":
               lines.push(
                 `\n🚀 **Build complete** — ${event.fileCount} files generated.`

@@ -28,14 +28,18 @@ export const HOW_IT_WORKS: GuideSection = {
   id: "how-it-works",
   title: "How a build works",
   summary:
-    "Your first message in a new project runs a team of six agents. Each one hands its work to the next, and the whole run shares a single time budget.",
+    "Your first message in a new project runs a team of ten agents. Each one hands its work to the next, and the whole run shares a single time budget.",
   points: [
     "Planner — turns your description into a build plan: pages, components, database tables, and features.",
+    "Architect — decides the file structure and conventions the other agents follow.",
     "UI — generates the preview page, every page in the plan, the components, and the stylesheet.",
     "Database — writes the SQL schema and matching TypeScript types.",
     "Coding — writes the data helpers, API routes, layout, and project files.",
-    "Debug — reviews the generated files and corrects what it can.",
-    "Deployment — saves every file and publishes your live preview.",
+    "Debugging — reviews the generated files and corrects what it can.",
+    "Security — scans for leaked secrets and unsafe patterns, and documents the app's env vars.",
+    "QA/Test — verifies structure, imports, dependencies, routes, and schema coverage.",
+    "Repair — automatically fixes what QA found, then re-tests (up to two rounds).",
+    "Deployment — saves every file, publishes your preview, and runs the final verification checklist.",
     "If a step runs out of time, it falls back to a scaffold built from your plan and says so in the log — the build always finishes with a working app rather than an error.",
   ],
 };

@@ -174,8 +174,8 @@ export const uiAgent: Agent = {
       try {
         const text = await runAgentCompletion({
           system: SYSTEM,
-          prompt: `Build plan:\n${JSON.stringify(plan, null, 2)}\n\nOriginal request: ${context.prompt}`,
-          role: "code",
+          prompt: `Build plan:\n${JSON.stringify(plan, null, 2)}${context.architecture ? `\n\nArchitecture (follow these paths and conventions):\n${context.architecture}` : ""}\n\nOriginal request: ${context.prompt}`,
+          role: "codegen",
           timeoutMs: stepBudgetMs(context),
         });
         generated = parseFileBlocks(text);

@@ -1,6 +1,7 @@
 import type { GeneratedFile } from "@/lib/agents/types";
+import { generalFallbackModel, modelForRole, type ModelRole } from "@/lib/ai/models";
 import { isAnyProviderConfigured, completeText } from "@/lib/ai/provider";
-import { isNvidiaConfigured, nvidiaCodeModel, nvidiaGlmModel } from "@/lib/ai/nvidia";
+import { isNvidiaConfigured, nvidiaGlmModel } from "@/lib/ai/nvidia";
 
 /** Model used only if the opt-in Anthropic tier is ever reached. */
 export const ANTHROPIC_AGENT_MODEL = "claude-opus-4-8";
@@ -15,11 +16,11 @@ export function agentModel(): string {
 }
 
 /**
- * What kind of work the agent call is doing — selects the NVIDIA model
- * used for the provider chain's primary tier: reasoning → GLM, code →
- * the code-specialized Laguna model.
+ * What kind of work the agent call is doing — routed to the NVIDIA model
+ * suited to it (see lib/ai/models.ts). Re-exported so agents declare a
+ * role, not a model id.
  */
-export type AgentRole = "reasoning" | "code";
+export type AgentRole = ModelRole;
 
 export function isLlmConfigured() {
   return isAnyProviderConfigured();
@@ -128,7 +129,7 @@ export async function runAgentCompletion({
   system,
   prompt,
   maxTokens = 8000,
-  role = "reasoning",
+  role = "deep-reasoning",
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: {
   system: string;
@@ -147,9 +148,10 @@ export async function runAgentCompletion({
       temperature: 0.3,
       timeoutMs,
       anthropicModel: ANTHROPIC_AGENT_MODEL,
-      // Keep the code-specialized NVIDIA model for code-generating
-      // agents; the GLM default covers planning/review/reasoning steps.
-      nvidiaModel: role === "code" ? nvidiaCodeModel() : undefined,
+      // Route by task complexity (see lib/ai/models.ts), with the
+      // general-purpose model as the chain's second tier.
+      nvidiaModel: modelForRole(role),
+      nvidiaFallbackModel: generalFallbackModel(),
     }
   );
   return result.text;

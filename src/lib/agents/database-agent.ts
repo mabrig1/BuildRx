@@ -88,7 +88,7 @@ export const databaseAgent: Agent = {
           system: SYSTEM,
           prompt: `Data model:\n${JSON.stringify(plan.dataModel, null, 2)}\n\nApp: ${plan.appName} — ${plan.summary}`,
           maxTokens: 6000,
-          role: "code",
+          role: "codegen",
           timeoutMs: stepBudgetMs(context),
         });
         files = parseFileBlocks(text);

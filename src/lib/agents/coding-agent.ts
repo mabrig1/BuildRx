@@ -183,10 +183,13 @@ export const codingAgent: Agent = {
           system: SYSTEM,
           prompt: [
             `Plan:\n${JSON.stringify(plan, null, 2)}`,
+            ...(context.architecture
+              ? [`Architecture (follow these paths and conventions):\n${context.architecture}`]
+              : []),
             `Files that already exist (do not regenerate):\n${existingPaths.join("\n")}`,
             `Original request: ${context.prompt}`,
           ].join("\n\n"),
-          role: "code",
+          role: "primary-coding",
           timeoutMs: stepBudgetMs(context),
         });
         files = parseFileBlocks(text);

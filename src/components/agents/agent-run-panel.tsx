@@ -5,13 +5,17 @@ import {
   Brain,
   Bug,
   Check,
+  ClipboardCheck,
   Code2,
+  Compass,
   Database,
   FileCode,
   Hammer,
   Loader2,
   Palette,
   Rocket,
+  ShieldCheck,
+  Wrench,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -34,20 +38,28 @@ import { AGENT_LABELS, AGENT_ORDER } from "@/lib/agents/types";
 
 const AGENT_ICONS: Record<AgentName, typeof Brain> = {
   planner: Brain,
+  architect: Compass,
   ui: Palette,
   database: Database,
   coding: Code2,
   debug: Bug,
+  security: ShieldCheck,
+  qa: ClipboardCheck,
+  repair: Wrench,
   deployment: Rocket,
 };
 
 const AGENT_DESCRIPTIONS: Record<AgentName, string> = {
   planner: "Understands requirements",
+  architect: "Designs the structure",
   ui: "Generates pages & components",
   database: "Creates database schema",
   coding: "Writes application code",
-  debug: "Fixes errors",
-  deployment: "Deploys the project",
+  debug: "Reviews & diagnoses",
+  security: "Scans for security issues",
+  qa: "Runs build & test checks",
+  repair: "Fixes what checks found",
+  deployment: "Deploys & verifies",
 };
 
 type StepStatus = "pending" | "running" | "done" | "error";

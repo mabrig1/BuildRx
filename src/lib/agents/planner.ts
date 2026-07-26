@@ -185,7 +185,7 @@ export const plannerAgent: Agent = {
           system: SYSTEM,
           prompt: `Build plan for this app request:\n\n${context.prompt}`,
           maxTokens: 6000,
-          role: "reasoning",
+          role: "deep-reasoning",
           timeoutMs: stepBudgetMs(context),
         });
         context.plan = normalizePlan(extractJson<AppPlan>(text), context.prompt);

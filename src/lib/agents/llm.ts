@@ -44,21 +44,90 @@ export function remainingBudgetMs(
 }
 
 /**
+ * The budget for the step currently running. Prefers the orchestrator's
+ * per-step slice and falls back to the whole-pipeline deadline for
+ * callers that run an agent outside the pipeline. No floor here — an
+ * honest "almost no time left" is what lets `canCallModel` skip the
+ * call rather than start one that is certain to be aborted.
+ */
+export function stepBudgetMs(context: {
+  stepDeadlineAt?: number;
+  deadlineAt?: number;
+}): number {
+  const deadlineAt = context.stepDeadlineAt ?? context.deadlineAt;
+  if (!deadlineAt) return DEFAULT_TIMEOUT_MS;
+  return Math.max(0, Math.min(DEFAULT_TIMEOUT_MS, deadlineAt - Date.now()));
+}
+
+/** Below this, no model call can realistically return in time. */
+const MIN_LLM_BUDGET_MS = 6_000;
+
+/**
+ * Note for a step that skipped its model call because the build budget
+ * was already spent. Empty when nothing is configured at all — that case
+ * is demo mode, not a degraded build, and shouldn't read like one.
+ */
+export function outOfTimeNote(context: {
+  stepDeadlineAt?: number;
+  deadlineAt?: number;
+}): string {
+  return isLlmConfigured() && stepBudgetMs(context) < MIN_LLM_BUDGET_MS
+    ? "no time left in the build budget"
+    : "";
+}
+
+/**
+ * Whether this step should call a model at all. False when nothing is
+ * configured, and also when the step's slice is already spent — a
+ * pipeline running late finishes on its deterministic scaffolds instead
+ * of spending its last seconds on calls that will be aborted.
+ */
+export function canCallModel(context: {
+  stepDeadlineAt?: number;
+  deadlineAt?: number;
+}): boolean {
+  return isLlmConfigured() && stepBudgetMs(context) >= MIN_LLM_BUDGET_MS;
+}
+
+/**
+ * Plain-language reason a step fell back to its built-in scaffold —
+ * shown in the build log, so it has to say what actually went wrong
+ * rather than "something failed".
+ */
+export function fallbackReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/ran out of time|time budget|timed? ?out|abort/i.test(message)) {
+    return "the model ran out of time";
+  }
+  if (/rate limit|429/i.test(message)) return "the model was rate-limited";
+  if (/not found|404/i.test(message)) return "the configured model is unavailable";
+  if (/authentication|401|403|api key/i.test(message)) {
+    return "the NVIDIA API key was rejected";
+  }
+  return "the model call failed";
+}
+
+/**
  * Runs one agent LLM call through the centralized provider chain
  * (NVIDIA GLM → NVIDIA Step → NVIDIA Llama, plus Anthropic only when
  * explicitly enabled). Returns the final text.
  *
- * Bounded by `timeoutMs` (the orchestrator passes the remaining slice of
- * its overall deadline): the six-agent pipeline shares one 300s Vercel
+ * Bounded by `timeoutMs` (the orchestrator passes this step's slice of
+ * the overall deadline): the six-agent pipeline shares one 300s Vercel
  * function budget, so a single step with no time limit of its own could
  * silently consume the whole thing and leave the platform to hard-kill
  * the request with no diagnosable error — exactly the "stuck waiting
- * indefinitely" failure this closes off.
+ * indefinitely" failure this closes off. The budget covers the whole
+ * provider chain, every model tier and retry included.
+ *
+ * `maxTokens` is the other half of that bound: output tokens are what
+ * generation time is actually made of, so a step's cap has to be
+ * something the step's time slice can realistically produce.
  */
 export async function runAgentCompletion({
   system,
   prompt,
-  maxTokens = 16000,
+  maxTokens = 8000,
   role = "reasoning",
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: {

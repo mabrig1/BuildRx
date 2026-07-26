@@ -1,10 +1,12 @@
 import {
   FILE_FORMAT_INSTRUCTIONS,
-  isLlmConfigured,
+  canCallModel,
+  fallbackReason,
+  outOfTimeNote,
   parseFileBlocks,
   pause,
-  remainingBudgetMs,
   runAgentCompletion,
+  stepBudgetMs,
 } from "@/lib/agents/llm";
 import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
 
@@ -15,6 +17,8 @@ Requirements:
 2. Generate EVERY page from the plan as a Next.js App Router page (TypeScript, Tailwind classes): "/" → "src/app/page.tsx", "/about" → "src/app/about/page.tsx", etc.
 3. Generate EVERY component from the plan under "src/components" (kebab-case filenames).
 4. Generate "src/app/globals.css" with Tailwind directives and any custom design tokens the app needs.
+
+You are on a strict time budget: keep every file focused and under ~120 lines, emit no commentary between blocks, and finish the whole set rather than perfecting any one file.
 
 ${FILE_FORMAT_INSTRUCTIONS}`;
 
@@ -106,12 +110,14 @@ body {
     files.push({
       path: pagePath(page.path),
       content: isHome
-        ? `import { Hero } from "@/components/hero";
-
-export default function HomePage() {
+        ? // Self-contained on purpose: this file may be filling a gap in
+          // a partly-generated app, where any component it imported
+          // might not exist.
+          `export default function HomePage() {
   return (
-    <main>
-      <Hero />
+    <main className="mx-auto max-w-4xl px-6 py-20 text-center">
+      <h1 className="text-4xl font-semibold tracking-tight">${plan.appName}</h1>
+      <p className="mx-auto mt-4 max-w-xl text-zinc-600">${plan.summary}</p>
     </main>
   );
 }
@@ -158,28 +164,52 @@ export const uiAgent: Agent = {
     });
     const plan = context.plan!;
 
-    let files: GeneratedFile[];
-    if (!isLlmConfigured()) {
-      await pause(900);
-      files = mockFiles(plan);
+    let generated: GeneratedFile[] = [];
+    let note = "";
+    if (!canCallModel(context)) {
+      const reason = outOfTimeNote(context);
+      if (reason) note = ` — ${reason}, so the built-in scaffold was used`;
+      else await pause(900);
     } else {
-      const text = await runAgentCompletion({
-        system: SYSTEM,
-        prompt: `Build plan:\n${JSON.stringify(plan, null, 2)}\n\nOriginal request: ${context.prompt}`,
-        role: "code",
-        timeoutMs: remainingBudgetMs(context.deadlineAt),
-      });
-      files = parseFileBlocks(text);
+      try {
+        const text = await runAgentCompletion({
+          system: SYSTEM,
+          prompt: `Build plan:\n${JSON.stringify(plan, null, 2)}\n\nOriginal request: ${context.prompt}`,
+          role: "code",
+          timeoutMs: stepBudgetMs(context),
+        });
+        generated = parseFileBlocks(text);
+        if (generated.length === 0) {
+          note = " — the model returned no usable files, so the built-in scaffold was used";
+        }
+      } catch (error) {
+        note = ` — ${fallbackReason(error)}, so the built-in scaffold was used`;
+      }
     }
 
-    for (const file of files) {
+    // The scaffold fills whatever the model didn't produce (a truncated
+    // or failed generation still has to leave a previewable app): the
+    // preview page, the stylesheet, and any planned page or component
+    // missing from the output.
+    const byPath = new Map(generated.map((file) => [file.path, file]));
+    let scaffolded = 0;
+    for (const file of mockFiles(plan)) {
+      if (byPath.has(file.path)) continue;
+      byPath.set(file.path, file);
+      scaffolded++;
+    }
+
+    for (const file of byPath.values()) {
       context.files.set(file.path, file);
       emit({ type: "file", agent: "ui", path: file.path });
+    }
+    if (!note && scaffolded > 0) {
+      note = ` — ${scaffolded} scaffolded from the plan`;
     }
     emit({
       type: "agent_complete",
       agent: "ui",
-      message: `Generated ${files.length} UI files`,
+      message: `Generated ${byPath.size} UI files${note}`,
     });
   },
 };

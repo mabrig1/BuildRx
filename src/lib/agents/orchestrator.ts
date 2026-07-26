@@ -3,11 +3,12 @@ import { databaseAgent } from "@/lib/agents/database-agent";
 import { debugAgent } from "@/lib/agents/debug-agent";
 import { deploymentAgent } from "@/lib/agents/deployment-agent";
 import { agentModel } from "@/lib/agents/llm";
-import { plannerAgent } from "@/lib/agents/planner";
+import { fallbackPlan, plannerAgent } from "@/lib/agents/planner";
 import {
   AGENT_LABELS,
   AGENT_ORDER,
   type Agent,
+  type AgentName,
   type EmitFn,
   type WorkflowContext,
 } from "@/lib/agents/types";
@@ -36,15 +37,44 @@ const agents: Record<string, Agent> = {
 /**
  * Leaves 30s of the route's 300s maxDuration for the deployment agent's
  * DB writes and the response flush, after six agent steps share the rest.
+ * Override with AGENT_PIPELINE_BUDGET_MS when the host caps function
+ * duration lower than 300s (some hosting tiers do).
  */
-const PIPELINE_BUDGET_MS = 270_000;
+function pipelineBudgetMs(): number {
+  const configured = Number(process.env.AGENT_PIPELINE_BUDGET_MS);
+  return Number.isFinite(configured) && configured > 10_000 ? configured : 270_000;
+}
+
+/**
+ * Share of the pipeline budget each step may claim, relative to the
+ * steps that haven't run yet. The two file-generating steps need the
+ * most; deployment is deterministic I/O and needs almost none. Because
+ * the split is recomputed from the *remaining* time before every step,
+ * time saved by a fast step is handed to the ones after it.
+ */
+const AGENT_WEIGHTS: Record<AgentName, number> = {
+  planner: 1,
+  ui: 2.5,
+  database: 1,
+  coding: 2.5,
+  debug: 1.25,
+  deployment: 0.25,
+};
+
+/** Absolute deadline for one step, from what the pipeline has left. */
+function stepDeadline(context: WorkflowContext, remaining: AgentName[]): number {
+  const totalWeight = remaining.reduce((sum, name) => sum + AGENT_WEIGHTS[name], 0);
+  const timeLeft = Math.max(0, (context.deadlineAt ?? Date.now()) - Date.now());
+  const share = (AGENT_WEIGHTS[remaining[0]] / totalWeight) * timeLeft;
+  return Date.now() + share;
+}
 
 export async function runWorkflow(
   context: WorkflowContext,
   emit: EmitFn
 ): Promise<void> {
   const startedAt = Date.now();
-  context.deadlineAt = startedAt + PIPELINE_BUDGET_MS;
+  context.deadlineAt = startedAt + pipelineBudgetMs();
   emit({ type: "workflow_start", agents: AGENT_ORDER });
 
   // Mark the project as generating while the pipeline runs.
@@ -58,13 +88,43 @@ export async function runWorkflow(
   }
 
   try {
-    for (const name of AGENT_ORDER) {
-      if (Date.now() >= context.deadlineAt!) {
-        throw new Error(
-          `Ran out of time before the ${AGENT_LABELS[name]} could start.`
-        );
+    for (const [index, name] of AGENT_ORDER.entries()) {
+      context.stepDeadlineAt = stepDeadline(context, AGENT_ORDER.slice(index));
+
+      // The planner is what every later step reads; if it produced
+      // nothing (a failure its own fallback couldn't cover), the
+      // pipeline still needs a plan to build against.
+      if (name !== "planner" && !context.plan) {
+        context.plan = fallbackPlan(context.prompt);
       }
-      await agents[name].run(context, emit);
+
+      try {
+        await agents[name].run(context, emit);
+      } catch (error) {
+        // Deployment is what writes the files and publishes the
+        // preview — if that fails there is no build to report, so it
+        // stays fatal. Every other step degrades: the user gets the app
+        // built so far instead of losing the whole run to one bad step.
+        if (name === "deployment") throw error;
+
+        const { classifyThrown } = await import("@/lib/health/error-response");
+        const { logError } = await import("@/lib/health/logger");
+        const diagnosed = classifyThrown(error);
+        await logError("agent-workflow", `${AGENT_LABELS[name]}: ${diagnosed.message}`, {
+          code: diagnosed.code,
+          subsystem: diagnosed.subsystem,
+          stack: error instanceof Error ? error.stack : undefined,
+          context: { projectId: context.projectId, agent: name, cause: diagnosed.cause },
+        });
+        emit({
+          type: "error",
+          agent: name,
+          message: `${diagnosed.message} Continuing with the rest of the build.`,
+          code: diagnosed.code,
+          cause: diagnosed.cause,
+          suggestedFix: diagnosed.suggestedFix,
+        });
+      }
     }
 
     emit({

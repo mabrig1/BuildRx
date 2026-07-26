@@ -1,10 +1,12 @@
 import {
   FILE_FORMAT_INSTRUCTIONS,
-  isLlmConfigured,
+  canCallModel,
+  fallbackReason,
+  outOfTimeNote,
   parseFileBlocks,
   pause,
-  remainingBudgetMs,
   runAgentCompletion,
+  stepBudgetMs,
 } from "@/lib/agents/llm";
 import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
 
@@ -169,21 +171,33 @@ export const codingAgent: Agent = {
     const existingPaths = [...context.files.keys()];
 
     let files: GeneratedFile[];
-    if (!isLlmConfigured()) {
-      await pause(800);
+    let note = "";
+    if (!canCallModel(context)) {
+      const reason = outOfTimeNote(context);
+      if (reason) note = ` (${reason} — wired up from the plan instead)`;
+      else await pause(800);
       files = mockFiles(plan, existingPaths);
     } else {
-      const text = await runAgentCompletion({
-        system: SYSTEM,
-        prompt: [
-          `Plan:\n${JSON.stringify(plan, null, 2)}`,
-          `Files that already exist (do not regenerate):\n${existingPaths.join("\n")}`,
-          `Original request: ${context.prompt}`,
-        ].join("\n\n"),
-        role: "code",
-        timeoutMs: remainingBudgetMs(context.deadlineAt),
-      });
-      files = parseFileBlocks(text);
+      try {
+        const text = await runAgentCompletion({
+          system: SYSTEM,
+          prompt: [
+            `Plan:\n${JSON.stringify(plan, null, 2)}`,
+            `Files that already exist (do not regenerate):\n${existingPaths.join("\n")}`,
+            `Original request: ${context.prompt}`,
+          ].join("\n\n"),
+          role: "code",
+          timeoutMs: stepBudgetMs(context),
+        });
+        files = parseFileBlocks(text);
+        if (files.length === 0) {
+          note = " (model returned no usable files — wired up from the plan instead)";
+          files = mockFiles(plan, existingPaths);
+        }
+      } catch (error) {
+        note = ` (${fallbackReason(error)} — wired up from the plan instead)`;
+        files = mockFiles(plan, existingPaths);
+      }
     }
 
     for (const file of files) {
@@ -193,7 +207,7 @@ export const codingAgent: Agent = {
     emit({
       type: "agent_complete",
       agent: "coding",
-      message: `Wrote ${files.length} code files`,
+      message: `Wrote ${files.length} code files${note}`,
     });
   },
 };

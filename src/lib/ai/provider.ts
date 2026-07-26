@@ -7,8 +7,11 @@
  * unavailable (404 for a retired model id, a 429, a 5xx), the next
  * NVIDIA model is tried instead.
  *
- * Priority: NVIDIA primary (GLM, or the caller's role-specialized model)
- * → NVIDIA fast (Step) → NVIDIA lightweight (Llama).
+ * Priority: nvidia-primary (GLM, or the caller's role-specialized
+ * model) → nvidia-fast (Step) → nvidia-lite (Llama). The tiers are named
+ * for their role rather than their model, since the model behind each is
+ * env-configurable — the concrete one used is always reported alongside
+ * the tier (the `X-Model` header, usage records, build logs).
  *
  * Anthropic Claude is opt-in and OFF unless `ANTHROPIC_ENABLED=true` is
  * set alongside a funded `ANTHROPIC_API_KEY`. Merely having the key in
@@ -33,13 +36,13 @@ import {
 } from "@/lib/ai/nvidia";
 
 export type ProviderName =
-  | "nvidia-glm"
-  | "nvidia-step"
-  | "nvidia-llama"
+  | "nvidia-primary"
+  | "nvidia-fast"
+  | "nvidia-lite"
   | "anthropic";
 
 /** The NVIDIA tiers, in the order they are attempted. */
-const NVIDIA_PROVIDERS = ["nvidia-glm", "nvidia-step", "nvidia-llama"] as const;
+const NVIDIA_PROVIDERS = ["nvidia-primary", "nvidia-fast", "nvidia-lite"] as const;
 
 type NvidiaProviderName = (typeof NVIDIA_PROVIDERS)[number];
 
@@ -115,11 +118,11 @@ function nvidiaModelFor(
   options: ProviderCallOptions
 ): string {
   switch (provider) {
-    case "nvidia-glm":
+    case "nvidia-primary":
       return options.nvidiaModel ?? nvidiaGlmModel();
-    case "nvidia-step":
+    case "nvidia-fast":
       return nvidiaChatModel();
-    case "nvidia-llama":
+    case "nvidia-lite":
       return nvidiaLlamaModel();
   }
 }
@@ -152,6 +155,31 @@ function plannedAttempts(options: ProviderCallOptions): Attempt[] {
   }
 
   return attempts;
+}
+
+/**
+ * Smallest slice worth starting an attempt with. Below this the call
+ * would be aborted mid-generation anyway, so the chain stops instead and
+ * lets the caller fall back.
+ */
+const MIN_ATTEMPT_MS = 8_000;
+
+/**
+ * Splits one call's budget across the tiers still to try. `timeoutMs` is
+ * the budget for the *whole* chain, not per tier — an agent given 60s
+ * must not be able to spend 60s on each of three models. The first tier
+ * gets the larger share (it's the one expected to answer); the rest
+ * divide what actually remains after it returns or fails.
+ */
+function attemptBudgetMs(
+  deadlineAt: number,
+  attemptsLeft: number
+): number {
+  const remaining = deadlineAt - Date.now();
+  if (attemptsLeft <= 1) return remaining;
+  // Never more than what's left: the floor keeps an attempt viable, it
+  // does not entitle a tier to time the caller doesn't have.
+  return Math.min(remaining, Math.max(MIN_ATTEMPT_MS, Math.round(remaining * 0.6)));
 }
 
 function noProviderError(): Error {
@@ -189,7 +217,7 @@ function nvidiaMaxTokens(
   requested?: number
 ): number | undefined {
   if (requested === undefined) return undefined;
-  const ceiling = provider === "nvidia-llama" ? 4096 : 16384;
+  const ceiling = provider === "nvidia-lite" ? 4096 : 16384;
   return Math.min(requested, ceiling);
 }
 
@@ -220,10 +248,19 @@ export async function completeText(
     throw noProviderError();
   }
 
+  const deadlineAt = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let lastError: unknown;
-  for (const attempt of attempts) {
+  for (const [index, attempt] of attempts.entries()) {
+    const budgetMs = attemptBudgetMs(deadlineAt, attempts.length - index);
+    if (budgetMs < MIN_ATTEMPT_MS && index > 0) {
+      lastError ??= new Error("Ran out of time before any model could answer.");
+      break;
+    }
     try {
-      return await completeWithProvider(attempt, messages, options);
+      return await completeWithProvider(attempt, messages, {
+        ...options,
+        timeoutMs: budgetMs,
+      });
     } catch (error) {
       console.error(
         `AI provider ${attempt.provider}${attempt.model ? ` (${attempt.model})` : ""} failed:`,
@@ -246,6 +283,7 @@ async function completeWithProvider(
       model: attempt.model,
       maxTokens: nvidiaMaxTokens(provider, options.maxTokens),
       temperature: options.temperature,
+      timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     });
     return { text: result.text, provider, model: result.model, usage: result.usage };
   }
@@ -319,8 +357,14 @@ export async function streamText(
     throw noProviderError();
   }
 
+  const deadlineAt = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let lastError: unknown;
-  for (const attempt of attempts) {
+  for (const [index, attempt] of attempts.entries()) {
+    const budgetMs = attemptBudgetMs(deadlineAt, attempts.length - index);
+    if (budgetMs < MIN_ATTEMPT_MS && index > 0) {
+      lastError ??= new Error("Ran out of time before any model could answer.");
+      break;
+    }
     try {
       const { provider } = attempt;
       if (isNvidiaProvider(provider)) {
@@ -330,6 +374,10 @@ export async function streamText(
             model: attempt.model,
             maxTokens: nvidiaMaxTokens(provider, options.maxTokens),
             temperature: options.temperature,
+            // Streaming keeps the connection open for the whole
+            // generation, so this bounds the reply itself, not just the
+            // connect: the client's own watchdog must never fire first.
+            timeoutMs: deadlineAt - Date.now(),
           }
         );
         return {
@@ -344,7 +392,7 @@ export async function streamText(
           })),
         };
       }
-      return streamAnthropic(messages, options);
+      return streamAnthropic(messages, { ...options, timeoutMs: budgetMs });
     } catch (error) {
       console.error(
         `AI provider ${attempt.provider}${attempt.model ? ` (${attempt.model})` : ""} failed:`,

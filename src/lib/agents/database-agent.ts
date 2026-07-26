@@ -1,10 +1,12 @@
 import {
   FILE_FORMAT_INSTRUCTIONS,
-  isLlmConfigured,
+  canCallModel,
+  fallbackReason,
+  outOfTimeNote,
   parseFileBlocks,
   pause,
-  remainingBudgetMs,
   runAgentCompletion,
+  stepBudgetMs,
 } from "@/lib/agents/llm";
 import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
 
@@ -74,18 +76,30 @@ export const databaseAgent: Agent = {
     const plan = context.plan!;
 
     let files: GeneratedFile[];
-    if (!isLlmConfigured()) {
-      await pause(700);
+    let note = "";
+    if (!canCallModel(context)) {
+      const reason = outOfTimeNote(context);
+      if (reason) note = ` (${reason} — schema generated from the plan)`;
+      else await pause(700);
       files = mockFiles(plan);
     } else {
-      const text = await runAgentCompletion({
-        system: SYSTEM,
-        prompt: `Data model:\n${JSON.stringify(plan.dataModel, null, 2)}\n\nApp: ${plan.appName} — ${plan.summary}`,
-        maxTokens: 8192,
-        role: "code",
-        timeoutMs: remainingBudgetMs(context.deadlineAt),
-      });
-      files = parseFileBlocks(text);
+      try {
+        const text = await runAgentCompletion({
+          system: SYSTEM,
+          prompt: `Data model:\n${JSON.stringify(plan.dataModel, null, 2)}\n\nApp: ${plan.appName} — ${plan.summary}`,
+          maxTokens: 6000,
+          role: "code",
+          timeoutMs: stepBudgetMs(context),
+        });
+        files = parseFileBlocks(text);
+        if (files.length === 0) {
+          note = " (model returned no usable files — schema generated from the plan)";
+          files = mockFiles(plan);
+        }
+      } catch (error) {
+        note = ` (${fallbackReason(error)} — schema generated from the plan)`;
+        files = mockFiles(plan);
+      }
     }
 
     for (const file of files) {
@@ -95,7 +109,7 @@ export const databaseAgent: Agent = {
     emit({
       type: "agent_complete",
       agent: "database",
-      message: `Schema ready: ${plan.dataModel.map((t) => t.table).join(", ") || "no tables needed"}`,
+      message: `Schema ready: ${plan.dataModel.map((t) => t.table).join(", ") || "no tables needed"}${note}`,
     });
   },
 };

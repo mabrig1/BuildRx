@@ -1,10 +1,11 @@
 import {
   FILE_FORMAT_INSTRUCTIONS,
-  isLlmConfigured,
+  canCallModel,
+  fallbackReason,
   parseFileBlocks,
   pause,
-  remainingBudgetMs,
   runAgentCompletion,
+  stepBudgetMs,
 } from "@/lib/agents/llm";
 import type { Agent, GeneratedFile } from "@/lib/agents/types";
 
@@ -55,7 +56,7 @@ export const debugAgent: Agent = {
       });
     }
 
-    if (!isLlmConfigured()) {
+    if (!canCallModel(context)) {
       await pause(700);
       emit({
         type: "agent_complete",
@@ -69,25 +70,55 @@ export const debugAgent: Agent = {
     }
 
     // LLM review: send files (bounded) and apply any corrected versions.
-    const MAX_PER_FILE = 6000;
-    const bundle = files
+    // The bundle is capped hard — reviewing every byte of a 20-file app
+    // costs more time than this step has, and a truncated request that
+    // times out helps nobody. Statically flagged files go first, then
+    // the rest, so the most suspect code is always in the window.
+    const MAX_PER_FILE = 2500;
+    const MAX_FILES = 10;
+    const flaggedPaths = new Set(flagged.map((entry) => entry.file.path));
+    const reviewOrder = [
+      ...files.filter((file) => flaggedPaths.has(file.path)),
+      ...files.filter((file) => !flaggedPaths.has(file.path)),
+    ].slice(0, MAX_FILES);
+    const bundle = reviewOrder
       .map(
         (file) =>
           `===FILE: ${file.path}===\n${file.content.slice(0, MAX_PER_FILE)}\n===END===`
       )
       .join("\n\n");
 
-    const text = await runAgentCompletion({
-      system: SYSTEM,
-      prompt: `Review these generated project files:\n\n${bundle}`,
-      role: "reasoning",
-      timeoutMs: remainingBudgetMs(context.deadlineAt),
-    });
+    // A review pass is an improvement, not a requirement: if the model
+    // can't deliver one in its slice, the already-generated files stand
+    // as they are rather than the build failing at the last step.
+    let fixes: GeneratedFile[] = [];
+    let note = "";
+    try {
+      const text = await runAgentCompletion({
+        system: SYSTEM,
+        prompt: `Review these generated project files:\n\n${bundle}`,
+        role: "reasoning",
+        timeoutMs: stepBudgetMs(context),
+      });
+      fixes = parseFileBlocks(text);
+    } catch (error) {
+      note = ` — review skipped (${fallbackReason(error)})`;
+    }
 
-    const fixes = parseFileBlocks(text);
+    // Only files the reviewer saw in full may be replaced. A file that
+    // was truncated into the bundle comes back "corrected" but shorter
+    // than the original, so applying it would silently delete code.
+    const reviewedInFull = new Set(
+      reviewOrder
+        .filter((file) => file.content.length <= MAX_PER_FILE)
+        .map((file) => file.path)
+    );
+
+    let applied = 0;
     for (const fix of fixes) {
-      if (context.files.has(fix.path)) {
+      if (context.files.has(fix.path) && reviewedInFull.has(fix.path)) {
         context.files.set(fix.path, fix);
+        applied++;
         emit({
           type: "agent_log",
           agent: "debug",
@@ -100,10 +131,11 @@ export const debugAgent: Agent = {
     emit({
       type: "agent_complete",
       agent: "debug",
-      message:
-        fixes.length === 0
-          ? `Checked ${files.length} files — no issues found`
-          : `Fixed ${fixes.length} file(s)`,
+      message: note
+        ? `Checked ${reviewOrder.length} of ${files.length} files${note}`
+        : applied === 0
+          ? `Checked ${reviewOrder.length} of ${files.length} files — no issues found`
+          : `Fixed ${applied} file(s)`,
     });
   },
 };

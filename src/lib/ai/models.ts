@@ -23,6 +23,12 @@ import {
   nvidiaGlmModel,
   validModelId,
 } from "@/lib/ai/nvidia";
+import {
+  isOpenRouterConfigured,
+  listAvailableModels as listOpenRouterModels,
+  openrouterModel,
+  openrouterStrongModel,
+} from "@/lib/ai/openrouter";
 
 /** What kind of work a model call is doing. */
 export type ModelRole =
@@ -285,4 +291,151 @@ export async function resolvedModelPlan(): Promise<Record<string, string>> {
       resolveGeneralFallbackModel(),
     ]);
   return { deepReasoning, primaryCoding, codegen, diagnostics, light, general };
+}
+
+
+// ------------------------------------------------------------------
+// OpenRouter role routing
+// ------------------------------------------------------------------
+
+/**
+ * Preferred OpenRouter models per role, strongest first.
+ *
+ * Drawn from the open-weight families this deployment standardises on —
+ * DeepSeek, Qwen, Llama, Mistral, Gemma, GLM and Kimi — and ordered by
+ * what each family is actually good at rather than by size: reasoning
+ * models lead planning, code-specialised models lead generation, and
+ * small fast models lead review and classification, where latency
+ * matters more than depth.
+ *
+ * These are candidates, not commitments. At call time the list is
+ * filtered against the catalog this key can really call
+ * (`resolveOpenRouterModelForRole`), so an id that is retired, renamed
+ * or not offered is skipped instead of 404ing mid-build. That is what
+ * makes "Kimi when available" a real behaviour rather than a guess, and
+ * it is why naming more models than any one account is guaranteed to
+ * have is safe.
+ */
+export const OPENROUTER_CANDIDATES: Record<ModelRole, readonly string[]> = {
+  // Planning and architecture: the step whose failure costs the build.
+  "deep-reasoning": [
+    "deepseek/deepseek-r1",
+    "deepseek/deepseek-chat",
+    "qwen/qwen-2.5-72b-instruct",
+    "moonshotai/kimi-k2",
+    "z-ai/glm-4-32b",
+    "meta-llama/llama-3.3-70b-instruct",
+  ],
+  // The main application code — correctness over speed.
+  "primary-coding": [
+    "qwen/qwen-2.5-coder-32b-instruct",
+    "deepseek/deepseek-chat",
+    "mistralai/codestral-2501",
+    "qwen/qwen-2.5-72b-instruct",
+    "meta-llama/llama-3.3-70b-instruct",
+  ],
+  // UI, schema and repair passes — same work, tighter budgets.
+  codegen: [
+    "qwen/qwen-2.5-coder-32b-instruct",
+    "mistralai/codestral-2501",
+    "mistralai/mistral-small-24b-instruct-2501",
+    "google/gemma-3-27b-it",
+    "deepseek/deepseek-chat",
+  ],
+  // Fast review and log analysis.
+  diagnostics: [
+    "meta-llama/llama-3.1-8b-instruct",
+    "mistralai/mistral-small-24b-instruct-2501",
+    "google/gemma-3-27b-it",
+    "qwen/qwen-2.5-coder-32b-instruct",
+  ],
+  // Small classification and summarisation.
+  light: [
+    "google/gemma-3-27b-it",
+    "meta-llama/llama-3.1-8b-instruct",
+    "mistralai/mistral-small-24b-instruct-2501",
+  ],
+};
+
+/**
+ * The catalog, cached and single-flighted for the same reasons as the
+ * NVIDIA one: a build makes a dozen model calls and the answer changes
+ * on the scale of weeks. A failed fetch caches nothing, so the next call
+ * retries.
+ */
+let openrouterCatalog: { fetchedAt: number; ids: Set<string> } | null = null;
+let openrouterInFlight: Promise<Set<string> | null> | null = null;
+
+async function openrouterModelIds(): Promise<Set<string> | null> {
+  if (openrouterCatalog && Date.now() - openrouterCatalog.fetchedAt < CATALOG_TTL_MS) {
+    return openrouterCatalog.ids;
+  }
+  openrouterInFlight ??= (async () => {
+    try {
+      const ids = await listOpenRouterModels();
+      if (ids.length === 0) return null;
+      openrouterCatalog = { fetchedAt: Date.now(), ids: new Set(ids) };
+      return openrouterCatalog.ids;
+    } finally {
+      openrouterInFlight = null;
+    }
+  })();
+  return openrouterInFlight;
+}
+
+/**
+ * The OpenRouter model a role should run on.
+ *
+ * Precedence mirrors the NVIDIA path: an explicit env override wins
+ * outright, then the strongest candidate this key can actually call,
+ * then the configured default. A `budgetMs` under the fast threshold
+ * drops the reasoning-grade leaders, since a model that cannot answer in
+ * the time available is worth less than a weaker one that can.
+ */
+export async function resolveOpenRouterModelForRole(
+  role: ModelRole,
+  budgetMs?: number
+): Promise<string> {
+  const strongRole = role === "deep-reasoning" || role === "primary-coding";
+  const override = strongRole
+    ? cleanOverride(process.env.OPENROUTER_MODEL_STRONG)
+    : cleanOverride(process.env.OPENROUTER_MODEL);
+  if (override) return override;
+
+  const fallback = strongRole ? openrouterStrongModel() : openrouterModel();
+  const available = await openrouterModelIds();
+  if (!available) return fallback;
+
+  const ladder =
+    budgetMs !== undefined && budgetMs < FAST_MODEL_BUDGET_MS
+      ? [
+          ...OPENROUTER_CANDIDATES.light,
+          ...OPENROUTER_CANDIDATES[role].filter(
+            (id) => !OPENROUTER_CANDIDATES.light.includes(id)
+          ),
+        ]
+      : OPENROUTER_CANDIDATES[role];
+
+  return ladder.find((id) => available.has(id)) ?? fallback;
+}
+
+function cleanOverride(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+/** Which OpenRouter model each role resolves to right now, for diagnostics. */
+export async function resolvedOpenRouterPlan(): Promise<Record<string, string> | null> {
+  if (!isOpenRouterConfigured()) return null;
+  const roles: ModelRole[] = [
+    "deep-reasoning",
+    "primary-coding",
+    "codegen",
+    "diagnostics",
+    "light",
+  ];
+  const resolved = await Promise.all(
+    roles.map((role) => resolveOpenRouterModelForRole(role))
+  );
+  return Object.fromEntries(roles.map((role, i) => [role, resolved[i]]));
 }

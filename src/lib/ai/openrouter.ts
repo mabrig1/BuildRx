@@ -220,6 +220,37 @@ export async function streamChatCompletion(
   return { stream, completion, model };
 }
 
+/**
+ * Every model id this key can actually call, straight from OpenRouter's
+ * catalog.
+ *
+ * This is what makes the role ladders safe to write from documentation:
+ * an id that is retired, renamed, or simply not offered is filtered out
+ * before it is ever requested, rather than 404ing mid-build. Ids only —
+ * no key material is returned or logged.
+ */
+export async function listAvailableModels(): Promise<string[]> {
+  try {
+    const apiKey = openrouterApiKey();
+    const response = await fetch(`${openrouterBaseUrl()}/models`, {
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const models: unknown = data?.data ?? data?.models;
+    if (!Array.isArray(models)) return [];
+    return models
+      .map((model: { id?: unknown }) =>
+        typeof model?.id === "string" ? model.id : null
+      )
+      .filter((id): id is string => Boolean(id))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
 /** Non-streaming completion — used by the connectivity check. */
 export async function createChatCompletion(
   messages: OpenRouterMessage[],

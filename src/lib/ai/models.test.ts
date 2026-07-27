@@ -176,3 +176,150 @@ describe("MODEL_CANDIDATES ordering", () => {
     expect(MODEL_CANDIDATES["deep-reasoning"]).toContain("openai/gpt-oss-120b");
   });
 });
+
+// ------------------------------------------------------------------
+// OpenRouter role routing
+// ------------------------------------------------------------------
+
+/** A representative slice of OpenRouter's catalog. */
+const OPENROUTER_CATALOG = [
+  "deepseek/deepseek-r1",
+  "deepseek/deepseek-chat",
+  "qwen/qwen-2.5-coder-32b-instruct",
+  "qwen/qwen-2.5-72b-instruct",
+  "meta-llama/llama-3.3-70b-instruct",
+  "meta-llama/llama-3.1-8b-instruct",
+  "mistralai/codestral-2501",
+  "mistralai/mistral-small-24b-instruct-2501",
+  "google/gemma-3-27b-it",
+  "z-ai/glm-4-32b",
+  "moonshotai/kimi-k2",
+];
+
+describe("resolveOpenRouterModelForRole", () => {
+  beforeEach(() => {
+    process.env.OPENROUTER_API_KEY = "sk-or-test";
+  });
+
+  it("routes each role to a different, task-appropriate family", async () => {
+    const { resolveOpenRouterModelForRole } = await freshModule();
+    catalog(OPENROUTER_CATALOG);
+
+    expect(await resolveOpenRouterModelForRole("deep-reasoning")).toBe(
+      "deepseek/deepseek-r1"
+    );
+    expect(await resolveOpenRouterModelForRole("primary-coding")).toBe(
+      "qwen/qwen-2.5-coder-32b-instruct"
+    );
+    expect(await resolveOpenRouterModelForRole("diagnostics")).toBe(
+      "meta-llama/llama-3.1-8b-instruct"
+    );
+    expect(await resolveOpenRouterModelForRole("light")).toBe(
+      "google/gemma-3-27b-it"
+    );
+  });
+
+  it("skips a family the key cannot call and takes the next", async () => {
+    const { resolveOpenRouterModelForRole } = await freshModule();
+    // No DeepSeek on this account.
+    catalog(OPENROUTER_CATALOG.filter((id) => !id.startsWith("deepseek/")));
+
+    expect(await resolveOpenRouterModelForRole("deep-reasoning")).toBe(
+      "qwen/qwen-2.5-72b-instruct"
+    );
+  });
+
+  /**
+   * "Kimi when available" is exactly this: it sits in the ladder and is
+   * reached only if the catalog offers it, rather than 404ing when not.
+   */
+  it("reaches Kimi only when the catalog actually offers it", async () => {
+    const { resolveOpenRouterModelForRole, OPENROUTER_CANDIDATES } =
+      await freshModule();
+    expect(OPENROUTER_CANDIDATES["deep-reasoning"]).toContain(
+      "moonshotai/kimi-k2"
+    );
+
+    catalog(["moonshotai/kimi-k2"]);
+    expect(await resolveOpenRouterModelForRole("deep-reasoning")).toBe(
+      "moonshotai/kimi-k2"
+    );
+  });
+
+  it("prefers a fast family when the step's budget is short", async () => {
+    const { resolveOpenRouterModelForRole } = await freshModule();
+    catalog(OPENROUTER_CATALOG);
+
+    const chosen = await resolveOpenRouterModelForRole("deep-reasoning", 20_000);
+
+    expect(chosen).not.toBe("deepseek/deepseek-r1");
+    expect(["google/gemma-3-27b-it", "meta-llama/llama-3.1-8b-instruct"]).toContain(
+      chosen
+    );
+  });
+
+  it("lets an explicit env override win outright", async () => {
+    const { resolveOpenRouterModelForRole } = await freshModule();
+    catalog(OPENROUTER_CATALOG);
+    process.env.OPENROUTER_MODEL_STRONG = "vendor/pinned-strong";
+    process.env.OPENROUTER_MODEL = "vendor/pinned-everyday";
+
+    expect(await resolveOpenRouterModelForRole("deep-reasoning")).toBe(
+      "vendor/pinned-strong"
+    );
+    expect(await resolveOpenRouterModelForRole("light")).toBe(
+      "vendor/pinned-everyday"
+    );
+  });
+
+  it("falls back to the configured default when the catalog is unreachable", async () => {
+    const { resolveOpenRouterModelForRole } = await freshModule();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+
+    expect(await resolveOpenRouterModelForRole("deep-reasoning")).toBe(
+      "openai/gpt-4o"
+    );
+    expect(await resolveOpenRouterModelForRole("light")).toBe(
+      "openai/gpt-4o-mini"
+    );
+  });
+
+  it("fetches the OpenRouter catalog once across roles", async () => {
+    const { resolvedOpenRouterPlan } = await freshModule();
+    catalog(OPENROUTER_CATALOG);
+
+    const plan = await resolvedOpenRouterPlan();
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(Object.keys(plan ?? {})).toHaveLength(5);
+  });
+
+  it("reports no plan at all when OpenRouter is not configured", async () => {
+    const { resolvedOpenRouterPlan } = await freshModule();
+    delete process.env.OPENROUTER_API_KEY;
+
+    await expect(resolvedOpenRouterPlan()).resolves.toBeNull();
+  });
+
+  it("only names families this deployment standardises on", async () => {
+    const { OPENROUTER_CANDIDATES } = await freshModule();
+    const allowed = [
+      "deepseek/",
+      "qwen/",
+      "meta-llama/",
+      "mistralai/",
+      "google/gemma",
+      "z-ai/glm",
+      "moonshotai/kimi",
+    ];
+
+    for (const [role, ladder] of Object.entries(OPENROUTER_CANDIDATES)) {
+      for (const id of ladder) {
+        expect(
+          allowed.some((prefix) => id.startsWith(prefix)),
+          `${role} names an out-of-family model: ${id}`
+        ).toBe(true);
+      }
+    }
+  });
+});

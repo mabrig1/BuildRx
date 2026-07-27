@@ -6,11 +6,11 @@ import type {
 import {
   resolveGeneralFallbackModel,
   resolveModelForRole,
+  resolveOpenRouterModelForRole,
   type ModelRole,
 } from "@/lib/ai/models";
 import { isAnyProviderConfigured, completeText } from "@/lib/ai/provider";
 import { isNvidiaConfigured, nvidiaGlmModel } from "@/lib/ai/nvidia";
-import { openrouterModel } from "@/lib/ai/openrouter";
 
 /** Model used only if the opt-in Anthropic tier is ever reached. */
 export const ANTHROPIC_AGENT_MODEL = "claude-opus-4-8";
@@ -285,15 +285,14 @@ export async function runAgentCompletion({
   // The step's actual budget decides the ladder: a large reasoning model
   // that needs most of a minute to start answering is the wrong choice
   // for a slice that is under one, however capable it is.
-  const [nvidiaModel, nvidiaFallbackModel] = await Promise.all([
-    resolveModelForRole(role, timeoutMs),
-    resolveGeneralFallbackModel(timeoutMs),
-  ]);
-
-  // Only the two roles that plan and write the application are worth the
-  // stronger (and costlier) OpenRouter model; review, diagnostics and
-  // classification are served fine by the everyday one.
-  const wantsStrongModel = role === "deep-reasoning" || role === "primary-coding";
+  // Each provider routes the same role to its own best model, resolved
+  // against what that key can actually call.
+  const [nvidiaModel, nvidiaFallbackModel, openrouterModelId] =
+    await Promise.all([
+      resolveModelForRole(role, timeoutMs),
+      resolveGeneralFallbackModel(timeoutMs),
+      resolveOpenRouterModelForRole(role, timeoutMs),
+    ]);
 
   const result = await completeText(
     [
@@ -307,7 +306,7 @@ export async function runAgentCompletion({
       anthropicModel: ANTHROPIC_AGENT_MODEL,
       nvidiaModel,
       nvidiaFallbackModel,
-      ...(wantsStrongModel ? {} : { openrouterModel: openrouterModel() }),
+      openrouterModel: openrouterModelId,
     }
   );
   return result.text;

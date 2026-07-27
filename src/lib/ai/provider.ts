@@ -323,6 +323,36 @@ async function collectStreamed(
     void reader.cancel().catch(() => {});
   }
 
+  /**
+   * Last resort: the model thought but never answered.
+   *
+   * Every default model in this chain is a reasoning model, and those
+   * stream their scratchpad in `reasoning_content` before emitting a
+   * single `content` delta. A model that spends its whole budget
+   * thinking therefore produced an empty `text` here — which was
+   * reported upstream as "returned nothing", failed every tier of the
+   * chain, and left the pipeline to fall back to built-in scaffolds.
+   * That is a generated app silently becoming a template.
+   *
+   * The thinking is not an answer, but it usually contains one: the plan
+   * JSON, or the ===FILE:=== blocks the agent asked for. The callers
+   * already cope — extractJson skips <think> blocks and hunts for the
+   * first JSON object, parseFileBlocks scans for file blocks anywhere.
+   * Handing back the reasoning gives them something to work with;
+   * handing back "" guarantees a scaffold.
+   */
+  if (text.trim().length === 0) {
+    const finished = await completion.catch(() => null);
+    const reasoning = finished?.reasoning?.trim() ?? "";
+    if (reasoning) {
+      console.warn(
+        `AI provider (${model}) emitted only reasoning (${reasoning.length} chars) and no content — using the reasoning.`
+      );
+      text = reasoning;
+      truncated = true;
+    }
+  }
+
   return { text, model, usage, truncated };
 }
 

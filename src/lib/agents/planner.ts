@@ -1,7 +1,8 @@
 import {
   canCallModel,
+  degradedEvent,
+  diagnoseModelFailure,
   extractJson,
-  fallbackReason,
   outOfTimeNote,
   pause,
   runAgentCompletion,
@@ -329,8 +330,20 @@ export const plannerAgent: Agent = {
     let note = "";
     if (!canCallModel(context)) {
       const reason = outOfTimeNote(context);
-      if (reason) note = ` (${reason} — planned from a built-in template instead)`;
-      else await pause(600);
+      if (reason) {
+        note = ` (${reason} — planned from a built-in template instead)`;
+        emit(
+          degradedEvent(
+            "planner",
+            "Your build plan is a built-in template, not one derived from your description.",
+            diagnoseModelFailure(
+              new Error(
+                "The build budget ran out before this step could start a model call."
+              )
+            )
+          )
+        );
+      } else await pause(600);
       context.plan = fallbackPlan(context.prompt);
     } else {
       try {
@@ -343,7 +356,15 @@ export const plannerAgent: Agent = {
         });
         context.plan = normalizePlan(extractJson<AppPlan>(text), context.prompt);
       } catch (error) {
-        note = ` (${fallbackReason(error)} — planned from a built-in template instead)`;
+        const failure = diagnoseModelFailure(error);
+        note = ` (${failure.summary} — planned from a built-in template instead)`;
+        emit(
+          degradedEvent(
+            "planner",
+            "Your build plan is a built-in template, not one derived from your description.",
+            failure
+          )
+        );
         context.plan = fallbackPlan(context.prompt);
       }
     }

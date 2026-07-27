@@ -1,7 +1,8 @@
 import {
   FILE_FORMAT_INSTRUCTIONS,
   canCallModel,
-  fallbackReason,
+  degradedEvent,
+  diagnoseModelFailure,
   parseFileBlocks,
   pause,
   runAgentCompletion,
@@ -102,7 +103,15 @@ export const debugAgent: Agent = {
       });
       fixes = parseFileBlocks(text);
     } catch (error) {
-      note = ` — review skipped (${fallbackReason(error)})`;
+      const failure = diagnoseModelFailure(error);
+      note = ` — review skipped (${failure.summary})`;
+      emit(
+        degradedEvent(
+          "debug",
+          "The generated code was not reviewed for defects.",
+          failure
+        )
+      );
     }
 
     // Only files the reviewer saw in full may be replaced. A file that

@@ -143,6 +143,26 @@ export type AgentEvent =
   | { type: "agent_log"; agent: AgentName; message: string }
   | { type: "file"; agent: AgentName; path: string }
   | { type: "agent_complete"; agent: AgentName; message: string }
+  /**
+   * A step produced something, but not what it was meant to — most often
+   * a model call that failed, leaving the built-in scaffold in its
+   * place. The build continues, so this is not an `error`; but it is the
+   * difference between a generated app and a template, and the user has
+   * to be told which one they got and why. Omit `agent` for a
+   * whole-build condition (nothing configured at all).
+   */
+  | {
+      type: "agent_degraded";
+      agent?: AgentName;
+      /** What the build lost, in plain language. */
+      message: string;
+      code: string;
+      /** The provider's own error, verbatim. */
+      cause: string;
+      suggestedFix: string;
+      /** Whether re-running alone could succeed. */
+      retryable: boolean;
+    }
   | {
       type: "workflow_complete";
       previewUrl: string | null;

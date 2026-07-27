@@ -139,6 +139,8 @@ export function ChatPanel({
 
     const lineForAgent: Partial<Record<AgentName, number>> = {};
     const lines: string[] = [];
+    /** Steps that fell back, so the finish can say so instead of "complete". */
+    const degraded: string[] = [];
     const render = () => updateMessage(assistantId, lines.join("\n"));
 
     // Idle watchdog, not a total-time limit. The build streams an event
@@ -226,13 +228,45 @@ export function ChatPanel({
               break;
             }
             case "workflow_complete":
+              // "Build complete" after four steps silently fell back to
+              // scaffolds is how you end up with a confused user and an
+              // app that isn't what they asked for. Say which one it is.
               lines.push(
-                `\n🚀 **Build complete** — ${event.fileCount} files generated.`
+                degraded.length === 0
+                  ? `\n🚀 **Build complete** — ${event.fileCount} files generated.`
+                  : [
+                      `\n⚠️ **Build finished with ${degraded.length} step(s) degraded** — ${event.fileCount} files written, but parts of this app are built-in scaffolding rather than generated from your description:`,
+                      ...degraded.map((item) => `- ${item}`),
+                      "\nSee the **Fix** notes above, then run the build again.",
+                    ].join("\n")
               );
               render();
+              if (degraded.length > 0) {
+                toast.warning(
+                  `${degraded.length} build step(s) fell back to scaffolds`,
+                  { description: "See the build log for why, and how to fix it." }
+                );
+              }
               window.dispatchEvent(new CustomEvent("vfs-changed", { detail: {} }));
               onBuildDeployed?.(event.previewUrl);
               break;
+            case "agent_degraded": {
+              // A degraded step still produces files, so it must not read
+              // like a success. Say what was lost, why, and what to do —
+              // "the model call failed" on its own just leaves the user
+              // guessing whether they got an app or a template.
+              degraded.push(event.message);
+              const who = event.agent ? `**${AGENT_LABELS[event.agent]}** — ` : "";
+              lines.push(
+                [
+                  `\n⚠️ ${who}${event.message}`,
+                  `> **Why:** ${event.cause}`,
+                  `> **Fix:** ${event.suggestedFix}`,
+                ].join("\n")
+              );
+              render();
+              break;
+            }
             case "error": {
               const line = event.agent
                 ? `❌ **${AGENT_LABELS[event.agent]}** — ${event.message}`

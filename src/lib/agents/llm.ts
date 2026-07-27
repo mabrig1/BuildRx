@@ -1,4 +1,8 @@
-import type { GeneratedFile } from "@/lib/agents/types";
+import type {
+  AgentEvent,
+  AgentName,
+  GeneratedFile,
+} from "@/lib/agents/types";
 import {
   resolveGeneralFallbackModel,
   resolveModelForRole,
@@ -95,21 +99,145 @@ export function canCallModel(context: {
 }
 
 /**
+ * Why a step fell back to its built-in scaffold, in enough detail to act
+ * on.
+ *
+ * The provider chain already builds a precise error ("All AI providers
+ * failed. Tried: … Last error: …"), and every bit of it used to be
+ * thrown away in favour of a six-word phrase — which is why a degraded
+ * build read as "the model call failed" with no way to find out why or
+ * what to do about it. `cause` carries the provider's own words
+ * verbatim; `suggestedFix` is the concrete next action.
+ */
+export interface ModelFailure {
+  /** Short phrase for the inline build-log note. */
+  summary: string;
+  /** Stable machine code, e.g. AI_TIMEOUT. */
+  code: string;
+  /** The underlying error, verbatim — never summarised away. */
+  cause: string;
+  /** What the user should actually do. */
+  suggestedFix: string;
+  /** Whether re-running the build alone could succeed. */
+  retryable: boolean;
+}
+
+/**
+ * Ordered: the first pattern that matches wins, so a message mentioning
+ * both a rate limit and a timeout is reported as the timeout that
+ * actually stopped it.
+ */
+const FAILURE_PATTERNS: ReadonlyArray<
+  Omit<ModelFailure, "cause"> & { test: RegExp }
+> = [
+  {
+    test: /no ai provider is configured|is not configured/i,
+    summary: "no AI provider is configured",
+    code: "AI_NOT_CONFIGURED",
+    suggestedFix:
+      "Set NVIDIA_API_KEY in your deployment environment (a free key is available at build.nvidia.com) and redeploy. Until then every build falls back to built-in scaffolds instead of generating code.",
+    retryable: false,
+  },
+  {
+    test: /ran out of time|time budget|timed? ?out|abort|returned nothing within/i,
+    summary: "the model ran out of time",
+    code: "AI_TIMEOUT",
+    suggestedFix:
+      "The model did not answer within this step's share of the build budget. Re-run the build, describe a smaller app, or raise AGENT_PIPELINE_BUDGET_MS if your host allows longer function runs.",
+    retryable: true,
+  },
+  {
+    test: /rate limit|429/i,
+    summary: "the model was rate-limited",
+    code: "AI_RATE_LIMITED",
+    suggestedFix:
+      "The provider is throttling this API key. Wait a minute, then run the build again.",
+    retryable: true,
+  },
+  {
+    test: /not found|404/i,
+    summary: "the configured model is unavailable",
+    code: "AI_MODEL_UNAVAILABLE",
+    suggestedFix:
+      "The model id this deployment asks for is not available to your key. Clear the NVIDIA_MODEL_* variables to fall back to the built-in defaults, or set them to an id listed by /api/ai/models.",
+    retryable: false,
+  },
+  {
+    test: /authentication|401|403|api key/i,
+    summary: "the NVIDIA API key was rejected",
+    code: "AI_KEY_REJECTED",
+    suggestedFix:
+      "NVIDIA_API_KEY was rejected. Check it has not expired and was pasted without stray spaces or newlines, then redeploy.",
+    retryable: false,
+  },
+];
+
+/** Full diagnosis of a failed model call. */
+export function diagnoseModelFailure(error: unknown): ModelFailure {
+  const cause =
+    error instanceof Error ? error.message : String(error ?? "unknown error");
+  const matched = FAILURE_PATTERNS.find((pattern) => pattern.test.test(cause));
+  if (matched) {
+    return {
+      summary: matched.summary,
+      code: matched.code,
+      cause,
+      suggestedFix: matched.suggestedFix,
+      retryable: matched.retryable,
+    };
+  }
+  return {
+    summary: "the model call failed",
+    code: "AI_CALL_FAILED",
+    cause,
+    suggestedFix:
+      "Re-run the build — this step fell back to its built-in scaffold, so the app still renders. If it keeps happening, the provider's own error is shown above.",
+    retryable: true,
+  };
+}
+
+/**
+ * The model answered, but produced nothing the pipeline could use — a
+ * distinct case from a failed call, and one the user can act on
+ * differently.
+ */
+export function emptyOutputFailure(detail: string): ModelFailure {
+  return {
+    summary: "the model returned no usable output",
+    code: "AI_EMPTY_OUTPUT",
+    cause: detail,
+    suggestedFix:
+      "The model replied, but nothing in the response could be used. Re-run the build; if it repeats, describe the app in smaller, more concrete steps.",
+    retryable: true,
+  };
+}
+
+/**
  * Plain-language reason a step fell back to its built-in scaffold —
- * shown in the build log, so it has to say what actually went wrong
- * rather than "something failed".
+ * shown inline in the build log next to the step's result.
  */
 export function fallbackReason(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/ran out of time|time budget|timed? ?out|abort/i.test(message)) {
-    return "the model ran out of time";
-  }
-  if (/rate limit|429/i.test(message)) return "the model was rate-limited";
-  if (/not found|404/i.test(message)) return "the configured model is unavailable";
-  if (/authentication|401|403|api key/i.test(message)) {
-    return "the NVIDIA API key was rejected";
-  }
-  return "the model call failed";
+  return diagnoseModelFailure(error).summary;
+}
+
+/**
+ * The build-log event for a step that produced something, but not what
+ * it was supposed to. Distinct from an `error`, which ends the run.
+ */
+export function degradedEvent(
+  agent: AgentName | undefined,
+  message: string,
+  failure: ModelFailure
+): AgentEvent {
+  return {
+    type: "agent_degraded",
+    ...(agent ? { agent } : {}),
+    message,
+    code: failure.code,
+    cause: failure.cause,
+    suggestedFix: failure.suggestedFix,
+    retryable: failure.retryable,
+  };
 }
 
 /**

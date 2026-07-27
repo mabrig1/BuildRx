@@ -1,5 +1,12 @@
 import type { NextConfig } from "next";
 
+/**
+ * The single source of these headers. Do not also set them in
+ * vercel.json — the platform appends rather than replaces, and a
+ * duplicated X-Frame-Options arrives as "SAMEORIGIN, SAMEORIGIN", which
+ * is not a valid value, so browsers fall back to DENY and block even
+ * same-origin iframes.
+ */
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },

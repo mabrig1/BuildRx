@@ -267,3 +267,169 @@ describe("listAvailableModels", () => {
     });
   });
 });
+
+// ------------------------------------------------------------------
+// Streaming: reasoning models emit `reasoning_content` before (or
+// instead of) `content`. Dropping it is what silently turned generated
+// apps into built-in scaffolds.
+// ------------------------------------------------------------------
+
+/** A Response whose body streams the given SSE lines. */
+function sseResponse(chunks: string[]) {
+  const encoder = new TextEncoder();
+  return {
+    ok: true,
+    status: 200,
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+        }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      },
+    }),
+  };
+}
+
+async function drain(stream: ReadableStream<Uint8Array>) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let out = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    out += decoder.decode(value, { stream: true });
+  }
+  return out;
+}
+
+describe("streamChatCompletion", () => {
+  const saved = { ...process.env };
+
+  beforeEach(() => {
+    process.env.NVIDIA_API_KEY = "nvapi-test";
+  });
+
+  afterEach(() => {
+    process.env = { ...saved };
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("streams content deltas and reports them as the text", async () => {
+    const { streamChatCompletion } = await freshModule();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        sseResponse([
+          '{"choices":[{"delta":{"content":"Hello "}}]}',
+          '{"choices":[{"delta":{"content":"world"}}]}',
+        ])
+      )
+    );
+
+    const { stream, completion } = await streamChatCompletion([
+      { role: "user", content: "hi" },
+    ]);
+
+    expect(await drain(stream)).toBe("Hello world");
+    const done = await completion;
+    expect(done.text).toBe("Hello world");
+    expect(done.reasoning).toBe("");
+  });
+
+  it("collects reasoning_content without streaming it to the caller", async () => {
+    // The user asked for an answer, not a transcript of the thinking.
+    const { streamChatCompletion } = await freshModule();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        sseResponse([
+          '{"choices":[{"delta":{"reasoning_content":"Let me think. "}}]}',
+          '{"choices":[{"delta":{"reasoning_content":"Maybe X. "}}]}',
+          '{"choices":[{"delta":{"content":"The answer is X."}}]}',
+        ])
+      )
+    );
+
+    const { stream, completion } = await streamChatCompletion([
+      { role: "user", content: "hi" },
+    ]);
+
+    expect(await drain(stream)).toBe("The answer is X.");
+    const done = await completion;
+    expect(done.text).toBe("The answer is X.");
+    expect(done.reasoning).toBe("Let me think. Maybe X. ");
+  });
+
+  /**
+   * The exact failure that made every agent fall back to a scaffold: a
+   * reasoning model that spends its whole budget thinking emits no
+   * `content` at all. Before this was captured, the call looked
+   * indistinguishable from a dead endpoint.
+   */
+  it("keeps the reasoning when the model never emits any content", async () => {
+    const { streamChatCompletion } = await freshModule();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        sseResponse([
+          '{"choices":[{"delta":{"reasoning_content":"===FILE: a.ts===\\nx\\n===END==="}}]}',
+        ])
+      )
+    );
+
+    const { stream, completion } = await streamChatCompletion([
+      { role: "user", content: "hi" },
+    ]);
+
+    expect(await drain(stream)).toBe("");
+    const done = await completion;
+    expect(done.text).toBe("");
+    expect(done.reasoning).toContain("===FILE: a.ts===");
+  });
+
+  it("ignores malformed keep-alive lines", async () => {
+    const { streamChatCompletion } = await freshModule();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        sseResponse([
+          "not json",
+          '{"choices":[{"delta":{"content":"ok"}}]}',
+        ])
+      )
+    );
+
+    const { stream, completion } = await streamChatCompletion([
+      { role: "user", content: "hi" },
+    ]);
+
+    expect(await drain(stream)).toBe("ok");
+    expect((await completion).text).toBe("ok");
+  });
+
+  it("reports token usage from the final chunk", async () => {
+    const { streamChatCompletion } = await freshModule();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        sseResponse([
+          '{"choices":[{"delta":{"content":"ok"}}]}',
+          '{"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":3}}',
+        ])
+      )
+    );
+
+    const { stream, completion } = await streamChatCompletion([
+      { role: "user", content: "hi" },
+    ]);
+    await drain(stream);
+
+    expect((await completion).usage).toEqual({
+      promptTokens: 12,
+      completionTokens: 3,
+    });
+  });
+});

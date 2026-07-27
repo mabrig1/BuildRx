@@ -53,6 +53,15 @@ export interface NvidiaUsage {
 
 export interface NvidiaCompletion {
   text: string;
+  /**
+   * Reasoning models stream their scratchpad in a separate
+   * `reasoning_content` field and only then emit `content`. Kept apart
+   * from `text` (it is thinking, not an answer) but never discarded: a
+   * model cut short mid-thought has produced nothing in `content`, and
+   * the work it did do is the only thing standing between the caller and
+   * a total failure.
+   */
+  reasoning: string;
   usage: NvidiaUsage;
   model: string;
 }
@@ -418,6 +427,7 @@ export async function createChatCompletion(
 
   return {
     text: data.choices?.[0]?.message?.content ?? "",
+    reasoning: data.choices?.[0]?.message?.reasoning_content ?? "",
     usage: {
       promptTokens: data.usage?.prompt_tokens ?? 0,
       completionTokens: data.usage?.completion_tokens ?? 0,
@@ -460,53 +470,91 @@ export async function streamChatCompletion(
 
   const reader = response.body.getReader();
   let fullText = "";
+  let reasoningText = "";
   let usage: NvidiaUsage = { promptTokens: 0, completionTokens: 0 };
   let buffer = "";
 
   const stream = new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
-        const { done, value } = await reader.read();
-        if (done) {
-          controller.close();
-          resolveCompletion({ text: fullText, usage, model });
-          return;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const payload = trimmed.slice(5).trim();
-          if (payload === "[DONE]") continue;
-
-          let chunk: {
-            choices?: Array<{ delta?: { content?: string } }>;
-            usage?: {
-              prompt_tokens?: number;
-              completion_tokens?: number;
-            } | null;
-          };
-          try {
-            chunk = JSON.parse(payload);
-          } catch {
-            continue; // skip malformed keep-alive/partial lines
+        /**
+         * Pump until something is actually enqueued (or upstream ends).
+         *
+         * A chunk can legitimately carry no content delta — a
+         * reasoning-only chunk, a usage-only chunk, an SSE keep-alive —
+         * and returning from `pull` without enqueueing anything stalls
+         * the stream: nothing asks for the next chunk, the consumer's
+         * read never settles, and the call dies at its timeout having
+         * collected nothing at all.
+         *
+         * That is not a rare edge case here. Every default model in this
+         * chain is a reasoning model, and those spend most of their
+         * chunks — often all of them — on `reasoning_content`. This is
+         * what made whole generations arrive as "returned nothing" and
+         * drop the build pipeline to its built-in scaffolds.
+         */
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) {
+            controller.close();
+            resolveCompletion({
+              text: fullText,
+              reasoning: reasoningText,
+              usage,
+              model,
+            });
+            return;
           }
 
-          const delta = chunk.choices?.[0]?.delta?.content;
-          if (delta) {
-            fullText += delta;
-            controller.enqueue(encoder.encode(delta));
-          }
-          if (chunk.usage) {
-            usage = {
-              promptTokens: chunk.usage.prompt_tokens ?? 0,
-              completionTokens: chunk.usage.completion_tokens ?? 0,
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          let enqueued = false;
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const payload = trimmed.slice(5).trim();
+            if (payload === "[DONE]") continue;
+
+            let chunk: {
+              choices?: Array<{
+                delta?: { content?: string; reasoning_content?: string };
+              }>;
+              usage?: {
+                prompt_tokens?: number;
+                completion_tokens?: number;
+              } | null;
             };
+            try {
+              chunk = JSON.parse(payload);
+            } catch {
+              continue; // skip malformed keep-alive/partial lines
+            }
+
+            const choice = chunk.choices?.[0]?.delta;
+            const delta = choice?.content;
+            if (delta) {
+              fullText += delta;
+              controller.enqueue(encoder.encode(delta));
+              enqueued = true;
+            }
+            // Collected but deliberately not streamed: the caller asked
+            // for an answer, not a transcript of the model thinking.
+            // Callers that would otherwise get nothing read it off
+            // `completion`.
+            if (choice?.reasoning_content) {
+              reasoningText += choice.reasoning_content;
+            }
+            if (chunk.usage) {
+              usage = {
+                promptTokens: chunk.usage.prompt_tokens ?? 0,
+                completionTokens: chunk.usage.completion_tokens ?? 0,
+              };
+            }
           }
+
+          if (enqueued) return;
         }
       } catch (error) {
         controller.error(error);
@@ -515,7 +563,12 @@ export async function streamChatCompletion(
     },
     cancel(reason) {
       void reader.cancel(reason);
-      resolveCompletion({ text: fullText, usage, model });
+      resolveCompletion({
+        text: fullText,
+        reasoning: reasoningText,
+        usage,
+        model,
+      });
     },
   });
 

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { announceConfigurationOnce, validateConfiguration } from "@/lib/config/validate";
 import { nvidiaApiKey, nvidiaBaseUrl } from "@/lib/ai/nvidia";
-import { resolvedModelPlan } from "@/lib/ai/models";
+import { resolvedModelPlan, resolvedOpenRouterPlan } from "@/lib/ai/models";
+import { isOpenRouterConfigured } from "@/lib/ai/openrouter";
 
 export const maxDuration = 30;
 
@@ -74,7 +75,10 @@ export async function GET() {
   }
 
   const latencyMs = Date.now() - startedAt;
-  const models = await resolvedModelPlan().catch(() => null);
+  const [models, openrouterModels] = await Promise.all([
+    resolvedModelPlan().catch(() => null),
+    resolvedOpenRouterPlan().catch(() => null),
+  ]);
 
   const status = reachable ? "healthy" : errorCategory === "rate_limited" ? "degraded" : "down";
 
@@ -88,6 +92,10 @@ export async function GET() {
       errorCategory,
       /** Model ids are not secrets; the variables that hold them are. */
       models,
+      /** Which OpenRouter model each task role resolves to right now. */
+      openrouter: isOpenRouterConfigured()
+        ? { configured: true, models: openrouterModels }
+        : { configured: false },
       config,
     },
     { status: reachable ? 200 : 503 }

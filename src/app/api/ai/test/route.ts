@@ -5,6 +5,12 @@ import {
   isNvidiaConfigured,
   NvidiaApiError,
 } from "@/lib/ai/nvidia";
+import {
+  createChatCompletion as createOpenRouterCompletion,
+  isOpenRouterConfigured,
+  openrouterStrongModel,
+  OpenRouterApiError,
+} from "@/lib/ai/openrouter";
 
 export const maxDuration = 60;
 
@@ -15,9 +21,40 @@ export const maxDuration = 60;
  * NVIDIA_API_KEY / base URL configuration in isolation.
  */
 export async function GET() {
+  // OpenRouter first, matching the provider chain — a green NVIDIA check
+  // would be misleading when OpenRouter is what actually serves calls.
+  if (isOpenRouterConfigured()) {
+    try {
+      const result = await createOpenRouterCompletion(
+        [{ role: "user", content: "Reply with the single word: pong" }],
+        { model: openrouterStrongModel(), maxTokens: 64, temperature: 0 }
+      );
+      return NextResponse.json({
+        connected: true,
+        provider: "openrouter",
+        message: "Connected to OpenRouter successfully",
+        model: result.model,
+        reply: result.text.trim().slice(0, 200),
+      });
+    } catch (error) {
+      const status = error instanceof OpenRouterApiError ? error.status : 500;
+      return NextResponse.json(
+        {
+          connected: false,
+          provider: "openrouter",
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        { status: status >= 500 ? 502 : status }
+      );
+    }
+  }
+
   if (!isNvidiaConfigured()) {
     return NextResponse.json(
-      { connected: false, error: "NVIDIA_API_KEY is not set" },
+      {
+        connected: false,
+        error: "Neither OPENROUTER_API_KEY nor NVIDIA_API_KEY is set",
+      },
       { status: 503 }
     );
   }
@@ -30,6 +67,7 @@ export async function GET() {
     );
     return NextResponse.json({
       connected: true,
+      provider: "nvidia",
       message: "Connected to NVIDIA successfully",
       model: result.model,
       reply: result.text.trim().slice(0, 200),

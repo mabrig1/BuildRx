@@ -359,8 +359,8 @@ describe("fallbackReason", () => {
     ["429 Too Many Requests", "the model was rate-limited"],
     ["rate limit exceeded", "the model was rate-limited"],
     ["404 model not found", "the configured model is unavailable"],
-    ["401 authentication failed", "the NVIDIA API key was rejected"],
-    ["Invalid api key", "the NVIDIA API key was rejected"],
+    ["401 authentication failed", "the provider rejected the API key"],
+    ["Invalid api key", "the provider rejected the API key"],
     ["something inexplicable", "the model call failed"],
   ])("classifies %j", (message, expected) => {
     expect(fallbackReason(new Error(message))).toBe(expected);
@@ -393,6 +393,7 @@ describe("diagnoseModelFailure", () => {
     ["429 Too Many Requests", "AI_RATE_LIMITED", true],
     ["404 model not found", "AI_MODEL_UNAVAILABLE", false],
     ["401 authentication failed", "AI_KEY_REJECTED", false],
+    ["402 credit balance is exhausted", "AI_NO_CREDIT", false],
     ["something nobody predicted", "AI_CALL_FAILED", true],
   ])("classifies %j as %s", (message, code, retryable) => {
     const failure = diagnoseModelFailure(new Error(message));

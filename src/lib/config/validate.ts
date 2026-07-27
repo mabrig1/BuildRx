@@ -9,6 +9,11 @@
  * name was being echoed into logs).
  */
 import { isNvidiaConfigured, nvidiaBaseUrl, rejectedModelVars } from "@/lib/ai/nvidia";
+import {
+  isOpenRouterConfigured,
+  openrouterModel,
+  openrouterStrongModel,
+} from "@/lib/ai/openrouter";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export type ConfigSeverity = "ok" | "warn" | "fail";
@@ -37,13 +42,27 @@ export function validateConfiguration(): ConfigReport {
   const checks: ConfigCheck[] = [];
 
   // --- AI provider ---------------------------------------------------
+  const openrouter = isOpenRouterConfigured();
+  checks.push({
+    key: "OPENROUTER_API_KEY",
+    status: openrouter ? "ok" : "warn",
+    detail: openrouter
+      ? `OpenRouter is the primary provider (${openrouterStrongModel()} / ${openrouterModel()}).`
+      : "No OpenRouter key — builds depend on the free NVIDIA tier, which may not answer within a step's time budget.",
+    action: openrouter
+      ? undefined
+      : "Set OPENROUTER_API_KEY (openrouter.ai/keys) for reliable generation.",
+  });
+
   const nvidiaKey = isNvidiaConfigured();
   checks.push({
     key: "NVIDIA_API_KEY",
-    status: nvidiaKey ? "ok" : "fail",
+    status: nvidiaKey ? "ok" : openrouter ? "warn" : "fail",
     detail: nvidiaKey
-      ? "AI provider key is present (server-side only)."
-      : "No AI provider key — every build falls back to mock output.",
+      ? "NVIDIA fallback key is present (server-side only)."
+      : openrouter
+        ? "No NVIDIA key — OpenRouter is serving every call, with no free fallback behind it."
+        : "No AI provider key — every build falls back to mock output.",
     action: nvidiaKey ? undefined : "Set NVIDIA_API_KEY (free at build.nvidia.com).",
   });
 
@@ -120,7 +139,8 @@ export function validateConfiguration(): ConfigReport {
       ? "warn"
       : "ok";
 
-  return { status, checks, canGenerate: nvidiaKey && baseUrlOk };
+  // Either provider alone is enough to generate for real.
+  return { status, checks, canGenerate: openrouter || (nvidiaKey && baseUrlOk) };
 }
 
 /**

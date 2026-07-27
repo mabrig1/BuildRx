@@ -1,17 +1,19 @@
 /**
  * Centralized AI provider selection.
  *
- * NVIDIA's Inference API (NIM) is the only provider used by default —
- * every tier of the chain is an NVIDIA model, so a build or a chat reply
- * never depends on a paid Anthropic balance. If one NVIDIA model is
- * unavailable (404 for a retired model id, a 429, a 5xx), the next
- * NVIDIA model is tried instead.
+ * Priority: OpenRouter (when OPENROUTER_API_KEY is set) → NVIDIA NIM →
+ * Anthropic (opt-in only). Each tier falls through to the next on
+ * failure, so no single provider outage stops a build.
  *
- * Priority: nvidia-primary (GLM, or the caller's role-specialized
- * model) → nvidia-fast (Step) → nvidia-lite (Llama). The tiers are named
- * for their role rather than their model, since the model behind each is
- * env-configurable — the concrete one used is always reported alongside
- * the tier (the `X-Model` header, usage records, build logs).
+ * OpenRouter leads because the free NVIDIA tier, in practice, did not
+ * return anything inside a build step's budget — every generated app
+ * came back as a built-in scaffold. NVIDIA remains in the chain as a
+ * no-cost fallback rather than being removed.
+ *
+ * The tiers are named for their role rather than their model, since the
+ * model behind each is env-configurable — the concrete one used is
+ * always reported alongside the tier (the `X-Model` header, usage
+ * records, build logs).
  *
  * Anthropic Claude is opt-in and OFF unless `ANTHROPIC_ENABLED=true` is
  * set alongside a funded `ANTHROPIC_API_KEY`. Merely having the key in
@@ -33,20 +35,46 @@ import {
   streamChatCompletion,
   type NvidiaMessage,
 } from "@/lib/ai/nvidia";
+import {
+  isOpenRouterConfigured,
+  openrouterModel,
+  openrouterStrongModel,
+  streamChatCompletion as streamOpenRouter,
+} from "@/lib/ai/openrouter";
 
 export type ProviderName =
+  | "openrouter-primary"
+  | "openrouter-fast"
   | "nvidia-primary"
   | "nvidia-fast"
   | "nvidia-lite"
   | "anthropic";
 
+/**
+ * The OpenRouter tiers, attempted before NVIDIA when configured.
+ *
+ * Order is deliberate: OpenRouter is a paid, multi-vendor endpoint that
+ * answers reliably, whereas the free NVIDIA tier repeatedly failed to
+ * return anything inside a build step's budget — which is what left
+ * every generated app as a built-in scaffold. NVIDIA stays in the chain
+ * behind it as a no-cost fallback.
+ */
+const OPENROUTER_PROVIDERS = ["openrouter-primary", "openrouter-fast"] as const;
+
 /** The NVIDIA tiers, in the order they are attempted. */
 const NVIDIA_PROVIDERS = ["nvidia-primary", "nvidia-fast", "nvidia-lite"] as const;
 
 type NvidiaProviderName = (typeof NVIDIA_PROVIDERS)[number];
+type OpenRouterProviderName = (typeof OPENROUTER_PROVIDERS)[number];
 
 function isNvidiaProvider(provider: ProviderName): provider is NvidiaProviderName {
   return (NVIDIA_PROVIDERS as readonly string[]).includes(provider);
+}
+
+function isOpenRouterProvider(
+  provider: ProviderName
+): provider is OpenRouterProviderName {
+  return (OPENROUTER_PROVIDERS as readonly string[]).includes(provider);
 }
 
 export interface ProviderMessage {
@@ -90,6 +118,13 @@ export interface ProviderCallOptions {
    * capable generalist before dropping to the lite tier.
    */
   nvidiaFallbackModel?: string;
+  /**
+   * Overrides the model used for the primary OpenRouter tier. Callers
+   * that know the shape of the work (planning and code generation want
+   * the stronger model; review and diagnostics do not) set this; anything
+   * unset uses the configured defaults.
+   */
+  openrouterModel?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 90_000;
@@ -109,6 +144,7 @@ function isAnthropicEnabled(): boolean {
 /** Providers usable right now, in priority order. */
 export function availableProviders(): ProviderName[] {
   const providers: ProviderName[] = [];
+  if (isOpenRouterConfigured()) providers.push(...OPENROUTER_PROVIDERS);
   if (isNvidiaConfigured()) providers.push(...NVIDIA_PROVIDERS);
   if (isAnthropicEnabled()) providers.push("anthropic");
   return providers;
@@ -133,6 +169,16 @@ function nvidiaModelFor(
   }
 }
 
+/** The concrete model each OpenRouter tier resolves to for this call. */
+function openrouterModelFor(
+  provider: OpenRouterProviderName,
+  options: ProviderCallOptions
+): string {
+  return provider === "openrouter-primary"
+    ? (options.openrouterModel ?? openrouterStrongModel())
+    : openrouterModel();
+}
+
 interface Attempt {
   provider: ProviderName;
   /** Empty for Anthropic — resolved separately from `anthropicModel`. */
@@ -150,6 +196,13 @@ function plannedAttempts(options: ProviderCallOptions): Attempt[] {
   const seenModels = new Set<string>();
 
   for (const provider of availableProviders()) {
+    if (isOpenRouterProvider(provider)) {
+      const model = openrouterModelFor(provider, options);
+      if (seenModels.has(model)) continue;
+      seenModels.add(model);
+      attempts.push({ provider, model });
+      continue;
+    }
     if (isNvidiaProvider(provider)) {
       const model = nvidiaModelFor(provider, options);
       if (seenModels.has(model)) continue;
@@ -178,31 +231,24 @@ const MIN_ATTEMPT_MS = 25_000;
 /**
  * The budget for the next attempt.
  *
- * The first tier gets the *whole* remaining budget rather than a share
- * of it. Reserving time for later tiers only pays off when failures are
- * fast (a 404 for a retired model, a 401), and those cost no time at
- * all — they return immediately and leave the budget intact for the
- * next tier. The expensive failure is a slow model, and holding time
- * back from the first attempt is precisely what turns "slow" into
- * "failed".
- */
-function attemptBudgetMs(deadlineAt: number): number {
-  return Math.floor(deadlineAt - Date.now());
-}
-
-/**
- * Whether a failure leaves any point trying another model.
+ * The first tier used to get the *whole* remaining budget, on the theory
+ * that failures are fast (a 404, a 401) and so cost the later tiers
+ * nothing. The expensive failure turned out to be the common one: a
+ * model that never answers consumed the entire step, every later tier
+ * was skipped for having under MIN_ATTEMPT_MS left, and the build fell
+ * back to a scaffold having genuinely tried exactly one model.
  *
- * A timeout means this endpoint is slower than the budget allows;
- * another model on the same endpoint will be too. Falling back to the
- * caller's scaffold immediately beats burning the rest of the step on a
- * second and third model that cannot answer any faster either.
+ * Halving rather than dividing evenly keeps the first tier — the best
+ * model for the job — with the largest single share, while guaranteeing
+ * the next one an actual turn.
  */
-function isTimeoutFailure(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /timeout|timed out|aborted|returned nothing|ran out of time|no response within/i.test(
-    message
-  );
+function attemptBudgetMs(deadlineAt: number, attemptsLeft: number): number {
+  const remaining = Math.floor(deadlineAt - Date.now());
+  if (attemptsLeft <= 1) return remaining;
+  // Never hand out more than is actually left: an inflated budget makes
+  // the caller's "not enough time to start" guard unreachable, so a
+  // spent step would still open an attempt it cannot finish.
+  return Math.min(remaining, Math.max(MIN_ATTEMPT_MS, Math.floor(remaining / 2)));
 }
 
 function noProviderError(): Error {
@@ -229,13 +275,25 @@ function safeModelName(model: string): string {
  * logs point at the real cause (bad key vs. retired model id) instead of
  * whichever error happened to be last.
  */
-function allFailedError(attempts: Attempt[], lastError: unknown): Error {
-  const tried = attempts
-    .map((a) => (a.model ? `${a.provider} (${safeModelName(a.model)})` : a.provider))
-    .join(", ");
+/**
+ * Reports the models that were *actually called*, each with its own
+ * error — not the models that were merely planned.
+ *
+ * Listing the plan made the log actively misleading: a first tier that
+ * consumed the whole budget left the others unreachable, yet the message
+ * still read "Tried: …, nvidia-lite (llama-3.2-1b)", which invited the
+ * conclusion that even a 1B model could not answer. It had never been
+ * asked.
+ */
+function allFailedError(tried: string[], lastError: unknown): Error {
   const detail =
     lastError instanceof Error ? lastError.message : String(lastError ?? "unknown error");
-  return new Error(`All AI providers failed. Tried: ${tried}. Last error: ${detail}`);
+  if (tried.length === 0) {
+    return new Error(
+      `No model could be called before the step's time ran out. Last error: ${detail}`
+    );
+  }
+  return new Error(`All AI providers failed. Tried ${tried.length}: ${tried.join(" | ")}`);
 }
 
 function toNvidiaMessages(messages: ProviderMessage[]): NvidiaMessage[] {
@@ -257,17 +315,20 @@ function toNvidiaMessages(messages: ProviderMessage[]): NvidiaMessage[] {
  */
 async function collectStreamed(
   messages: ProviderMessage[],
-  nvidiaOptions: {
+  callOptions: {
     model: string;
     maxTokens?: number;
     temperature?: number;
     timeoutMs: number;
+    /** Which upstream to stream from. Both speak the OpenAI wire format. */
+    via?: "nvidia" | "openrouter";
   }
 ): Promise<{ text: string; model: string; usage: ProviderUsage; truncated: boolean }> {
-  const { stream, completion, model } = await streamChatCompletion(
-    toNvidiaMessages(messages),
-    nvidiaOptions
-  );
+  const { via, ...upstreamOptions } = callOptions;
+  const { stream, completion, model } =
+    via === "openrouter"
+      ? await streamOpenRouter(messages, upstreamOptions)
+      : await streamChatCompletion(toNvidiaMessages(messages), upstreamOptions);
   // The completion promise is the streaming API's own bookkeeping; we
   // read the stream directly, so its rejection must be swallowed at the
   // moment it is created. Attaching the handler in two steps
@@ -287,13 +348,13 @@ async function collectStreamed(
 
   const reader = stream.getReader();
   const decoder = new TextDecoder();
-  const deadlineAt = Date.now() + nvidiaOptions.timeoutMs;
+  const deadlineAt = Date.now() + callOptions.timeoutMs;
 
   let text = "";
   let truncated = false;
   let expiry: ReturnType<typeof setTimeout> | undefined;
   const expired = new Promise<"expired">((resolve) => {
-    expiry = setTimeout(() => resolve("expired"), nvidiaOptions.timeoutMs);
+    expiry = setTimeout(() => resolve("expired"), callOptions.timeoutMs);
   });
 
   try {
@@ -400,28 +461,41 @@ export async function completeText(
 
   const deadlineAt = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let lastError: unknown;
+  const tried: string[] = [];
   for (const [index, attempt] of attempts.entries()) {
-    const budgetMs = attemptBudgetMs(deadlineAt);
-    if (budgetMs < MIN_ATTEMPT_MS && index > 0) {
+    const budgetMs = attemptBudgetMs(deadlineAt, attempts.length - index);
+    // No time at all stops even the first attempt: opening a request
+    // against a spent budget only produces a misleading timeout.
+    if (budgetMs <= 0 || (budgetMs < MIN_ATTEMPT_MS && index > 0)) {
       lastError ??= new Error("Ran out of time before any model could answer.");
       break;
     }
+    const label = attempt.model
+      ? `${attempt.provider} (${safeModelName(attempt.model)})`
+      : attempt.provider;
     try {
       return await completeWithProvider(attempt, messages, {
         ...options,
         timeoutMs: budgetMs,
       });
     } catch (error) {
-      console.error(
-        `AI provider ${attempt.provider}${attempt.model ? ` (${safeModelName(attempt.model)})` : ""} failed:`,
-        error instanceof Error ? error.message : error
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`AI provider ${label} failed:`, message);
+      tried.push(`${label}: ${message}`);
       lastError = error;
-      // A slow endpoint won't get faster for the next model on it.
-      if (isTimeoutFailure(error)) break;
+      /**
+       * Deliberately no early exit on a timeout.
+       *
+       * This used to break out of the chain, reasoning that a slow
+       * endpoint would be slow for every model on it. A single build
+       * disproved that: qwen2.5-coder-32b answered for the UI and
+       * database steps while gpt-oss-20b timed out for the planner —
+       * same endpoint, same key, same minute. Slowness is a property of
+       * the model, so the next tier is worth its turn.
+       */
     }
   }
-  throw allFailedError(attempts, lastError);
+  throw allFailedError(tried, lastError);
 }
 
 async function completeWithProvider(
@@ -430,6 +504,21 @@ async function completeWithProvider(
   options: ProviderCallOptions
 ): Promise<CompletionResult> {
   const { provider } = attempt;
+  if (isOpenRouterProvider(provider)) {
+    const result = await collectStreamed(messages, {
+      model: attempt.model,
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+      timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      via: "openrouter",
+    });
+    if (result.text.trim().length === 0) {
+      throw new Error(
+        `${safeModelName(attempt.model)} returned nothing within ${Math.round((options.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000)}s.`
+      );
+    }
+    return { text: result.text, provider, model: result.model, usage: result.usage };
+  }
   if (isNvidiaProvider(provider)) {
     const result = await collectStreamed(messages, {
       model: attempt.model,
@@ -524,14 +613,43 @@ export async function streamText(
 
   const deadlineAt = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let lastError: unknown;
+  const tried: string[] = [];
   for (const [index, attempt] of attempts.entries()) {
-    const budgetMs = attemptBudgetMs(deadlineAt);
-    if (budgetMs < MIN_ATTEMPT_MS && index > 0) {
+    const budgetMs = attemptBudgetMs(deadlineAt, attempts.length - index);
+    // No time at all stops even the first attempt: opening a request
+    // against a spent budget only produces a misleading timeout.
+    if (budgetMs <= 0 || (budgetMs < MIN_ATTEMPT_MS && index > 0)) {
       lastError ??= new Error("Ran out of time before any model could answer.");
       break;
     }
+    const label = attempt.model
+      ? `${attempt.provider} (${safeModelName(attempt.model)})`
+      : attempt.provider;
     try {
       const { provider } = attempt;
+      if (isOpenRouterProvider(provider)) {
+        const {
+          stream,
+          completion,
+          model: resolvedModel,
+        } = await streamOpenRouter(messages, {
+          model: attempt.model,
+          maxTokens: options.maxTokens,
+          temperature: options.temperature,
+          timeoutMs: deadlineAt - Date.now(),
+        });
+        return {
+          stream,
+          provider,
+          model: resolvedModel,
+          completion: completion.then((result) => ({
+            text: result.text,
+            provider,
+            model: result.model,
+            usage: result.usage,
+          })),
+        };
+      }
       if (isNvidiaProvider(provider)) {
         const { stream, completion, model: resolvedModel } = await streamChatCompletion(
           toNvidiaMessages(messages),
@@ -559,16 +677,15 @@ export async function streamText(
       }
       return streamAnthropic(messages, { ...options, timeoutMs: budgetMs });
     } catch (error) {
-      console.error(
-        `AI provider ${attempt.provider}${attempt.model ? ` (${safeModelName(attempt.model)})` : ""} failed:`,
-        error instanceof Error ? error.message : error
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`AI provider ${label} failed:`, message);
+      tried.push(`${label}: ${message}`);
       lastError = error;
-      // A slow endpoint won't get faster for the next model on it.
-      if (isTimeoutFailure(error)) break;
+      // No early exit on a timeout — see completeText: slowness is a
+      // property of the model, not of the endpoint.
     }
   }
-  throw allFailedError(attempts, lastError);
+  throw allFailedError(tried, lastError);
 }
 
 function streamAnthropic(

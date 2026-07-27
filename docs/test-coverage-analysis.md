@@ -1,6 +1,7 @@
 # Test coverage analysis
 
-_Baseline as of `fa56e89`._
+_Baseline as of `fa56e89`. Progress against the plan is tracked in
+[Status](#status) at the end._
 
 ## Where we stand
 
@@ -315,3 +316,69 @@ Steps 1–5 are pure-function tests with no infrastructure. They would also have
 caught the two concrete defects this analysis turned up (cross-user invoice
 leakage, non-idempotent subscription renewal), which is the argument for
 starting there.
+
+---
+
+## Status
+
+Steps 1–5 are done: **325 tests across 11 files**, all passing, with `npm run
+lint`, `npm run typecheck`, and `npm test` wired into `.github/workflows/ci.yml`.
+
+Overall statement coverage of `src/lib` is 18.96%, which is the honest headline
+— but it is concentrated where it was meant to be:
+
+| Module | Stmts | What it covers |
+| --- | --- | --- |
+| `rate-limit.ts` | 100% | sliding window, headers, stale-key cleanup |
+| `health/retry.ts` | 98% | retry/backoff, timeout, circuit breaker |
+| `agents/llm.ts` | 89% | path guard, file blocks, JSON repair, budgets |
+| `agents/checks.ts` | high | full static-check suite via golden fixtures |
+| `config/validate.ts` | high | env → report, severity rollup, no value leaks |
+| `files/manager.ts` | 61% | tree building, demo filesystem, path guards |
+| `billing/providers.ts` | 39% | both signature verifiers (the network calls are untested) |
+
+The remaining 80% is the deliberately-deferred tier: agents that call a model,
+Supabase-backed code paths, health checks, and React components. Getting those
+up needs mocks or infrastructure, not more of the same.
+
+### Defects found while writing the tests
+
+Three now have pinned "known gaps" test blocks rather than being invisible:
+
+1. **Neither payment webhook validates the amount** against the Pro plan price,
+   and both default a missing amount to `0`. Only reachable with a valid
+   signature, so it is a correctness gap, not an open door.
+2. **Both webhooks synthesise a reference** (`ps_${Date.now()}` /
+   `flw_${Date.now()}`) when the provider omits one. A synthesised reference is
+   unique per call, which defeats the reference-keyed idempotency on the
+   invoice insert downstream.
+3. **`rateLimit`'s cleanup pass evicts across limiters.** The sweep judges every
+   key in the shared module-level map against *the current call's* `windowMs`.
+   All call sites use 60s today so it is benign; the first limiter added with a
+   longer window will silently have its live entries erased. Fix when it
+   matters: store `windowMs` per entry and evict against the entry's own window.
+
+The two billing defects named earlier in this document — cross-user invoice
+leakage in `getBillingSummary`, and `activateProSubscription` re-extending
+`current_period_end` on replay — are **not yet fixed and not yet covered**.
+Both need a Supabase client mock, and both change money-handling behaviour, so
+they are called out here rather than changed as a side effect of adding tests.
+
+### Corrections to the analysis above
+
+Two assumptions in the original write-up turned out to be wrong, and the tests
+record the real behaviour:
+
+- The rate-limit window is **exclusive at its lower bound** (`t > now -
+  windowMs`), so an entry exactly `windowMs` old has already left the window.
+- `buildFileTree` orders files with `localeCompare`, which is case-insensitive
+  — `package.json` sorts before `README.md`, not the other way round.
+
+### Next
+
+6. RLS integration suite (unchanged — still the highest-value remaining item).
+7. One Playwright smoke path.
+
+Plus, in the same tier as the above: `authorizeAiRequest` and `requireAdmin`
+(both need a Supabase mock), and `middleware.ts`'s `hostRedirect` state machine
+(needs `NextRequest` fixtures).

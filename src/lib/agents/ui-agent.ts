@@ -12,13 +12,34 @@ import {
 } from "@/lib/agents/llm";
 import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
 
-const SYSTEM = `You are the UI Agent in an automated app-building pipeline. Given a build plan, you generate the visual layer.
+/**
+ * Two prompts, run as two concurrent calls, because one call could not
+ * do both jobs.
+ *
+ * The prototype is a single large file; the pages are many small ones.
+ * Asked for together — with the prototype first — the prototype consumed
+ * the entire token ceiling and was cut off mid-file, so a build emitted
+ * one truncated preview and scaffolded all eleven pages behind it.
+ * Splitting gives each job its own ceiling and its own truncation
+ * boundary, and running them concurrently means neither loses wall-clock
+ * time to the other.
+ */
+const PREVIEW_SYSTEM = `You are the UI Agent in an automated app-building pipeline. Your ONLY job in this call is to produce "preview/index.html".
+
+It must be a SELF-CONTAINED, WORKING PROTOTYPE of the app, not a landing page. Show the app's primary interface (the dashboard, table, editor, upload form or analysis view the app is actually for), seeded with 3-5 realistic sample records, and make it RESPOND to interaction: inline <script> so buttons, forms, filters, tabs and controls work against in-memory data. Inline <style> and <script> only — no external stylesheets, fonts, scripts, or images. Modern, polished, responsive. Include a nav linking the plan's pages.
+
+Emit exactly ONE file block and nothing else. Budget it: finish the whole page rather than perfecting any one section, and stay under ~400 lines.
+
+${FILE_FORMAT_INSTRUCTIONS}`;
+
+const PAGES_SYSTEM = `You are the UI Agent in an automated app-building pipeline. Given a build plan, you generate the application's page layer.
 
 Requirements:
-1. FIRST generate "preview/index.html" — a SELF-CONTAINED, WORKING PROTOTYPE of the app, not a landing page. It must show the app's primary interface (the board, list, dashboard, editor or form the app is actually for), seeded with 3-5 realistic sample records, and it must RESPOND to interaction: inline <script> so buttons, forms, filters, checkboxes and tabs actually work against in-memory data. Inline <style> and <script> only — no external stylesheets, fonts, scripts, or images. Modern, polished, responsive. Include a nav linking the plan's pages.
-2. Generate EVERY page from the plan as a Next.js App Router page (TypeScript, Tailwind classes): "/" → "src/app/page.tsx", "/about" → "src/app/about/page.tsx", etc.
-3. Generate EVERY component from the plan under "src/components" (kebab-case filenames).
-4. Generate "src/app/globals.css" with Tailwind directives and any custom design tokens the app needs.
+1. Generate EVERY page from the plan as a Next.js App Router page (TypeScript, Tailwind classes): "/" → "src/app/page.tsx", "/about" → "src/app/about/page.tsx", etc.
+2. Generate EVERY component from the plan under "src/components" (kebab-case filenames).
+3. Generate "src/app/globals.css" with Tailwind directives and any custom design tokens the app needs.
+
+Do NOT generate "preview/index.html" — another call is producing it.
 
 You are on a strict time budget: keep every file focused and under ~120 lines, emit no commentary between blocks, and finish the whole set rather than perfecting any one file.
 
@@ -236,7 +257,7 @@ export const uiAgent: Agent = {
     });
     const plan = context.plan!;
 
-    let generated: GeneratedFile[] = [];
+    const generated: GeneratedFile[] = [];
     let note = "";
     if (!canCallModel(context)) {
       const reason = outOfTimeNote(context);
@@ -255,33 +276,47 @@ export const uiAgent: Agent = {
         );
       } else await pause(900);
     } else {
-      try {
-        const text = await runAgentCompletion({
-          system: SYSTEM,
-          // This step emits many whole files at once; the default
-          // ceiling truncates it mid-file, and a truncated block used to
-          // discard the entire response.
+      const prompt = `Build plan:\n${JSON.stringify(plan, null, 2)}${context.architecture ? `\n\nArchitecture (follow these paths and conventions):\n${context.architecture}` : ""}\n\nOriginal request: ${context.prompt}`;
+      const timeoutMs = stepBudgetMs(context);
+
+      // Concurrent, not sequential: both jobs then get the step's whole
+      // slice instead of half of it, and one failing leaves the other's
+      // files intact.
+      const [preview, pages] = await Promise.allSettled([
+        runAgentCompletion({
+          system: PREVIEW_SYSTEM,
           maxTokens: 16000,
-          prompt: `Build plan:\n${JSON.stringify(plan, null, 2)}${context.architecture ? `\n\nArchitecture (follow these paths and conventions):\n${context.architecture}` : ""}\n\nOriginal request: ${context.prompt}`,
+          prompt,
           role: "codegen",
-          timeoutMs: stepBudgetMs(context),
-        });
-        generated = parseFileBlocks(text);
-        if (generated.length === 0) {
-          const failure = emptyOutputFailure(
-            "The model's response contained no ===FILE:…===/===END=== blocks, so no page could be read out of it."
-          );
-          note = ` — ${failure.summary}, so the built-in scaffold was used`;
-          emit(
-            degradedEvent(
-              "ui",
-              "Your pages are the built-in scaffold, not generated from your description.",
-              failure
-            )
-          );
+          timeoutMs,
+        }),
+        runAgentCompletion({
+          system: PAGES_SYSTEM,
+          maxTokens: 16000,
+          prompt,
+          role: "codegen",
+          timeoutMs,
+        }),
+      ]);
+
+      for (const outcome of [preview, pages]) {
+        if (outcome.status === "fulfilled") {
+          generated.push(...parseFileBlocks(outcome.value));
         }
-      } catch (error) {
-        const failure = diagnoseModelFailure(error);
+      }
+
+      if (generated.length === 0) {
+        // Both halves came back empty. Report the real error when there
+        // was one; otherwise this is a model that answered without
+        // following the format.
+        const rejected = [preview, pages].find(
+          (outcome) => outcome.status === "rejected"
+        ) as PromiseRejectedResult | undefined;
+        const failure = rejected
+          ? diagnoseModelFailure(rejected.reason)
+          : emptyOutputFailure(
+              "Neither the prototype nor the pages call produced a ===FILE:…===/===END=== block."
+            );
         note = ` — ${failure.summary}, so the built-in scaffold was used`;
         emit(
           degradedEvent(

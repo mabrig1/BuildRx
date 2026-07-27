@@ -67,9 +67,15 @@ export async function GET(
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       // Generated content: keep it sandboxed away from the app origin.
+      //
+      // Framing is restricted with frame-ancestors, NOT X-Frame-Options.
+      // next.config.ts already applies X-Frame-Options to every route; a
+      // second one here made the browser see "SAMEORIGIN, SAMEORIGIN",
+      // which is not a valid X-Frame-Options value, so Chromium fell
+      // back to DENY and blocked the workspace's own preview iframe
+      // (ERR_BLOCKED_BY_RESPONSE) even though it is same-origin.
       "Content-Security-Policy":
-        "default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'",
-      "X-Frame-Options": "SAMEORIGIN",
+        "default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'; frame-ancestors 'self'",
       // Owner-scoped content — never let shared caches store it.
       "Cache-Control": "private, no-store",
     },

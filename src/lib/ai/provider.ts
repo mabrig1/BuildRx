@@ -178,31 +178,24 @@ const MIN_ATTEMPT_MS = 25_000;
 /**
  * The budget for the next attempt.
  *
- * The first tier gets the *whole* remaining budget rather than a share
- * of it. Reserving time for later tiers only pays off when failures are
- * fast (a 404 for a retired model, a 401), and those cost no time at
- * all — they return immediately and leave the budget intact for the
- * next tier. The expensive failure is a slow model, and holding time
- * back from the first attempt is precisely what turns "slow" into
- * "failed".
- */
-function attemptBudgetMs(deadlineAt: number): number {
-  return Math.floor(deadlineAt - Date.now());
-}
-
-/**
- * Whether a failure leaves any point trying another model.
+ * The first tier used to get the *whole* remaining budget, on the theory
+ * that failures are fast (a 404, a 401) and so cost the later tiers
+ * nothing. The expensive failure turned out to be the common one: a
+ * model that never answers consumed the entire step, every later tier
+ * was skipped for having under MIN_ATTEMPT_MS left, and the build fell
+ * back to a scaffold having genuinely tried exactly one model.
  *
- * A timeout means this endpoint is slower than the budget allows;
- * another model on the same endpoint will be too. Falling back to the
- * caller's scaffold immediately beats burning the rest of the step on a
- * second and third model that cannot answer any faster either.
+ * Halving rather than dividing evenly keeps the first tier — the best
+ * model for the job — with the largest single share, while guaranteeing
+ * the next one an actual turn.
  */
-function isTimeoutFailure(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /timeout|timed out|aborted|returned nothing|ran out of time|no response within/i.test(
-    message
-  );
+function attemptBudgetMs(deadlineAt: number, attemptsLeft: number): number {
+  const remaining = Math.floor(deadlineAt - Date.now());
+  if (attemptsLeft <= 1) return remaining;
+  // Never hand out more than is actually left: an inflated budget makes
+  // the caller's "not enough time to start" guard unreachable, so a
+  // spent step would still open an attempt it cannot finish.
+  return Math.min(remaining, Math.max(MIN_ATTEMPT_MS, Math.floor(remaining / 2)));
 }
 
 function noProviderError(): Error {
@@ -229,13 +222,25 @@ function safeModelName(model: string): string {
  * logs point at the real cause (bad key vs. retired model id) instead of
  * whichever error happened to be last.
  */
-function allFailedError(attempts: Attempt[], lastError: unknown): Error {
-  const tried = attempts
-    .map((a) => (a.model ? `${a.provider} (${safeModelName(a.model)})` : a.provider))
-    .join(", ");
+/**
+ * Reports the models that were *actually called*, each with its own
+ * error — not the models that were merely planned.
+ *
+ * Listing the plan made the log actively misleading: a first tier that
+ * consumed the whole budget left the others unreachable, yet the message
+ * still read "Tried: …, nvidia-lite (llama-3.2-1b)", which invited the
+ * conclusion that even a 1B model could not answer. It had never been
+ * asked.
+ */
+function allFailedError(tried: string[], lastError: unknown): Error {
   const detail =
     lastError instanceof Error ? lastError.message : String(lastError ?? "unknown error");
-  return new Error(`All AI providers failed. Tried: ${tried}. Last error: ${detail}`);
+  if (tried.length === 0) {
+    return new Error(
+      `No model could be called before the step's time ran out. Last error: ${detail}`
+    );
+  }
+  return new Error(`All AI providers failed. Tried ${tried.length}: ${tried.join(" | ")}`);
 }
 
 function toNvidiaMessages(messages: ProviderMessage[]): NvidiaMessage[] {
@@ -400,28 +405,41 @@ export async function completeText(
 
   const deadlineAt = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let lastError: unknown;
+  const tried: string[] = [];
   for (const [index, attempt] of attempts.entries()) {
-    const budgetMs = attemptBudgetMs(deadlineAt);
-    if (budgetMs < MIN_ATTEMPT_MS && index > 0) {
+    const budgetMs = attemptBudgetMs(deadlineAt, attempts.length - index);
+    // No time at all stops even the first attempt: opening a request
+    // against a spent budget only produces a misleading timeout.
+    if (budgetMs <= 0 || (budgetMs < MIN_ATTEMPT_MS && index > 0)) {
       lastError ??= new Error("Ran out of time before any model could answer.");
       break;
     }
+    const label = attempt.model
+      ? `${attempt.provider} (${safeModelName(attempt.model)})`
+      : attempt.provider;
     try {
       return await completeWithProvider(attempt, messages, {
         ...options,
         timeoutMs: budgetMs,
       });
     } catch (error) {
-      console.error(
-        `AI provider ${attempt.provider}${attempt.model ? ` (${safeModelName(attempt.model)})` : ""} failed:`,
-        error instanceof Error ? error.message : error
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`AI provider ${label} failed:`, message);
+      tried.push(`${label}: ${message}`);
       lastError = error;
-      // A slow endpoint won't get faster for the next model on it.
-      if (isTimeoutFailure(error)) break;
+      /**
+       * Deliberately no early exit on a timeout.
+       *
+       * This used to break out of the chain, reasoning that a slow
+       * endpoint would be slow for every model on it. A single build
+       * disproved that: qwen2.5-coder-32b answered for the UI and
+       * database steps while gpt-oss-20b timed out for the planner —
+       * same endpoint, same key, same minute. Slowness is a property of
+       * the model, so the next tier is worth its turn.
+       */
     }
   }
-  throw allFailedError(attempts, lastError);
+  throw allFailedError(tried, lastError);
 }
 
 async function completeWithProvider(
@@ -524,12 +542,18 @@ export async function streamText(
 
   const deadlineAt = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let lastError: unknown;
+  const tried: string[] = [];
   for (const [index, attempt] of attempts.entries()) {
-    const budgetMs = attemptBudgetMs(deadlineAt);
-    if (budgetMs < MIN_ATTEMPT_MS && index > 0) {
+    const budgetMs = attemptBudgetMs(deadlineAt, attempts.length - index);
+    // No time at all stops even the first attempt: opening a request
+    // against a spent budget only produces a misleading timeout.
+    if (budgetMs <= 0 || (budgetMs < MIN_ATTEMPT_MS && index > 0)) {
       lastError ??= new Error("Ran out of time before any model could answer.");
       break;
     }
+    const label = attempt.model
+      ? `${attempt.provider} (${safeModelName(attempt.model)})`
+      : attempt.provider;
     try {
       const { provider } = attempt;
       if (isNvidiaProvider(provider)) {
@@ -559,16 +583,15 @@ export async function streamText(
       }
       return streamAnthropic(messages, { ...options, timeoutMs: budgetMs });
     } catch (error) {
-      console.error(
-        `AI provider ${attempt.provider}${attempt.model ? ` (${safeModelName(attempt.model)})` : ""} failed:`,
-        error instanceof Error ? error.message : error
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`AI provider ${label} failed:`, message);
+      tried.push(`${label}: ${message}`);
       lastError = error;
-      // A slow endpoint won't get faster for the next model on it.
-      if (isTimeoutFailure(error)) break;
+      // No early exit on a timeout — see completeText: slowness is a
+      // property of the model, not of the endpoint.
     }
   }
-  throw allFailedError(attempts, lastError);
+  throw allFailedError(tried, lastError);
 }
 
 function streamAnthropic(

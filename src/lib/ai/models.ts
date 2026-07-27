@@ -84,42 +84,53 @@ export function generalFallbackModel(): string {
 }
 
 /**
- * Preferred models per role, strongest first.
+ * Preferred models per role, best-that-actually-answers first.
  *
  * These are candidates, not commitments: at call time the list is
  * filtered against the models this deployment's key can actually call
  * (see `resolveModelForRole`), so an id that is retired, renamed, or
  * simply not available on this account is skipped rather than 404ing.
- * That is what makes it safe to name more models than any one account
- * is guaranteed to have — the ladder gets stronger as the catalog does,
- * and never weaker than the built-in defaults at the end of each list.
  *
- * Ordering rationale: reasoning-grade models lead the roles that plan
- * and write application code; small fast models lead the roles that
- * review, diagnose, and classify, where latency matters more than depth
- * and every step shares one time budget.
+ * Ordering rationale — and it is not "biggest first", which is what this
+ * used to be. On the free NVIDIA tier the very large models do not
+ * return inside a pipeline step's slice at all. One build made the
+ * pattern unambiguous:
+ *
+ *   planner  (deep-reasoning) -> gpt-oss-120b   (120B)  no response in 39s
+ *   coding   (primary-coding) -> qwen3-next-80b ( 80B)  no response
+ *   ui       (codegen)        -> qwen2.5-coder  ( 32B)  succeeded
+ *   database (codegen)        -> qwen2.5-coder  ( 32B)  succeeded
+ *
+ * Leading with a model that cannot answer is worse than merely slow:
+ * `completeText` breaks its fallback chain on a timeout (a slow endpoint
+ * will not be faster for the next model on it), so the giant model at
+ * the front of the list stopped the working 32B one behind it from ever
+ * being tried. The mid-size models lead now, and the large ones stay as
+ * later rungs for deployments whose tier can actually serve them.
  */
 export const MODEL_CANDIDATES: Record<ModelRole, readonly string[]> = {
   "deep-reasoning": [
-    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
     "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    "mistralai/ministral-14b-instruct-2512",
+    "openai/gpt-oss-120b",
     "qwen/qwen3-next-80b-a3b-instruct",
-    "deepseek-ai/deepseek-r1",
     "z-ai/glm-5.2",
   ],
   "primary-coding": [
+    "qwen/qwen2.5-coder-32b-instruct",
+    "openai/gpt-oss-20b",
+    "poolside/laguna-xs-2.1",
+    "nvidia/llama-3.3-nemotron-super-49b-v1.5",
     "qwen/qwen3-next-80b-a3b-instruct",
     "openai/gpt-oss-120b",
-    "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-    "qwen/qwen2.5-coder-32b-instruct",
-    "poolside/laguna-xs-2.1",
   ],
   codegen: [
     "qwen/qwen2.5-coder-32b-instruct",
     "mistralai/ministral-14b-instruct-2512",
-    "qwen/qwen3-next-80b-a3b-instruct",
     "openai/gpt-oss-20b",
     "poolside/laguna-xs-2.1",
+    "qwen/qwen3-next-80b-a3b-instruct",
   ],
   diagnostics: [
     "openai/gpt-oss-20b",
@@ -137,11 +148,53 @@ export const MODEL_CANDIDATES: Record<ModelRole, readonly string[]> = {
 
 /** General-purpose models for the chain's second tier, strongest first. */
 const GENERAL_CANDIDATES: readonly string[] = [
-  "nvidia/llama-3.3-nemotron-super-49b-v1.5",
   "mistralai/ministral-14b-instruct-2512",
   "openai/gpt-oss-20b",
+  "nvidia/llama-3.3-nemotron-super-49b-v1.5",
   "stepfun-ai/step-3.7-flash",
 ];
+
+/**
+ * Small models that reliably start answering quickly, strongest first.
+ *
+ * The candidate ladders above rank by capability, which is the right
+ * answer only when there is time to collect it. On a free inference tier
+ * a 120B reasoning model can spend a step's entire slice before its
+ * first token — the planner had 39 seconds, asked gpt-oss-120b, and got
+ * "no response within 39s" from every tier it tried. A weaker model that
+ * answers is worth more than a stronger one that doesn't: the fallback
+ * when a step times out is not a lesser model, it is a built-in
+ * template.
+ */
+const FAST_CANDIDATES: readonly string[] = [
+  "openai/gpt-oss-20b",
+  "mistralai/ministral-14b-instruct-2512",
+  "meta/llama-3.1-8b-instruct",
+  "stepfun-ai/step-3.7-flash",
+];
+
+/**
+ * Below this, prefer a model that starts fast over one that reasons
+ * well. Sized against observed time-to-first-token on the free NVIDIA
+ * tier, where the large models routinely need most of a minute.
+ */
+const FAST_MODEL_BUDGET_MS = 60_000;
+
+/**
+ * The ladder to try for a role, given how long the step actually has.
+ * Fast models lead when the slice is short; the capability ladder still
+ * follows, so a short budget narrows the preference rather than
+ * discarding the stronger options entirely.
+ */
+function candidatesFor(role: ModelRole, budgetMs?: number): readonly string[] {
+  if (budgetMs === undefined || budgetMs >= FAST_MODEL_BUDGET_MS) {
+    return MODEL_CANDIDATES[role];
+  }
+  return [
+    ...FAST_CANDIDATES,
+    ...MODEL_CANDIDATES[role].filter((id) => !FAST_CANDIDATES.includes(id)),
+  ];
+}
 
 /**
  * The catalog is fetched once and reused: it changes on the scale of
@@ -180,7 +233,10 @@ async function availableModelIds(): Promise<Set<string> | null> {
  * catalog being unreachable is not a failure — it just means the static
  * answer stands.
  */
-export async function resolveModelForRole(role: ModelRole): Promise<string> {
+export async function resolveModelForRole(
+  role: ModelRole,
+  budgetMs?: number
+): Promise<string> {
   const fallback = modelForRole(role);
   // An explicit, valid override is a deliberate choice — never overrule it.
   const overrides: Record<ModelRole, string | undefined> = {
@@ -194,18 +250,27 @@ export async function resolveModelForRole(role: ModelRole): Promise<string> {
 
   const available = await availableModelIds();
   if (!available) return fallback;
-  return MODEL_CANDIDATES[role].find((id) => available.has(id)) ?? fallback;
+  return (
+    candidatesFor(role, budgetMs).find((id) => available.has(id)) ?? fallback
+  );
 }
 
 /** Same resolution for the chain's general-purpose second tier. */
-export async function resolveGeneralFallbackModel(): Promise<string> {
+export async function resolveGeneralFallbackModel(
+  budgetMs?: number
+): Promise<string> {
   const override = kimiModel();
   if (override) return override;
   const available = await availableModelIds();
   if (!available) return generalFallbackModel();
-  return (
-    GENERAL_CANDIDATES.find((id) => available.has(id)) ?? generalFallbackModel()
-  );
+  const ladder =
+    budgetMs !== undefined && budgetMs < FAST_MODEL_BUDGET_MS
+      ? [
+          ...FAST_CANDIDATES,
+          ...GENERAL_CANDIDATES.filter((id) => !FAST_CANDIDATES.includes(id)),
+        ]
+      : GENERAL_CANDIDATES;
+  return ladder.find((id) => available.has(id)) ?? generalFallbackModel();
 }
 
 /** Which candidate each role resolves to right now, for diagnostics. */

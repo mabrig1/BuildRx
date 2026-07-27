@@ -273,9 +273,12 @@ export async function runAgentCompletion({
   // Route by task complexity (see lib/ai/models.ts): the strongest
   // model for this role that the configured key can actually call,
   // with a general-purpose model as the chain's second tier.
+  // The step's actual budget decides the ladder: a large reasoning model
+  // that needs most of a minute to start answering is the wrong choice
+  // for a slice that is under one, however capable it is.
   const [nvidiaModel, nvidiaFallbackModel] = await Promise.all([
-    resolveModelForRole(role),
-    resolveGeneralFallbackModel(),
+    resolveModelForRole(role, timeoutMs),
+    resolveGeneralFallbackModel(timeoutMs),
   ]);
 
   const result = await completeText(

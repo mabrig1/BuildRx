@@ -79,15 +79,23 @@ const AGENT_WEIGHTS: Record<AgentName, number> = {
   // three steps that actually write the app and let the rest be
   // deterministic (architect, security, qa and repair all have full
   // non-model paths, and debug is a review pass the build can skip).
-  planner: 2,
+  // The planner is the one step whose failure costs the whole build.
+  // Everything downstream builds *its* plan, so when it falls back to the
+  // built-in template every later agent faithfully generates a generic
+  // CRUD app — the user asked for a statistical analysis tool and got
+  // "Items / Sample Item 1" because the plan, not the code generation,
+  // was the thing that failed. It was on 39s; it now gets the largest
+  // share, taken from the two review passes that have full deterministic
+  // fallbacks and cost nothing when skipped.
+  planner: 4,
   architect: 0.05, // deterministic file map — no model call needed
   ui: 3.5,
   database: 1.25,
   coding: 3.5,
-  debug: 0.5,
+  debug: 0.25, // review pass — the generated files stand without it
   security: 0.05, // deterministic scan
   qa: 0.05, // deterministic checks
-  repair: 1, // one bounded model pass when findings need it
+  repair: 0.5, // one bounded model pass when findings need it
   deployment: 0.3,
 };
 

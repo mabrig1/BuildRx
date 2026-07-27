@@ -95,6 +95,8 @@ export interface WorkflowContext {
   architecture?: string;
   /** Open findings from the QA Agent, consumed by the Repair Agent. */
   findings?: CheckFinding[];
+  /** Correlates every event and log line of one build run. */
+  requestId?: string;
 }
 
 /** One issue found by the QA/Security check suite. */
@@ -122,6 +124,21 @@ export interface VerificationItem {
 export type AgentEvent =
   | { type: "workflow_start"; agents: AgentName[] }
   | { type: "verification"; agent: AgentName; items: VerificationItem[] }
+  /**
+   * Emitted every few seconds while a step is working. A build can spend
+   * a minute inside one model call; without a signal in between, a
+   * silent connection and a working one look identical to the client
+   * (and to the user, who sees "Thinking…" forever). `requestId` ties
+   * every event of one run together in the logs.
+   */
+  | {
+      type: "heartbeat";
+      agent: AgentName;
+      requestId: string;
+      elapsedMs: number;
+      /** Whole-pipeline budget remaining, so the UI can show a bound. */
+      remainingMs: number;
+    }
   | { type: "agent_start"; agent: AgentName; message: string }
   | { type: "agent_log"; agent: AgentName; message: string }
   | { type: "file"; agent: AgentName; path: string }

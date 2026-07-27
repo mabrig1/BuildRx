@@ -3,6 +3,8 @@ import { pause } from "@/lib/agents/llm";
 import { verifyPreviewResponds } from "@/lib/agents/tools";
 import type { Agent, VerificationItem, WorkflowContext } from "@/lib/agents/types";
 import { isNvidiaConfigured } from "@/lib/ai/nvidia";
+import { isOpenRouterConfigured } from "@/lib/ai/openrouter";
+import { isAnyProviderConfigured } from "@/lib/ai/provider";
 import { getFileSystem } from "@/lib/files/manager";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -55,12 +57,20 @@ async function buildVerification(
       : "demo mode — no auth provider connected",
   });
 
+  // Any configured provider counts. Hardcoding NVIDIA here marked a
+  // build that generated fine on OpenRouter as failed verification, and
+  // a failed check writes project status "error" — so the app reported
+  // itself broken while every other check passed.
+  const providers = [
+    isOpenRouterConfigured() ? "OpenRouter" : null,
+    isNvidiaConfigured() ? "NVIDIA" : null,
+  ].filter(Boolean);
   items.push({
     label: "Environment variables",
-    status: isNvidiaConfigured() ? "pass" : "fail",
-    detail: isNvidiaConfigured()
-      ? "AI provider key present server-side"
-      : "NVIDIA_API_KEY missing",
+    status: isAnyProviderConfigured() ? "pass" : "fail",
+    detail: isAnyProviderConfigured()
+      ? `AI provider key present server-side (${providers.join(", ") || "Anthropic"})`
+      : "no AI provider key — set OPENROUTER_API_KEY or NVIDIA_API_KEY",
   });
 
   const pages = plan.pages.filter((page) => {

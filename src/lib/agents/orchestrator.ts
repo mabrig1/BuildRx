@@ -106,12 +106,18 @@ function stepDeadline(context: WorkflowContext, remaining: AgentName[]): number 
   return Math.floor(Date.now() + share);
 }
 
+/** How often a running step reports that it is still alive. */
+const HEARTBEAT_INTERVAL_MS = 5_000;
+
 export async function runWorkflow(
   context: WorkflowContext,
   emit: EmitFn
 ): Promise<void> {
   const startedAt = Date.now();
   context.deadlineAt = startedAt + pipelineBudgetMs();
+  context.requestId =
+    context.requestId ??
+    `run_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   emit({ type: "workflow_start", agents: AGENT_ORDER });
 
   // Mark the project as generating while the pipeline runs.
@@ -134,6 +140,20 @@ export async function runWorkflow(
       if (name !== "planner" && !context.plan) {
         context.plan = fallbackPlan(context.prompt);
       }
+
+      // Heartbeat for the duration of this step: a model call can hold
+      // the pipeline for a minute, and silence is indistinguishable from
+      // a hang. The client's watchdog is idle-based, so these also keep
+      // a working build from being cut off by its own browser.
+      const heartbeat = setInterval(() => {
+        emit({
+          type: "heartbeat",
+          agent: name,
+          requestId: context.requestId!,
+          elapsedMs: Date.now() - startedAt,
+          remainingMs: Math.max(0, (context.deadlineAt ?? Date.now()) - Date.now()),
+        });
+      }, HEARTBEAT_INTERVAL_MS);
 
       try {
         await agents[name].run(context, emit);
@@ -161,6 +181,8 @@ export async function runWorkflow(
           cause: diagnosed.cause,
           suggestedFix: diagnosed.suggestedFix,
         });
+      } finally {
+        clearInterval(heartbeat);
       }
     }
 

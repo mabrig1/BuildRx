@@ -99,6 +99,15 @@ export function AgentRunPanel({
           [event.agent]: { status: "running", message: event.message },
         }));
         break;
+      case "heartbeat":
+        setSteps((prev) => ({
+          ...prev,
+          [event.agent]: {
+            ...prev[event.agent],
+            message: `${prev[event.agent].message.replace(/ \(\d+s\)$/, "")} (${Math.round(event.elapsedMs / 1000)}s)`,
+          },
+        }));
+        break;
       case "agent_log":
         setSteps((prev) => ({
           ...prev,

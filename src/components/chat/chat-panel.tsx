@@ -200,6 +200,17 @@ export function ChatPanel({
               render();
               break;
             }
+            case "heartbeat": {
+              // Keeps the running step's line moving so a long model
+              // call reads as work in progress, not a hang.
+              const index = lineForAgent[event.agent];
+              if (index !== undefined) {
+                const seconds = Math.round(event.elapsedMs / 1000);
+                lines[index] = lines[index].replace(/ \(\d+s\)$/, "") + ` (${seconds}s)`;
+                render();
+              }
+              break;
+            }
             case "verification": {
               const icons = { pass: "✅", warn: "⚠️", fail: "❌" } as const;
               lines.push(

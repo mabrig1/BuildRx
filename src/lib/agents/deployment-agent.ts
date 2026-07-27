@@ -122,6 +122,16 @@ export const deploymentAgent: Agent = {
       ...context.files.values(),
     ]);
 
+    // Verification runs BEFORE the project is marked ready: "ready" has
+    // to mean verified, not merely generated. Files are already saved at
+    // this point, so a failed verification still leaves the user their
+    // app and the preview — it just refuses to claim the build is good.
+    context.previewUrl = previewUrl;
+    const items = await buildVerification(context);
+    emit({ type: "verification", agent: "deployment", items });
+    const failures = items.filter((item) => item.status === "fail");
+    const verified = failures.length === 0;
+
     if (context.persist && isSupabaseConfigured()) {
       const { createClient } = await import("@/lib/supabase/server");
       const supabase = await createClient();
@@ -134,7 +144,14 @@ export const deploymentAgent: Agent = {
 
       const { error: projectError } = await supabase
         .from("projects")
-        .update({ status: "ready", preview_url: previewUrl })
+        .update({
+          // A build that failed verification is not "ready". Recording
+          // it as an error is what lets the user retry from chat (a
+          // ready project switches to conversation-only mode), and it
+          // stops the platform claiming success it did not establish.
+          status: verified ? "ready" : "error",
+          preview_url: previewUrl,
+        })
         .eq("id", context.projectId);
       if (projectError) {
         throw new Error(`Failed to update project: ${projectError.message}`);
@@ -153,7 +170,17 @@ export const deploymentAgent: Agent = {
       await supabase.from("chat_messages").insert({
         project_id: context.projectId,
         role: "assistant",
-        content: `🚀 **Build complete!** The agent team built **${plan?.appName ?? "your app"}** — ${context.files.size} files generated (${plan?.pages.length ?? 0} pages, ${plan?.dataModel.length ?? 0} tables). The live preview has been updated.`,
+        content: verified
+          ? `🚀 **Build complete and verified** — **${plan?.appName ?? "your app"}**, ${context.files.size} files (${plan?.pages.length ?? 0} pages, ${plan?.dataModel.length ?? 0} tables). Every check passed and the preview is live.`
+          : [
+              `⚠️ **Build finished but did not pass verification** — **${plan?.appName ?? "your app"}**, ${context.files.size} files saved.`,
+              "",
+              "**What failed**",
+              ...failures.map((item) => `- ${item.label}${item.detail ? ` — ${item.detail}` : ""}`),
+              "",
+              "**What BuildRx did** — it generated the app, ran its checks, and applied every repair it could before stopping at the configured limit.",
+              "**What you can do** — send another message to retry the build, or open the Code tab to inspect the files that were saved.",
+            ].join("\n"),
       });
     } else {
       await pause(600);
@@ -164,21 +191,12 @@ export const deploymentAgent: Agent = {
       });
     }
 
-    context.previewUrl = previewUrl;
-
-    // Final verification — run after the files are saved so the preview
-    // fetch exercises the real published state.
-    const items = await buildVerification(context);
-    emit({ type: "verification", agent: "deployment", items });
-    const failed = items.filter((item) => item.status === "fail").length;
-
     emit({
       type: "agent_complete",
       agent: "deployment",
-      message:
-        failed === 0
-          ? `Deployed and verified — preview live at ${previewUrl}`
-          : `Deployed with ${failed} verification failure(s) — preview at ${previewUrl}`,
+      message: verified
+        ? `Deployed and verified — preview live at ${previewUrl}`
+        : `NOT verified: ${failures.map((f) => f.label).join(", ")} — files saved, preview at ${previewUrl}`,
     });
   },
 };

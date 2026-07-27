@@ -351,8 +351,17 @@ export const repairAgent: Agent = {
       message: `Repairing ${findings.filter((f) => f.severity === "error").length} issue(s)…`,
     });
 
+    const errorCount = (list: CheckFinding[]) =>
+      list.filter((finding) => finding.severity === "error").length;
+
     let totalFixes = 0;
     for (let round = 1; round <= TOOL_LIMITS.maxRepairRounds; round++) {
+      // Checkpoint before touching anything: a repair round must never
+      // leave the build worse than it found it. If the round increases
+      // the error count (an LLM rewrite that broke a working file, say),
+      // every change it made is rolled back and the loop stops.
+      const checkpoint = new Map(context.files);
+      const before = errorCount(findings);
       // Deterministic fixes.
       for (const finding of findings) {
         if (finding.fix !== "auto") continue;
@@ -381,7 +390,20 @@ export const repairAgent: Agent = {
       }
 
       // RETEST.
-      findings = runStaticChecks(context, plan);
+      const retested = runStaticChecks(context, plan);
+      if (errorCount(retested) > before) {
+        context.files.clear();
+        for (const [path, file] of checkpoint) context.files.set(path, file);
+        context.findings = findings;
+        emit({
+          type: "agent_log",
+          agent: "repair",
+          message: `Round ${round} made things worse (${before} → ${errorCount(retested)} errors) — rolled back to the checkpoint`,
+        });
+        break;
+      }
+
+      findings = retested;
       context.findings = findings;
       if (checksPass(findings)) break;
     }

@@ -39,8 +39,18 @@ export const TOOL_LIMITS = {
   maxFileBytes: 200_000,
   /** Total tool writes (create/edit/delete) per run. */
   maxWritesPerRun: 80,
-  /** Repair loop iterations (fix → retest). */
-  maxRepairRounds: 2,
+  /**
+   * Repair loop iterations (fix → retest). Override with
+   * MAX_REPAIR_ATTEMPTS. Bounded on both sides: zero would disable
+   * self-repair, and an unbounded value would let a build spend its
+   * whole time budget re-running the same failing fix.
+   */
+  maxRepairRounds: (() => {
+    const configured = Number(process.env.MAX_REPAIR_ATTEMPTS);
+    return Number.isFinite(configured) && configured >= 1 && configured <= 10
+      ? Math.floor(configured)
+      : 5;
+  })(),
   /** Timeout for the deployment self-verification fetch. */
   verifyFetchTimeoutMs: 8_000,
 } as const;

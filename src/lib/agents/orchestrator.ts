@@ -3,7 +3,12 @@ import { codingAgent } from "@/lib/agents/coding-agent";
 import { databaseAgent } from "@/lib/agents/database-agent";
 import { debugAgent } from "@/lib/agents/debug-agent";
 import { deploymentAgent } from "@/lib/agents/deployment-agent";
-import { agentModel } from "@/lib/agents/llm";
+import {
+  agentModel,
+  degradedEvent,
+  diagnoseModelFailure,
+  isLlmConfigured,
+} from "@/lib/agents/llm";
 import { fallbackPlan, plannerAgent } from "@/lib/agents/planner";
 import { qaAgent } from "@/lib/agents/qa-agent";
 import { repairAgent } from "@/lib/agents/repair-agent";
@@ -119,6 +124,19 @@ export async function runWorkflow(
     context.requestId ??
     `run_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   emit({ type: "workflow_start", agents: AGENT_ORDER });
+
+  // Say up front what this build can actually do. Finding out after five
+  // minutes that every step fell back to a scaffold is the difference
+  // between a slow build and a wasted one.
+  if (!isLlmConfigured()) {
+    emit(
+      degradedEvent(
+        undefined,
+        "No AI provider is configured — this build will assemble built-in scaffolds instead of generating code from your description.",
+        diagnoseModelFailure(new Error("No AI provider is configured."))
+      )
+    );
+  }
 
   // Mark the project as generating while the pipeline runs.
   if (context.persist && isSupabaseConfigured()) {

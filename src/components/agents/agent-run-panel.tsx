@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
+  AlertTriangle,
   Brain,
   Bug,
   Check,
@@ -62,7 +63,12 @@ const AGENT_DESCRIPTIONS: Record<AgentName, string> = {
   deployment: "Deploys & verifies",
 };
 
-type StepStatus = "pending" | "running" | "done" | "error";
+/**
+ * "degraded" sits between done and error on purpose: the step wrote its
+ * files, but from a scaffold rather than a model, and showing that as a
+ * green tick is what made a template look like a generated app.
+ */
+type StepStatus = "pending" | "running" | "done" | "degraded" | "error";
 
 interface StepState {
   status: StepStatus;
@@ -90,6 +96,10 @@ export function AgentRunPanel({
   const [steps, setSteps] = useState(initialSteps);
   const [files, setFiles] = useState<string[]>([]);
   const [finished, setFinished] = useState(false);
+  // A ref, not state: workflow_complete can arrive in the same batch as
+  // the degraded events it needs to count, and a queued setState would
+  // still read as empty when the summary toast fires.
+  const degradedRef = useRef<string[]>([]);
 
   function applyEvent(event: AgentEvent) {
     switch (event.type) {
@@ -125,11 +135,38 @@ export function AgentRunPanel({
           prev.includes(event.path) ? prev : [...prev, event.path]
         );
         break;
-      case "workflow_complete":
+      case "workflow_complete": {
         setFinished(true);
-        toast.success(`Build complete — ${event.fileCount} files generated`);
+        const degradedCount = degradedRef.current.length;
+        if (degradedCount === 0) {
+          toast.success(`Build complete — ${event.fileCount} files generated`);
+        } else {
+          toast.warning(
+            `Build finished with ${degradedCount} step(s) degraded`,
+            {
+              description:
+                "Parts of this app are built-in scaffolding, not generated from your description. See each step for why.",
+            }
+          );
+        }
         window.dispatchEvent(new CustomEvent("vfs-changed", { detail: {} }));
         onDeployed?.(event.previewUrl);
+        break;
+      }
+      case "agent_degraded":
+        degradedRef.current = [...degradedRef.current, event.message];
+        // Not an error — the step produced files — but not a success
+        // either. It gets its own status so the row can't read as "done".
+        if (event.agent) {
+          setSteps((prev) => ({
+            ...prev,
+            [event.agent as AgentName]: {
+              status: "degraded",
+              message: `${event.message} ${event.suggestedFix}`,
+            },
+          }));
+        }
+        toast.warning(event.message, { description: event.suggestedFix });
         break;
       case "error":
         if (event.agent) {
@@ -159,6 +196,7 @@ export function AgentRunPanel({
     setFinished(false);
     setSteps(initialSteps());
     setFiles([]);
+    degradedRef.current = [];
 
     try {
       const response = await fetch("/api/agents/run", {
@@ -263,6 +301,8 @@ export function AgentRunPanel({
                         "border-violet-500/50 bg-violet-500/5",
                       step.status === "done" &&
                         "border-emerald-500/40 bg-emerald-500/5",
+                      step.status === "degraded" &&
+                        "border-amber-500/50 bg-amber-500/5",
                       step.status === "error" &&
                         "border-destructive/50 bg-destructive/5"
                     )}
@@ -277,6 +317,8 @@ export function AgentRunPanel({
                             "bg-violet-500/15 text-violet-600 dark:text-violet-400",
                           step.status === "done" &&
                             "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+                          step.status === "degraded" &&
+                            "bg-amber-500/15 text-amber-600 dark:text-amber-400",
                           step.status === "error" &&
                             "bg-destructive/15 text-destructive"
                         )}
@@ -285,6 +327,8 @@ export function AgentRunPanel({
                           <Loader2 className="size-4 animate-spin" />
                         ) : step.status === "done" ? (
                           <Check className="size-4" />
+                        ) : step.status === "degraded" ? (
+                          <AlertTriangle className="size-4" />
                         ) : step.status === "error" ? (
                           <X className="size-4" />
                         ) : (

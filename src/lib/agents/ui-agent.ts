@@ -1,7 +1,9 @@
 import {
   FILE_FORMAT_INSTRUCTIONS,
   canCallModel,
-  fallbackReason,
+  degradedEvent,
+  diagnoseModelFailure,
+  emptyOutputFailure,
   outOfTimeNote,
   parseFileBlocks,
   pause,
@@ -238,8 +240,20 @@ export const uiAgent: Agent = {
     let note = "";
     if (!canCallModel(context)) {
       const reason = outOfTimeNote(context);
-      if (reason) note = ` — ${reason}, so the built-in scaffold was used`;
-      else await pause(900);
+      if (reason) {
+        note = ` — ${reason}, so the built-in scaffold was used`;
+        emit(
+          degradedEvent(
+            "ui",
+            "Your pages are the built-in scaffold, not generated from your description.",
+            diagnoseModelFailure(
+              new Error(
+                "The build budget ran out before this step could start a model call."
+              )
+            )
+          )
+        );
+      } else await pause(900);
     } else {
       try {
         const text = await runAgentCompletion({
@@ -250,10 +264,28 @@ export const uiAgent: Agent = {
         });
         generated = parseFileBlocks(text);
         if (generated.length === 0) {
-          note = " — the model returned no usable files, so the built-in scaffold was used";
+          const failure = emptyOutputFailure(
+            "The model's response contained no ===FILE:…===/===END=== blocks, so no page could be read out of it."
+          );
+          note = ` — ${failure.summary}, so the built-in scaffold was used`;
+          emit(
+            degradedEvent(
+              "ui",
+              "Your pages are the built-in scaffold, not generated from your description.",
+              failure
+            )
+          );
         }
       } catch (error) {
-        note = ` — ${fallbackReason(error)}, so the built-in scaffold was used`;
+        const failure = diagnoseModelFailure(error);
+        note = ` — ${failure.summary}, so the built-in scaffold was used`;
+        emit(
+          degradedEvent(
+            "ui",
+            "Your pages are the built-in scaffold, not generated from your description.",
+            failure
+          )
+        );
       }
     }
 

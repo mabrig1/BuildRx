@@ -1,7 +1,9 @@
 import {
   FILE_FORMAT_INSTRUCTIONS,
   canCallModel,
-  fallbackReason,
+  degradedEvent,
+  diagnoseModelFailure,
+  emptyOutputFailure,
   outOfTimeNote,
   parseFileBlocks,
   pause,
@@ -174,8 +176,20 @@ export const codingAgent: Agent = {
     let note = "";
     if (!canCallModel(context)) {
       const reason = outOfTimeNote(context);
-      if (reason) note = ` (${reason} — wired up from the plan instead)`;
-      else await pause(800);
+      if (reason) {
+        note = ` (${reason} — wired up from the plan instead)`;
+        emit(
+          degradedEvent(
+            "coding",
+            "Your application code is wired up from the plan, not written by a model.",
+            diagnoseModelFailure(
+              new Error(
+                "The build budget ran out before this step could start a model call."
+              )
+            )
+          )
+        );
+      } else await pause(800);
       files = mockFiles(plan, existingPaths);
     } else {
       try {
@@ -194,11 +208,29 @@ export const codingAgent: Agent = {
         });
         files = parseFileBlocks(text);
         if (files.length === 0) {
-          note = " (model returned no usable files — wired up from the plan instead)";
+          const failure = emptyOutputFailure(
+            "The model's response contained no ===FILE:…===/===END=== blocks, so no code could be read out of it."
+          );
+          note = ` (${failure.summary} — wired up from the plan instead)`;
+          emit(
+            degradedEvent(
+              "coding",
+              "Your application code is wired up from the plan, not written by a model.",
+              failure
+            )
+          );
           files = mockFiles(plan, existingPaths);
         }
       } catch (error) {
-        note = ` (${fallbackReason(error)} — wired up from the plan instead)`;
+        const failure = diagnoseModelFailure(error);
+        note = ` (${failure.summary} — wired up from the plan instead)`;
+        emit(
+          degradedEvent(
+            "coding",
+            "Your application code is wired up from the plan, not written by a model.",
+            failure
+          )
+        );
         files = mockFiles(plan, existingPaths);
       }
     }

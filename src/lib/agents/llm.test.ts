@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   canCallModel,
+  degradedEvent,
+  diagnoseModelFailure,
+  emptyOutputFailure,
   extractJson,
   fallbackReason,
   isSafeFilePath,
@@ -374,5 +377,118 @@ describe("fallbackReason", () => {
     expect(fallbackReason(new Error("429 rate limited, then timed out"))).toBe(
       "the model ran out of time"
     );
+  });
+});
+
+// ------------------------------------------------------------------
+// diagnoseModelFailure — what the user is actually told when a step
+// degrades. The provider's own error must survive to the build log.
+// ------------------------------------------------------------------
+
+describe("diagnoseModelFailure", () => {
+  it.each([
+    ["No AI provider is configured.", "AI_NOT_CONFIGURED", false],
+    ["Request timed out", "AI_TIMEOUT", true],
+    ["z-ai/glm-5.2 returned nothing within 54s.", "AI_TIMEOUT", true],
+    ["429 Too Many Requests", "AI_RATE_LIMITED", true],
+    ["404 model not found", "AI_MODEL_UNAVAILABLE", false],
+    ["401 authentication failed", "AI_KEY_REJECTED", false],
+    ["something nobody predicted", "AI_CALL_FAILED", true],
+  ])("classifies %j as %s", (message, code, retryable) => {
+    const failure = diagnoseModelFailure(new Error(message));
+
+    expect(failure.code).toBe(code);
+    expect(failure.retryable).toBe(retryable);
+    expect(failure.suggestedFix.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * The whole point of this function: the provider chain builds a precise
+   * error, and it used to be collapsed into a six-word phrase with the
+   * detail discarded. If `cause` ever stops carrying it verbatim, the
+   * build log goes back to being useless.
+   */
+  it("preserves the provider's own error verbatim as the cause", () => {
+    const real =
+      "All AI providers failed. Tried: nvidia (z-ai/glm-5.2), nvidia (openai/gpt-oss-20b). Last error: 401 Unauthorized";
+
+    const failure = diagnoseModelFailure(new Error(real));
+
+    expect(failure.cause).toBe(real);
+    expect(failure.cause).toContain("z-ai/glm-5.2");
+    expect(failure.cause).toContain("401 Unauthorized");
+  });
+
+  it("always offers a next action, whatever the error", () => {
+    for (const error of [
+      new Error("boom"),
+      "a bare string",
+      null,
+      undefined,
+      { weird: true },
+    ]) {
+      const failure = diagnoseModelFailure(error);
+      expect(failure.suggestedFix).toBeTruthy();
+      expect(failure.summary).toBeTruthy();
+      expect(failure.code).toBeTruthy();
+    }
+  });
+
+  it("describes a missing key without echoing any key material", () => {
+    const failure = diagnoseModelFailure(
+      new Error("No AI provider is configured — set NVIDIA_API_KEY.")
+    );
+
+    expect(failure.code).toBe("AI_NOT_CONFIGURED");
+    expect(failure.suggestedFix).toMatch(/NVIDIA_API_KEY/);
+    expect(failure.retryable).toBe(false);
+  });
+
+  it("keeps summary in step with fallbackReason", () => {
+    const error = new Error("429 slow down");
+    expect(diagnoseModelFailure(error).summary).toBe(fallbackReason(error));
+  });
+});
+
+describe("emptyOutputFailure", () => {
+  it("is distinct from a failed call — the model answered", () => {
+    const failure = emptyOutputFailure("no ===FILE:=== blocks in the response");
+
+    expect(failure.code).toBe("AI_EMPTY_OUTPUT");
+    expect(failure.retryable).toBe(true);
+    expect(failure.cause).toBe("no ===FILE:=== blocks in the response");
+  });
+});
+
+describe("degradedEvent", () => {
+  const failure = {
+    summary: "the model ran out of time",
+    code: "AI_TIMEOUT",
+    cause: "timed out after 54s",
+    suggestedFix: "Re-run the build.",
+    retryable: true,
+  };
+
+  it("carries the diagnosis onto the wire", () => {
+    expect(degradedEvent("ui", "Pages are scaffolded.", failure)).toEqual({
+      type: "agent_degraded",
+      agent: "ui",
+      message: "Pages are scaffolded.",
+      code: "AI_TIMEOUT",
+      cause: "timed out after 54s",
+      suggestedFix: "Re-run the build.",
+      retryable: true,
+    });
+  });
+
+  it("omits the agent for a whole-build condition", () => {
+    const event = degradedEvent(undefined, "Nothing configured.", failure);
+
+    expect(event).not.toHaveProperty("agent");
+  });
+
+  it("does not leak the internal summary field onto the event", () => {
+    // `summary` is for the inline note; the event carries `message`.
+    expect(degradedEvent("ui", "m", failure)).not.toHaveProperty("summary");
   });
 });

@@ -1,7 +1,9 @@
 import {
   FILE_FORMAT_INSTRUCTIONS,
   canCallModel,
-  fallbackReason,
+  degradedEvent,
+  diagnoseModelFailure,
+  emptyOutputFailure,
   outOfTimeNote,
   parseFileBlocks,
   pause,
@@ -79,8 +81,20 @@ export const databaseAgent: Agent = {
     let note = "";
     if (!canCallModel(context)) {
       const reason = outOfTimeNote(context);
-      if (reason) note = ` (${reason} — schema generated from the plan)`;
-      else await pause(700);
+      if (reason) {
+        note = ` (${reason} — schema generated from the plan)`;
+        emit(
+          degradedEvent(
+            "database",
+            "Your database schema comes from the plan, not from a model.",
+            diagnoseModelFailure(
+              new Error(
+                "The build budget ran out before this step could start a model call."
+              )
+            )
+          )
+        );
+      } else await pause(700);
       files = mockFiles(plan);
     } else {
       try {
@@ -93,11 +107,29 @@ export const databaseAgent: Agent = {
         });
         files = parseFileBlocks(text);
         if (files.length === 0) {
-          note = " (model returned no usable files — schema generated from the plan)";
+          const failure = emptyOutputFailure(
+            "The model's response contained no ===FILE:…===/===END=== blocks, so no schema could be read out of it."
+          );
+          note = ` (${failure.summary} — schema generated from the plan)`;
+          emit(
+            degradedEvent(
+              "database",
+              "Your database schema comes from the plan, not from a model.",
+              failure
+            )
+          );
           files = mockFiles(plan);
         }
       } catch (error) {
-        note = ` (${fallbackReason(error)} — schema generated from the plan)`;
+        const failure = diagnoseModelFailure(error);
+        note = ` (${failure.summary} — schema generated from the plan)`;
+        emit(
+          degradedEvent(
+            "database",
+            "Your database schema comes from the plan, not from a model.",
+            failure
+          )
+        );
         files = mockFiles(plan);
       }
     }

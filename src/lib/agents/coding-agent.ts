@@ -195,6 +195,10 @@ export const codingAgent: Agent = {
       try {
         const text = await runAgentCompletion({
           system: SYSTEM,
+          // This step emits many whole files at once; the default
+          // ceiling truncates it mid-file, and a truncated block used to
+          // discard the entire response.
+          maxTokens: 16000,
           prompt: [
             `Plan:\n${JSON.stringify(plan, null, 2)}`,
             ...(context.architecture

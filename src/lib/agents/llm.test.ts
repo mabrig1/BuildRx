@@ -147,9 +147,49 @@ ok
     ]);
   });
 
-  it("returns nothing for an unterminated block", () => {
-    const text = "===FILE: a.ts===\nconst a = 1;";
-    expect(parseFileBlocks(text)).toEqual([]);
+  /**
+   * A generation cut off at its token ceiling used to yield nothing at
+   * all, because the pattern keys on the closing marker. That is what an
+   * entire UI generation arriving as "the model returned no usable
+   * output" actually was.
+   */
+  describe("recovering a truncated final block", () => {
+    it("keeps a block the model was still writing", () => {
+      const text = "===FILE: a.ts===\nconst a = 1;";
+      expect(parseFileBlocks(text)).toEqual([
+        { path: "a.ts", content: "const a = 1;" },
+      ]);
+    });
+
+    it("keeps the completed blocks alongside the truncated one", () => {
+      const text = `===FILE: a.ts===
+const a = 1;
+===END===
+===FILE: b.tsx===
+export default function B() {
+  return <main>half writ`;
+
+      const files = parseFileBlocks(text);
+
+      expect(files.map((f) => f.path)).toEqual(["a.ts", "b.tsx"]);
+      expect(files[1].content).toContain("half writ");
+    });
+
+    it("ignores a trailing header with no content yet", () => {
+      expect(parseFileBlocks("===FILE: a.ts===\n")).toEqual([]);
+      expect(parseFileBlocks("===FILE: a.ts===\n   \n  ")).toEqual([]);
+    });
+
+    it("still drops a truncated block with an unsafe path", () => {
+      expect(parseFileBlocks("===FILE: ../../etc/passwd===\nroot:x:0:0")).toEqual(
+        []
+      );
+    });
+
+    it("does not double-count a complete final block", () => {
+      const text = "===FILE: a.ts===\nconst a = 1;\n===END===\n";
+      expect(parseFileBlocks(text)).toHaveLength(1);
+    });
   });
 
   it("returns nothing when there are no blocks", () => {

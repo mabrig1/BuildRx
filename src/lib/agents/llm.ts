@@ -425,12 +425,40 @@ export function parseFileBlocks(text: string): GeneratedFile[] {
   const files: GeneratedFile[] = [];
   const pattern = /===FILE:\s*(.+?)===\r?\n([\s\S]*?)\r?\n?===END===/g;
   let match: RegExpExecArray | null;
+  let consumedTo = 0;
   while ((match = pattern.exec(text)) !== null) {
     const path = match[1].trim();
     if (isSafeFilePath(path)) {
       files.push({ path, content: match[2] });
     }
+    consumedTo = pattern.lastIndex;
   }
+
+  /**
+   * Recover a final block the model was still writing when it hit its
+   * token ceiling.
+   *
+   * The pattern keys on the closing marker, so a generation cut off
+   * mid-file used to yield *nothing at all* — not the truncated file,
+   * and not the complete ones before it, when the very first block was
+   * the one cut short. That is what a whole UI generation arriving as
+   * "the model returned no usable output" actually was: the UI agent is
+   * asked for a self-contained interactive prototype first, which for a
+   * real app does not fit in one response.
+   *
+   * A partial file still beats a built-in scaffold, and the QA and
+   * Repair agents downstream are built to fix incomplete code.
+   */
+  const tail = text.slice(consumedTo);
+  const unterminated = /===FILE:\s*(.+?)===\r?\n([\s\S]*)$/.exec(tail);
+  if (unterminated) {
+    const path = unterminated[1].trim();
+    const content = unterminated[2];
+    if (isSafeFilePath(path) && content.trim().length > 0) {
+      files.push({ path, content });
+    }
+  }
+
   return files;
 }
 

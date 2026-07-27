@@ -1,17 +1,19 @@
 /**
  * Centralized AI provider selection.
  *
- * NVIDIA's Inference API (NIM) is the only provider used by default —
- * every tier of the chain is an NVIDIA model, so a build or a chat reply
- * never depends on a paid Anthropic balance. If one NVIDIA model is
- * unavailable (404 for a retired model id, a 429, a 5xx), the next
- * NVIDIA model is tried instead.
+ * Priority: OpenRouter (when OPENROUTER_API_KEY is set) → NVIDIA NIM →
+ * Anthropic (opt-in only). Each tier falls through to the next on
+ * failure, so no single provider outage stops a build.
  *
- * Priority: nvidia-primary (GLM, or the caller's role-specialized
- * model) → nvidia-fast (Step) → nvidia-lite (Llama). The tiers are named
- * for their role rather than their model, since the model behind each is
- * env-configurable — the concrete one used is always reported alongside
- * the tier (the `X-Model` header, usage records, build logs).
+ * OpenRouter leads because the free NVIDIA tier, in practice, did not
+ * return anything inside a build step's budget — every generated app
+ * came back as a built-in scaffold. NVIDIA remains in the chain as a
+ * no-cost fallback rather than being removed.
+ *
+ * The tiers are named for their role rather than their model, since the
+ * model behind each is env-configurable — the concrete one used is
+ * always reported alongside the tier (the `X-Model` header, usage
+ * records, build logs).
  *
  * Anthropic Claude is opt-in and OFF unless `ANTHROPIC_ENABLED=true` is
  * set alongside a funded `ANTHROPIC_API_KEY`. Merely having the key in
@@ -33,20 +35,46 @@ import {
   streamChatCompletion,
   type NvidiaMessage,
 } from "@/lib/ai/nvidia";
+import {
+  isOpenRouterConfigured,
+  openrouterModel,
+  openrouterStrongModel,
+  streamChatCompletion as streamOpenRouter,
+} from "@/lib/ai/openrouter";
 
 export type ProviderName =
+  | "openrouter-primary"
+  | "openrouter-fast"
   | "nvidia-primary"
   | "nvidia-fast"
   | "nvidia-lite"
   | "anthropic";
 
+/**
+ * The OpenRouter tiers, attempted before NVIDIA when configured.
+ *
+ * Order is deliberate: OpenRouter is a paid, multi-vendor endpoint that
+ * answers reliably, whereas the free NVIDIA tier repeatedly failed to
+ * return anything inside a build step's budget — which is what left
+ * every generated app as a built-in scaffold. NVIDIA stays in the chain
+ * behind it as a no-cost fallback.
+ */
+const OPENROUTER_PROVIDERS = ["openrouter-primary", "openrouter-fast"] as const;
+
 /** The NVIDIA tiers, in the order they are attempted. */
 const NVIDIA_PROVIDERS = ["nvidia-primary", "nvidia-fast", "nvidia-lite"] as const;
 
 type NvidiaProviderName = (typeof NVIDIA_PROVIDERS)[number];
+type OpenRouterProviderName = (typeof OPENROUTER_PROVIDERS)[number];
 
 function isNvidiaProvider(provider: ProviderName): provider is NvidiaProviderName {
   return (NVIDIA_PROVIDERS as readonly string[]).includes(provider);
+}
+
+function isOpenRouterProvider(
+  provider: ProviderName
+): provider is OpenRouterProviderName {
+  return (OPENROUTER_PROVIDERS as readonly string[]).includes(provider);
 }
 
 export interface ProviderMessage {
@@ -90,6 +118,13 @@ export interface ProviderCallOptions {
    * capable generalist before dropping to the lite tier.
    */
   nvidiaFallbackModel?: string;
+  /**
+   * Overrides the model used for the primary OpenRouter tier. Callers
+   * that know the shape of the work (planning and code generation want
+   * the stronger model; review and diagnostics do not) set this; anything
+   * unset uses the configured defaults.
+   */
+  openrouterModel?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 90_000;
@@ -109,6 +144,7 @@ function isAnthropicEnabled(): boolean {
 /** Providers usable right now, in priority order. */
 export function availableProviders(): ProviderName[] {
   const providers: ProviderName[] = [];
+  if (isOpenRouterConfigured()) providers.push(...OPENROUTER_PROVIDERS);
   if (isNvidiaConfigured()) providers.push(...NVIDIA_PROVIDERS);
   if (isAnthropicEnabled()) providers.push("anthropic");
   return providers;
@@ -133,6 +169,16 @@ function nvidiaModelFor(
   }
 }
 
+/** The concrete model each OpenRouter tier resolves to for this call. */
+function openrouterModelFor(
+  provider: OpenRouterProviderName,
+  options: ProviderCallOptions
+): string {
+  return provider === "openrouter-primary"
+    ? (options.openrouterModel ?? openrouterStrongModel())
+    : openrouterModel();
+}
+
 interface Attempt {
   provider: ProviderName;
   /** Empty for Anthropic — resolved separately from `anthropicModel`. */
@@ -150,6 +196,13 @@ function plannedAttempts(options: ProviderCallOptions): Attempt[] {
   const seenModels = new Set<string>();
 
   for (const provider of availableProviders()) {
+    if (isOpenRouterProvider(provider)) {
+      const model = openrouterModelFor(provider, options);
+      if (seenModels.has(model)) continue;
+      seenModels.add(model);
+      attempts.push({ provider, model });
+      continue;
+    }
     if (isNvidiaProvider(provider)) {
       const model = nvidiaModelFor(provider, options);
       if (seenModels.has(model)) continue;
@@ -262,17 +315,20 @@ function toNvidiaMessages(messages: ProviderMessage[]): NvidiaMessage[] {
  */
 async function collectStreamed(
   messages: ProviderMessage[],
-  nvidiaOptions: {
+  callOptions: {
     model: string;
     maxTokens?: number;
     temperature?: number;
     timeoutMs: number;
+    /** Which upstream to stream from. Both speak the OpenAI wire format. */
+    via?: "nvidia" | "openrouter";
   }
 ): Promise<{ text: string; model: string; usage: ProviderUsage; truncated: boolean }> {
-  const { stream, completion, model } = await streamChatCompletion(
-    toNvidiaMessages(messages),
-    nvidiaOptions
-  );
+  const { via, ...upstreamOptions } = callOptions;
+  const { stream, completion, model } =
+    via === "openrouter"
+      ? await streamOpenRouter(messages, upstreamOptions)
+      : await streamChatCompletion(toNvidiaMessages(messages), upstreamOptions);
   // The completion promise is the streaming API's own bookkeeping; we
   // read the stream directly, so its rejection must be swallowed at the
   // moment it is created. Attaching the handler in two steps
@@ -292,13 +348,13 @@ async function collectStreamed(
 
   const reader = stream.getReader();
   const decoder = new TextDecoder();
-  const deadlineAt = Date.now() + nvidiaOptions.timeoutMs;
+  const deadlineAt = Date.now() + callOptions.timeoutMs;
 
   let text = "";
   let truncated = false;
   let expiry: ReturnType<typeof setTimeout> | undefined;
   const expired = new Promise<"expired">((resolve) => {
-    expiry = setTimeout(() => resolve("expired"), nvidiaOptions.timeoutMs);
+    expiry = setTimeout(() => resolve("expired"), callOptions.timeoutMs);
   });
 
   try {
@@ -448,6 +504,21 @@ async function completeWithProvider(
   options: ProviderCallOptions
 ): Promise<CompletionResult> {
   const { provider } = attempt;
+  if (isOpenRouterProvider(provider)) {
+    const result = await collectStreamed(messages, {
+      model: attempt.model,
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+      timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      via: "openrouter",
+    });
+    if (result.text.trim().length === 0) {
+      throw new Error(
+        `${safeModelName(attempt.model)} returned nothing within ${Math.round((options.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000)}s.`
+      );
+    }
+    return { text: result.text, provider, model: result.model, usage: result.usage };
+  }
   if (isNvidiaProvider(provider)) {
     const result = await collectStreamed(messages, {
       model: attempt.model,
@@ -556,6 +627,29 @@ export async function streamText(
       : attempt.provider;
     try {
       const { provider } = attempt;
+      if (isOpenRouterProvider(provider)) {
+        const {
+          stream,
+          completion,
+          model: resolvedModel,
+        } = await streamOpenRouter(messages, {
+          model: attempt.model,
+          maxTokens: options.maxTokens,
+          temperature: options.temperature,
+          timeoutMs: deadlineAt - Date.now(),
+        });
+        return {
+          stream,
+          provider,
+          model: resolvedModel,
+          completion: completion.then((result) => ({
+            text: result.text,
+            provider,
+            model: result.model,
+            usage: result.usage,
+          })),
+        };
+      }
       if (isNvidiaProvider(provider)) {
         const { stream, completion, model: resolvedModel } = await streamChatCompletion(
           toNvidiaMessages(messages),

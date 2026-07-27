@@ -10,6 +10,7 @@ import {
 } from "@/lib/ai/models";
 import { isAnyProviderConfigured, completeText } from "@/lib/ai/provider";
 import { isNvidiaConfigured, nvidiaGlmModel } from "@/lib/ai/nvidia";
+import { openrouterModel } from "@/lib/ai/openrouter";
 
 /** Model used only if the opt-in Anthropic tier is ever reached. */
 export const ANTHROPIC_AGENT_MODEL = "claude-opus-4-8";
@@ -135,7 +136,7 @@ const FAILURE_PATTERNS: ReadonlyArray<
     summary: "no AI provider is configured",
     code: "AI_NOT_CONFIGURED",
     suggestedFix:
-      "Set NVIDIA_API_KEY in your deployment environment (a free key is available at build.nvidia.com) and redeploy. Until then every build falls back to built-in scaffolds instead of generating code.",
+      "Set OPENROUTER_API_KEY (openrouter.ai/keys), or NVIDIA_API_KEY for the free tier, in your deployment environment and redeploy. Until then every build falls back to built-in scaffolds instead of generating code.",
     retryable: false,
   },
   {
@@ -145,6 +146,14 @@ const FAILURE_PATTERNS: ReadonlyArray<
     suggestedFix:
       "The model did not answer within this step's share of the build budget. Re-run the build, describe a smaller app, or raise AGENT_PIPELINE_BUDGET_MS if your host allows longer function runs.",
     retryable: true,
+  },
+  {
+    test: /credit|402|insufficient funds|balance/i,
+    summary: "the provider account is out of credit",
+    code: "AI_NO_CREDIT",
+    suggestedFix:
+      "Top up the OpenRouter account, or set OPENROUTER_MODEL / OPENROUTER_MODEL_STRONG to a cheaper model. The free NVIDIA tier still runs behind it if NVIDIA_API_KEY is set.",
+    retryable: false,
   },
   {
     test: /rate limit|429/i,
@@ -159,15 +168,15 @@ const FAILURE_PATTERNS: ReadonlyArray<
     summary: "the configured model is unavailable",
     code: "AI_MODEL_UNAVAILABLE",
     suggestedFix:
-      "The model id this deployment asks for is not available to your key. Clear the NVIDIA_MODEL_* variables to fall back to the built-in defaults, or set them to an id listed by /api/ai/models.",
+      "The model id this deployment asks for is not available to your key. Clear the OPENROUTER_MODEL* / NVIDIA_MODEL_* variables to fall back to the built-in defaults, or set them to an id the provider actually serves.",
     retryable: false,
   },
   {
     test: /authentication|401|403|api key/i,
-    summary: "the NVIDIA API key was rejected",
+    summary: "the provider rejected the API key",
     code: "AI_KEY_REJECTED",
     suggestedFix:
-      "NVIDIA_API_KEY was rejected. Check it has not expired and was pasted without stray spaces or newlines, then redeploy.",
+      "The provider rejected the key named in the error above. Check it has not expired or been revoked and was pasted without stray spaces or newlines, then redeploy.",
     retryable: false,
   },
 ];
@@ -281,6 +290,11 @@ export async function runAgentCompletion({
     resolveGeneralFallbackModel(timeoutMs),
   ]);
 
+  // Only the two roles that plan and write the application are worth the
+  // stronger (and costlier) OpenRouter model; review, diagnostics and
+  // classification are served fine by the everyday one.
+  const wantsStrongModel = role === "deep-reasoning" || role === "primary-coding";
+
   const result = await completeText(
     [
       { role: "system", content: system },
@@ -293,6 +307,7 @@ export async function runAgentCompletion({
       anthropicModel: ANTHROPIC_AGENT_MODEL,
       nvidiaModel,
       nvidiaFallbackModel,
+      ...(wantsStrongModel ? {} : { openrouterModel: openrouterModel() }),
     }
   );
   return result.text;

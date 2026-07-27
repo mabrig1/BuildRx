@@ -28,6 +28,7 @@ const savedEnv = { ...process.env };
 
 /** A fully-healthy deployment. */
 function healthy() {
+  process.env.OPENROUTER_API_KEY = "sk-or-testkey";
   process.env.NVIDIA_API_KEY = "nvapi-testkey";
   process.env.NVIDIA_API_BASE_URL = "https://integrate.api.nvidia.com/v1";
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://proj.supabase.co";
@@ -42,6 +43,9 @@ const check = (report: ConfigReport, key: string): ConfigCheck =>
 beforeEach(() => {
   for (const name of [
     ...MODEL_VARS,
+    "OPENROUTER_API_KEY",
+    "OPENROUTER_MODEL",
+    "OPENROUTER_MODEL_STRONG",
     "NVIDIA_API_KEY",
     "NVIDIA_API_BASE_URL",
     "NVIDIA_BASE_URL",
@@ -76,9 +80,10 @@ describe("validateConfiguration", () => {
   });
 
   describe("AI provider", () => {
-    it("fails without an API key and cannot generate", async () => {
+    it("fails when neither provider has a key, and cannot generate", async () => {
       const { validateConfiguration } = await freshModule();
       healthy();
+      delete process.env.OPENROUTER_API_KEY;
       delete process.env.NVIDIA_API_KEY;
 
       const report = validateConfiguration();
@@ -89,9 +94,35 @@ describe("validateConfiguration", () => {
       expect(check(report, "NVIDIA_API_KEY").action).toMatch(/NVIDIA_API_KEY/);
     });
 
-    it("fails when the endpoint is not https", async () => {
+    it("can still generate on OpenRouter alone", async () => {
       const { validateConfiguration } = await freshModule();
       healthy();
+      delete process.env.NVIDIA_API_KEY;
+
+      const report = validateConfiguration();
+
+      expect(report.canGenerate).toBe(true);
+      // Warned, not failed: OpenRouter serves every call, but there is
+      // no free fallback behind it.
+      expect(check(report, "NVIDIA_API_KEY").status).toBe("warn");
+    });
+
+    it("warns when OpenRouter is absent and only the free tier remains", async () => {
+      const { validateConfiguration } = await freshModule();
+      healthy();
+      delete process.env.OPENROUTER_API_KEY;
+
+      const report = validateConfiguration();
+
+      expect(check(report, "OPENROUTER_API_KEY").status).toBe("warn");
+      expect(check(report, "OPENROUTER_API_KEY").action).toMatch(/OPENROUTER_API_KEY/);
+      expect(report.canGenerate).toBe(true);
+    });
+
+    it("fails when the NVIDIA endpoint is not https", async () => {
+      const { validateConfiguration } = await freshModule();
+      healthy();
+      delete process.env.OPENROUTER_API_KEY;
       process.env.NVIDIA_API_BASE_URL = "http://insecure.example/v1";
 
       const report = validateConfiguration();
@@ -256,6 +287,7 @@ describe("validateConfiguration", () => {
 
       expect(serialised).not.toContain(serviceKey);
       expect(serialised).not.toContain("nvapi-testkey");
+      expect(serialised).not.toContain("sk-or-testkey");
     });
   });
 });

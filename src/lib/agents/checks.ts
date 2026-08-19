@@ -306,6 +306,67 @@ export function runStaticChecks(
   }
 
   const schemaTables = new Set(inspectSchema(context));
+  const schema = context.files.get("supabase/schema.sql")?.content ?? "";
+  if (
+    plan.dataModel.length > 0 &&
+    paths.has("supabase/schema.sql") &&
+    !/create\s+policy\b/i.test(schema)
+  ) {
+    findings.push({
+      rule: "missing-rls-policies",
+      severity: "error",
+      file: "supabase/schema.sql",
+      message: "schema enables persistence but defines no owner-scoped RLS policies",
+      fix: "llm",
+    });
+  }
+
+  const dataLayer = context.files.get("src/lib/data.ts")?.content ?? "";
+  if (
+    plan.dataModel.length > 0 &&
+    /const\s+[A-Za-z_$][\w$]*\s*:\s*(?:unknown|any|Record<[^>]+>)\[\]\s*=\s*\[\]/.test(dataLayer)
+  ) {
+    findings.push({
+      rule: "ephemeral-data-layer",
+      severity: "error",
+      file: "src/lib/data.ts",
+      message: "data is stored in a module array and will disappear on refresh or redeploy",
+      fix: "llm",
+    });
+  }
+
+  const preview = context.files.get("preview/index.html")?.content ?? "";
+  if (
+    plan.dataModel.length > 0 &&
+    (!/<script[\s>]/i.test(preview) ||
+      !/<(?:form|input|select|button|textarea)[\s>]/i.test(preview) ||
+      preview.length < 2500)
+  ) {
+    findings.push({
+      rule: "shallow-preview",
+      severity: "error",
+      file: "preview/index.html",
+      message: "preview does not yet demonstrate a complete interactive product workflow",
+      fix: "llm",
+    });
+  }
+
+  if (plan.dataModel.length > 0) {
+    for (const page of plan.pages) {
+      const path =
+        page.path === "/" ? "src/app/page.tsx" : `src/app${page.path}/page.tsx`;
+      const content = context.files.get(path)?.content;
+      if (!content || content.length >= 500) continue;
+      findings.push({
+        rule: "placeholder-page",
+        severity: "error",
+        file: path,
+        message: `page "${page.name}" is only a placeholder and does not implement its planned workflow`,
+        fix: "llm",
+      });
+    }
+  }
+
   for (const table of plan.dataModel) {
     if (!paths.has(`src/app/api/${table.table}/route.ts`)) {
       findings.push({

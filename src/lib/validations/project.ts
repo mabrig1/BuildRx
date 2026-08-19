@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
+
 export const createProjectSchema = z.object({
   name: z
     .string()
@@ -11,8 +13,14 @@ export const createProjectSchema = z.object({
     .optional(),
   prompt: z
     .string()
-    .min(10, "Describe your app in at least 10 characters")
-    .max(4000, "Prompt must be at most 4,000 characters")
+    .max(
+      MAX_AI_PROMPT_CHARACTERS,
+      `Prompt must be at most ${MAX_AI_PROMPT_CHARACTERS.toLocaleString()} characters`
+    )
+    .refine(
+      (value) => value.length === 0 || value.trim().length >= 10,
+      "Describe your app in at least 10 characters"
+    )
     .optional(),
 });
 

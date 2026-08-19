@@ -12,17 +12,23 @@ import type { Agent, AppPlan } from "@/lib/agents/types";
 
 const SYSTEM = `You are the Planner Agent in an automated app-building pipeline. You turn a user's app description into a precise build plan the other agents (UI, Database, Coding) execute.
 
+Your job is to plan a credible production MVP, never a landing-page mock-up. Infer the user's domain, primary users, permissions, records, and complete workflows. Every core workflow must have a place to start, enter or import data, review results, recover from errors, and reach a useful outcome. Prefer a smaller end-to-end vertical product over many decorative pages.
+
 Respond with ONLY a JSON object, no prose, matching:
 {
   "appName": string,
   "summary": string (one sentence),
+  "userRoles": [{ "name": string, "permissions": [string] }],
+  "workflows": [{ "name": string, "actor": string, "steps": [string], "outcome": string }],
   "pages": [{ "name": string, "path": string (route like "/" or "/about"), "description": string }],
   "components": [{ "name": string (PascalCase), "description": string }],
   "dataModel": [{ "table": string (snake_case), "description": string, "columns": [{ "name": string, "type": string (postgres type) }] }],
-  "features": [string]
+  "features": [string],
+  "acceptanceCriteria": [string],
+  "qualityRequirements": [string]
 }
 
-Keep the plan small and buildable: at most 4 pages, 6 components, 4 tables.
+Plan 4-7 purposeful pages, at most 12 components, 7 tables, 4 user roles, and 5 core workflows. Include authentication when records belong to users. Include search/filter, validation, loading, empty, error and success states where relevant. Acceptance criteria must be testable and describe behavior, not appearance.
 
 Output the JSON object and nothing else — no code fence, no commentary, and no reasoning before or after it. Finish the object: a complete small plan beats a detailed one that gets cut off.`;
 
@@ -156,9 +162,9 @@ export function parsePromptStructure(prompt: string): Partial<AppPlan> {
     }
   }
 
-  if (pages.length > 0) result.pages = pages.slice(0, 4);
-  if (components.length > 0) result.components = components.slice(0, 6);
-  if (dataModel.length > 0) result.dataModel = dataModel.slice(0, 4);
+  if (pages.length > 0) result.pages = pages.slice(0, 7);
+  if (components.length > 0) result.components = components.slice(0, 12);
+  if (dataModel.length > 0) result.dataModel = dataModel.slice(0, 7);
   return result;
 }
 
@@ -182,11 +188,213 @@ export function fallbackPlan(prompt: string): AppPlan {
   const lower = prompt.toLowerCase();
   const parsed = parsePromptStructure(prompt);
 
+  if (/statistic|analysis|dataset|survey|regression|anova|spss/.test(lower)) {
+    const statistics: AppPlan = {
+      appName: "InsightLab",
+      summary:
+        "A secure statistical-analysis workspace for importing datasets, running guided analyses, and exporting publication-ready results.",
+      userRoles: [
+        {
+          name: "Researcher",
+          permissions: [
+            "manage own projects and datasets",
+            "run analyses",
+            "export reports",
+          ],
+        },
+        {
+          name: "Administrator",
+          permissions: ["manage users", "view system health and usage"],
+        },
+      ],
+      workflows: [
+        {
+          name: "Import and validate a dataset",
+          actor: "Researcher",
+          steps: [
+            "create a project",
+            "upload CSV or paste tabular data",
+            "review inferred variable types",
+            "resolve missing-value warnings",
+            "save the validated dataset",
+          ],
+          outcome: "A reusable, validated dataset is ready for analysis",
+        },
+        {
+          name: "Run an analysis",
+          actor: "Researcher",
+          steps: [
+            "choose an analysis method",
+            "select dependent and independent variables",
+            "review assumptions",
+            "run the analysis",
+            "inspect tables, charts, and interpretation",
+          ],
+          outcome: "Reproducible statistical results are saved to the project",
+        },
+        {
+          name: "Export findings",
+          actor: "Researcher",
+          steps: [
+            "select result sections",
+            "choose APA or report format",
+            "preview the report",
+            "download the export",
+          ],
+          outcome: "A publication-ready report is downloaded",
+        },
+      ],
+      pages: [
+        {
+          name: "Overview",
+          path: "/",
+          description:
+            "Workspace dashboard with recent projects, dataset health, analysis activity, and primary actions",
+        },
+        {
+          name: "Projects",
+          path: "/projects",
+          description:
+            "Searchable project library with create, duplicate, archive, and ownership controls",
+        },
+        {
+          name: "Data Workspace",
+          path: "/data",
+          description:
+            "CSV upload and paste flow, variable inspector, data grid, validation warnings, and missing-value tools",
+        },
+        {
+          name: "Analysis Studio",
+          path: "/analysis",
+          description:
+            "Guided selection for descriptive statistics, correlation, regression, t-test and ANOVA with assumptions",
+        },
+        {
+          name: "Results",
+          path: "/results",
+          description:
+            "Saved outputs with statistical tables, charts, interpretations, confidence intervals, and effect sizes",
+        },
+        {
+          name: "Reports",
+          path: "/reports",
+          description:
+            "Report composer with APA-ready narrative, selected outputs, preview, and Word/PDF export actions",
+        },
+      ],
+      components: [
+        { name: "WorkspaceShell", description: "Responsive product navigation and project context" },
+        { name: "DatasetUploader", description: "Drag-and-drop CSV and pasted-data importer with progress" },
+        { name: "VariableInspector", description: "Variable type, label, missing-value and measurement-level editor" },
+        { name: "DataGrid", description: "Virtualized searchable dataset table" },
+        { name: "AnalysisBuilder", description: "Method and variable configuration panel with validation" },
+        { name: "AssumptionChecklist", description: "Analysis assumptions with pass, warning and remediation states" },
+        { name: "ResultsTable", description: "Accessible statistical output table" },
+        { name: "ResultChart", description: "Responsive visualization for the selected analysis" },
+        { name: "ReportComposer", description: "Reorderable report sections and export settings" },
+      ],
+      dataModel: [
+        {
+          table: "projects",
+          description: "Research workspaces owned by a user",
+          columns: [
+            { name: "id", type: "uuid" },
+            { name: "owner_id", type: "uuid" },
+            { name: "name", type: "text" },
+            { name: "status", type: "text" },
+            { name: "created_at", type: "timestamptz" },
+          ],
+        },
+        {
+          table: "datasets",
+          description: "Uploaded dataset metadata and validation state",
+          columns: [
+            { name: "id", type: "uuid" },
+            { name: "owner_id", type: "uuid" },
+            { name: "project_id", type: "uuid" },
+            { name: "name", type: "text" },
+            { name: "row_count", type: "integer" },
+            { name: "validation_status", type: "text" },
+            { name: "created_at", type: "timestamptz" },
+          ],
+        },
+        {
+          table: "analyses",
+          description: "Saved analysis configurations and execution status",
+          columns: [
+            { name: "id", type: "uuid" },
+            { name: "owner_id", type: "uuid" },
+            { name: "project_id", type: "uuid" },
+            { name: "method", type: "text" },
+            { name: "status", type: "text" },
+            { name: "created_at", type: "timestamptz" },
+          ],
+        },
+        {
+          table: "results",
+          description: "Structured statistical outputs and interpretations",
+          columns: [
+            { name: "id", type: "uuid" },
+            { name: "owner_id", type: "uuid" },
+            { name: "analysis_id", type: "uuid" },
+            { name: "summary", type: "text" },
+            { name: "result_json", type: "jsonb" },
+            { name: "created_at", type: "timestamptz" },
+          ],
+        },
+        {
+          table: "reports",
+          description: "Saved report configurations and export records",
+          columns: [
+            { name: "id", type: "uuid" },
+            { name: "owner_id", type: "uuid" },
+            { name: "project_id", type: "uuid" },
+            { name: "title", type: "text" },
+            { name: "format", type: "text" },
+            { name: "created_at", type: "timestamptz" },
+          ],
+        },
+      ],
+      features: [
+        "CSV upload and pasted-data import",
+        "data validation and variable typing",
+        "guided statistical methods",
+        "saved reproducible analysis configurations",
+        "interactive tables and charts",
+        "APA narrative and Word/PDF report export",
+        "project ownership and row-level security",
+      ],
+      acceptanceCriteria: [
+        "A researcher can import a dataset and see validation feedback before saving",
+        "An analysis cannot run until required variables and assumptions are satisfied",
+        "Results include statistics, uncertainty, effect size where applicable, and a plain-language interpretation",
+        "Saved projects, datasets, analyses, results, and reports persist per authenticated user",
+        "Every data screen has loading, empty, error, and success states",
+      ],
+      qualityRequirements: [
+        "responsive and keyboard accessible",
+        "no fabricated statistical results",
+        "server-side authorization for every mutation",
+        "clear validation and recovery guidance",
+      ],
+    };
+    return { ...statistics, ...parsed };
+  }
+
   if (lower.includes("church")) {
     const church: AppPlan = {
       appName: "Grace Community Church",
       summary:
         "A welcoming church website with service times, sermons, and upcoming events.",
+      userRoles: [{ name: "Visitor", permissions: ["view sermons and events"] }],
+      workflows: [
+        {
+          name: "Find and watch a sermon",
+          actor: "Visitor",
+          steps: ["browse sermons", "filter by speaker or topic", "open a sermon"],
+          outcome: "The visitor can watch or listen to the selected sermon",
+        },
+      ],
       pages: [
         { name: "Home", path: "/", description: "Hero with service times and welcome message" },
         { name: "About", path: "/about", description: "Our story, beliefs, and leadership" },
@@ -223,6 +431,10 @@ export function fallbackPlan(prompt: string): AppPlan {
         },
       ],
       features: ["Service times", "Sermon archive", "Events calendar"],
+      acceptanceCriteria: [
+        "Visitors can find service information and open a sermon or event",
+      ],
+      qualityRequirements: ["responsive", "accessible", "fast loading"],
     };
     return { ...church, ...parsed };
   }
@@ -236,13 +448,30 @@ export function fallbackPlan(prompt: string): AppPlan {
   const base: AppPlan = {
     appName,
     summary: summaryFromPrompt(prompt),
+    userRoles: [
+      {
+        name: "Member",
+        permissions: ["manage own records", "search and filter records"],
+      },
+    ],
+    workflows: [
+      {
+        name: "Manage the primary record",
+        actor: "Member",
+        steps: ["open the workspace", "create a record", "review it", "edit or archive it"],
+        outcome: "The record is validated and persists for the signed-in member",
+      },
+    ],
     pages: [
-      { name: "Home", path: "/", description: "Landing page with hero and features" },
-      { name: "About", path: "/about", description: "About page" },
+      { name: "Workspace", path: "/", description: "Operational dashboard with records, status, search, filters, and primary actions" },
+      { name: "Records", path: "/records", description: "Searchable record list with create, detail, edit, archive, loading, empty and error states" },
+      { name: "Settings", path: "/settings", description: "Account and product preferences with validation and saved feedback" },
     ],
     components: [
-      { name: "Hero", description: "Hero section with headline and CTA" },
-      { name: "FeatureGrid", description: "Three-column feature grid" },
+      { name: "AppShell", description: "Responsive authenticated navigation and page context" },
+      { name: "RecordTable", description: "Searchable and filterable record table with row actions" },
+      { name: "RecordForm", description: "Validated create and edit form with loading, error and success states" },
+      { name: "EmptyState", description: "Actionable empty state for first-time users" },
     ],
     dataModel: [
       {
@@ -250,12 +479,20 @@ export function fallbackPlan(prompt: string): AppPlan {
         description: "Core content items",
         columns: [
           { name: "id", type: "uuid" },
+          { name: "owner_id", type: "uuid" },
           { name: "title", type: "text" },
+          { name: "status", type: "text" },
           { name: "created_at", type: "timestamptz" },
         ],
       },
     ],
-    features: ["Responsive layout", "Modern design", "Fast page loads"],
+    features: ["Authentication", "Persistent CRUD", "Search and filters", "Validation", "Responsive product workspace"],
+    acceptanceCriteria: [
+      "A signed-in member can create, find, update, and archive their own records",
+      "Records persist across refreshes and are isolated by owner",
+      "Loading, empty, validation, error, and success states are visible and actionable",
+    ],
+    qualityRequirements: ["responsive", "keyboard accessible", "secure by default", "clear error recovery"],
   };
 
   // Anything the user spelled out wins over the template.
@@ -294,26 +531,53 @@ function normalizePlan(plan: Partial<AppPlan> | null, prompt: string): AppPlan {
     pages: list(
       plan?.pages,
       base.pages,
-      4,
+      7,
       (page) => typeof page?.path === "string" && page.path.startsWith("/")
     ),
     components: list(
       plan?.components,
       base.components,
-      6,
+      12,
       (component) => typeof component?.name === "string" && /^\w+$/.test(component.name)
     ),
     dataModel: list(
       plan?.dataModel,
       base.dataModel,
-      4,
+      7,
       (table) => typeof table?.table === "string" && Array.isArray(table?.columns)
     ),
     features: list(
       plan?.features,
       base.features,
-      8,
+      12,
       (feature) => typeof feature === "string"
+    ),
+    userRoles: list(
+      plan?.userRoles,
+      base.userRoles ?? [],
+      4,
+      (role) => typeof role?.name === "string" && Array.isArray(role?.permissions)
+    ),
+    workflows: list(
+      plan?.workflows,
+      base.workflows ?? [],
+      5,
+      (workflow) =>
+        typeof workflow?.name === "string" &&
+        Array.isArray(workflow?.steps) &&
+        workflow.steps.length > 0
+    ),
+    acceptanceCriteria: list(
+      plan?.acceptanceCriteria,
+      base.acceptanceCriteria ?? [],
+      10,
+      (criterion) => typeof criterion === "string"
+    ),
+    qualityRequirements: list(
+      plan?.qualityRequirements,
+      base.qualityRequirements ?? [],
+      8,
+      (requirement) => typeof requirement === "string"
     ),
   };
 }

@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
 
+const SUPABASE_AUTH_TIMEOUT_MS = 2_000;
+
 /** Routes that require an authenticated session. */
 const protectedPrefixes = [
   "/dashboard",
@@ -16,6 +18,47 @@ const protectedPrefixes = [
 
 /** Auth pages a signed-in user should be bounced away from. */
 const authPages = ["/login", "/signup", "/forgot-password"];
+
+function matchesPrefix(pathname: string, prefixes: string[]) {
+  return prefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
+function hasSupabaseAuthCookie(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .some(
+      ({ name }) => name.startsWith("sb-") && name.includes("-auth-token")
+    );
+}
+
+/**
+ * Routing middleware must never wait indefinitely on an external auth API.
+ * A slow or unreachable Supabase project previously held every request open
+ * until Vercel returned MIDDLEWARE_INVOCATION_TIMEOUT.
+ */
+async function fetchWithAuthTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort("Supabase auth middleware timed out"),
+    SUPABASE_AUTH_TIMEOUT_MS
+  );
+
+  const upstreamSignal = init?.signal;
+  const abortFromUpstream = () => controller.abort(upstreamSignal?.reason);
+  upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+    upstreamSignal?.removeEventListener("abort", abortFromUpstream);
+  }
+}
 
 /** Marketing-only routes (served on the apex domain). */
 const marketingPrefixes = ["/pricing", "/features", "/docs"];
@@ -83,6 +126,22 @@ export async function updateSession(request: NextRequest) {
 
   let supabaseResponse = NextResponse.next({ request });
 
+  const { pathname } = request.nextUrl;
+  const isProtected = matchesPrefix(pathname, protectedPrefixes);
+  const isAuthPage = authPages.includes(pathname);
+
+  // Public and marketing requests do not need a verified user. Avoiding a
+  // Supabase round trip here keeps the homepage available even if the auth
+  // provider is degraded or its environment variables are wrong.
+  if (!isProtected && !isAuthPage) {
+    return supabaseResponse;
+  }
+
+  // A signed-out visitor opening a login page has no session to refresh.
+  if (isAuthPage && !hasSupabaseAuthCookie(request)) {
+    return supabaseResponse;
+  }
+
   const url = supabaseUrl();
   const anonKey = supabaseAnonKey();
 
@@ -92,6 +151,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   const supabase = createServerClient(url, anonKey, {
+    global: { fetch: fetchWithAuthTimeout },
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -110,21 +170,34 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: do not add logic between createServerClient and getUser —
   // it can cause hard-to-debug session issues.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
-
-  const isProtected = protectedPrefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
+  let user = null;
+  let authUnavailable = false;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+    if (result.error) {
+      authUnavailable = true;
+      console.warn("[middleware:auth] Supabase user verification failed", {
+        pathname,
+        message: result.error.message,
+      });
+    }
+  } catch (error) {
+    authUnavailable = true;
+    console.error("[middleware:auth] Supabase request failed", {
+      pathname,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   if (!user && isProtected) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";
     redirectUrl.searchParams.set("next", pathname);
+    if (authUnavailable) {
+      redirectUrl.searchParams.set("error", "auth_unavailable");
+    }
     return NextResponse.redirect(redirectUrl);
   }
 

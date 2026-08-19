@@ -14,13 +14,14 @@ import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
 
 const SYSTEM = `You are the Coding Agent in an automated app-building pipeline. The UI and Database agents have already generated the visual layer and schema. You write the remaining application code that wires everything together:
 
-- data access helpers ("src/lib/data.ts") matching the schema
-- a REST API route handler under "src/app/api/<table>/route.ts" (GET list + POST create) for each table in the plan's data model
+- authenticated Supabase clients for server and browser code
+- persistent data access helpers ("src/lib/data.ts") matching the schema; never use module arrays, sample-data stores, or fake CRUD
+- a REST API route handler under "src/app/api/<table>/route.ts" with authenticated GET, POST, PATCH, and DELETE for each table in the plan's data model
 - the root layout ("src/app/layout.tsx") importing globals.css, if not already generated
-- project structure files: "package.json" (next/react/tailwind deps, dev/build/start scripts) and "README.md" describing the app, its pages, and how to run it
+- project structure files: "package.json" (next/react/tailwind/Supabase deps, dev/build/start/lint/typecheck scripts), ".env.example", and "README.md" describing setup, workflows, schema migration, and verification
 - any hooks or utilities the plan's features require
 
-Use TypeScript and keep files focused. Do NOT regenerate files that already exist (you'll be given the list).
+Use TypeScript and keep files focused. Verify the user server-side for every query and mutation. Validate request bodies, never trust owner_id from the client, and return actionable errors. Do NOT regenerate files that already exist (you'll be given the list).
 
 ${FILE_FORMAT_INSTRUCTIONS}`;
 
@@ -36,20 +37,108 @@ function mockFiles(
 ): GeneratedFile[] {
   const files: GeneratedFile[] = [
     {
+      path: "src/lib/supabase/server.ts",
+      content: `import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
+export async function createClient() {
+  const cookieStore = await cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: (values) => {
+          try {
+            values.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Server Components cannot write cookies; middleware refreshes sessions.
+          }
+        },
+      },
+    }
+  );
+}
+`,
+    },
+    {
+      path: "src/lib/supabase/client.ts",
+      content: `import { createBrowserClient } from "@supabase/ssr";
+
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+`,
+    },
+    {
       path: "src/lib/data.ts",
-      content: `// Data access helpers wired to the generated schema.
+      content: `import { createClient } from "@/lib/supabase/server";
+
+async function authenticatedClient() {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new Error("UNAUTHENTICATED");
+  return { supabase, user };
+}
+
 ${plan.dataModel
   .map((t) => {
     const type = toPascal(t.table);
+    const ownerColumn = t.columns.some((column) => column.name === "user_id")
+      ? "user_id"
+      : "owner_id";
     return `
-const ${t.table}: unknown[] = [];
-
-export async function list${type}(): Promise<unknown[]> {
-  return ${t.table};
+export async function list${type}() {
+  const { supabase, user } = await authenticatedClient();
+  const { data, error } = await supabase
+    .from("${t.table}")
+    .select("*")
+    .eq("${ownerColumn}", user.id)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
 }
 
-export async function add${type}(row: unknown): Promise<void> {
-  ${t.table}.push(row);
+export async function create${type}(input: Record<string, unknown>) {
+  const { supabase, user } = await authenticatedClient();
+  const { id: _id, ${ownerColumn}: _owner, created_at: _created, ...safeInput } = input;
+  const { data, error } = await supabase
+    .from("${t.table}")
+    .insert({ ...safeInput, ${ownerColumn}: user.id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function update${type}(id: string, input: Record<string, unknown>) {
+  const { supabase, user } = await authenticatedClient();
+  const { id: _id, ${ownerColumn}: _owner, created_at: _created, ...safeInput } = input;
+  const { data, error } = await supabase
+    .from("${t.table}")
+    .update(safeInput)
+    .eq("id", id)
+    .eq("${ownerColumn}", user.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function delete${type}(id: string) {
+  const { supabase, user } = await authenticatedClient();
+  const { error } = await supabase
+    .from("${t.table}")
+    .delete()
+    .eq("id", id)
+    .eq("${ownerColumn}", user.id);
+  if (error) throw error;
 }`;
   })
   .join("\n")}
@@ -64,20 +153,56 @@ export async function add${type}(row: unknown): Promise<void> {
       path: `src/app/api/${table.table}/route.ts`,
       content: `import { NextResponse } from "next/server";
 
-import { add${type}, list${type} } from "@/lib/data";
+import { create${type}, delete${type}, list${type}, update${type} } from "@/lib/data";
+
+function responseError(error: unknown) {
+  const message = error instanceof Error ? error.message : "Request failed";
+  const status = message === "UNAUTHENTICATED" ? 401 : 500;
+  return NextResponse.json({ error: message }, { status });
+}
 
 /** ${table.description} */
 export async function GET() {
-  return NextResponse.json({ data: await list${type}() });
+  try {
+    return NextResponse.json({ data: await list${type}() });
+  } catch (error) {
+    return responseError(error);
+  }
 }
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  if (!body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
-  await add${type}(body);
-  return NextResponse.json({ success: true }, { status: 201 });
+  try {
+    return NextResponse.json({ data: await create${type}(body) }, { status: 201 });
+  } catch (error) {
+    return responseError(error);
+  }
+}
+
+export async function PATCH(request: Request) {
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body) || typeof body.id !== "string") {
+    return NextResponse.json({ error: "A valid id is required" }, { status: 400 });
+  }
+  try {
+    return NextResponse.json({ data: await update${type}(body.id, body) });
+  } catch (error) {
+    return responseError(error);
+  }
+}
+
+export async function DELETE(request: Request) {
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  try {
+    await delete${type}(id);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return responseError(error);
+  }
 }
 `,
     });
@@ -121,8 +246,12 @@ export default function RootLayout({
             dev: "next dev",
             build: "next build",
             start: "next start",
+            lint: "next lint",
+            typecheck: "tsc --noEmit",
           },
           dependencies: {
+            "@supabase/ssr": "^0.7.0",
+            "@supabase/supabase-js": "^2.50.0",
             next: "^15.0.0",
             react: "^19.0.0",
             "react-dom": "^19.0.0",
@@ -137,6 +266,12 @@ export default function RootLayout({
       )}\n`,
     },
     {
+      path: ".env.example",
+      content: `NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+`,
+    },
+    {
       path: "README.md",
       content: `# ${plan.appName}
 
@@ -146,14 +281,19 @@ ${plan.summary}
 
 ${plan.pages.map((p) => `- **${p.name}** (\`${p.path}\`) — ${p.description}`).join("\n")}
 
+## Core workflows
+
+${(plan.workflows ?? []).map((workflow) => `- **${workflow.name}** — ${workflow.steps.join(" → ")} → ${workflow.outcome}`).join("\n") || "- Manage records through the product workspace"}
+
 ## Getting started
 
 \`\`\`bash
 npm install
+npx supabase db push
 npm run dev
 \`\`\`
 
-Generated by App-Creator.
+Copy \`.env.example\` to \`.env.local\` and add the project URL and anonymous key. Before release, run \`npm run typecheck\`, \`npm run build\`, and verify every acceptance criterion.
 `,
     }
   );

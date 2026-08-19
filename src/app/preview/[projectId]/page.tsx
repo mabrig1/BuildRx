@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Monitor, RefreshCw, Smartphone, Tablet } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
+import { PreviewPanel } from "@/components/preview/preview-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getFileSystem } from "@/lib/files/manager";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Live Preview",
@@ -16,6 +20,23 @@ export default async function PreviewPage({
 }) {
   const { projectId } = await params;
 
+  let previewUrl: string | null = null;
+  if (isSupabaseConfigured()) {
+    const supabase = await createClient();
+    const { data: project } = await supabase
+      .from("projects")
+      .select("preview_url")
+      .eq("id", projectId)
+      .maybeSingle();
+    previewUrl = project?.preview_url ?? null;
+  } else {
+    // Demo mode: point at the in-memory preview when it exists.
+    const file = await getFileSystem(projectId)
+      .read("preview/index.html")
+      .catch(() => null);
+    previewUrl = file ? `/api/preview/${projectId}` : null;
+  }
+
   return (
     <div className="flex h-svh flex-col">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
@@ -25,36 +46,13 @@ export default async function PreviewPage({
             Back to workspace
           </Link>
         </Button>
-        <Badge variant="secondary" className="ml-2">
-          Live Preview
-        </Badge>
-        <div className="ml-auto flex items-center gap-1">
-          <Button variant="ghost" size="icon" aria-label="Desktop viewport">
-            <Monitor className="size-4" />
-          </Button>
-          <Button variant="ghost" size="icon" aria-label="Tablet viewport">
-            <Tablet className="size-4" />
-          </Button>
-          <Button variant="ghost" size="icon" aria-label="Mobile viewport">
-            <Smartphone className="size-4" />
-          </Button>
-          <Button variant="ghost" size="icon" aria-label="Refresh preview">
-            <RefreshCw className="size-4" />
-          </Button>
-        </div>
+        <Badge variant="secondary">Live Preview</Badge>
       </header>
-
-      <main className="bg-muted/40 flex flex-1 items-center justify-center p-6">
-        <div className="bg-background flex h-full w-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed text-center">
-          <Monitor className="text-muted-foreground size-10" />
-          <div className="space-y-1">
-            <p className="font-medium">Preview not available yet</p>
-            <p className="text-muted-foreground text-sm">
-              Your generated app will render here once it&apos;s built.
-            </p>
-          </div>
-        </div>
-      </main>
+      <PreviewPanel
+        projectId={projectId}
+        previewUrl={previewUrl}
+        className="min-h-0 flex-1"
+      />
     </div>
   );
 }

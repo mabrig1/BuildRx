@@ -18,9 +18,13 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{
+    next?: string;
+    error?: string;
+    error_description?: string;
+  }>;
 }) {
-  const { next, error } = await searchParams;
+  const { next, error, error_description: errorDescription } = await searchParams;
 
   return (
     <Card>
@@ -33,7 +37,9 @@ export default async function LoginPage({
       <CardContent className="grid gap-4">
         {error ? (
           <p className="border-destructive/50 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm">
-            Something went wrong signing you in. Please try again.
+            {errorDescription
+              ? `Sign-in failed: ${errorDescription.slice(0, 200)}`
+              : "Something went wrong signing you in. Please try again."}
           </p>
         ) : null}
         <LoginForm next={next} />

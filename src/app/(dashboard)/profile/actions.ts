@@ -32,7 +32,7 @@ export async function updateProfile(
   }
 
   const { error: dbError } = await supabase
-    .from("profiles")
+    .from("users")
     .update({ name: parsed.data.name })
     .eq("id", user.id);
   if (dbError) {

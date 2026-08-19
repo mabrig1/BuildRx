@@ -3,6 +3,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { sanitizeNextPath } from "@/lib/auth/redirects";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import {
   forgotPasswordSchema,
@@ -17,6 +19,11 @@ import {
 
 type ActionResult = { error: string } | { success: true } | void;
 
+const NOT_CONFIGURED_ERROR =
+  "Authentication isn't set up yet: the NEXT_PUBLIC_SUPABASE_URL and " +
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables are missing on " +
+  "this deployment. Add them (Production environment) and redeploy.";
+
 async function getOrigin() {
   const headerList = await headers();
   return (
@@ -26,25 +33,20 @@ async function getOrigin() {
   );
 }
 
-/** Only allow same-origin relative paths as post-auth redirect targets. */
-function sanitizeNext(next: string | undefined | null) {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return "/dashboard";
-  }
-  return next;
-}
-
 export async function login(
   input: LoginInput,
   next?: string
 ): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) {
+    return { error: NOT_CONFIGURED_ERROR };
+  }
   const parsed = loginSchema.safeParse(input);
   if (!parsed.success) {
     return { error: "Please check your email and password." };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
@@ -53,10 +55,20 @@ export async function login(
     return { error: error.message };
   }
 
-  redirect(sanitizeNext(next));
+  const { trackServerEvent } = await import("@/lib/analytics/track");
+  await trackServerEvent({
+    userId: data.user?.id ?? null,
+    eventType: "login",
+    properties: { method: "password" },
+  });
+
+  redirect(sanitizeNextPath(next));
 }
 
 export async function signup(input: SignupInput): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) {
+    return { error: NOT_CONFIGURED_ERROR };
+  }
   const parsed = signupSchema.safeParse(input);
   if (!parsed.success) {
     return { error: "Please check the form for errors." };
@@ -79,6 +91,12 @@ export async function signup(input: SignupInput): Promise<ActionResult> {
 
   // Email confirmation disabled → session is live, go straight in.
   if (data.session) {
+    const { trackServerEvent } = await import("@/lib/analytics/track");
+    await trackServerEvent({
+      userId: data.user?.id ?? null,
+      eventType: "signup",
+      properties: { method: "password" },
+    });
     redirect("/dashboard");
   }
 
@@ -87,10 +105,13 @@ export async function signup(input: SignupInput): Promise<ActionResult> {
 }
 
 export async function signInWithGoogle(next?: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) {
+    return { error: NOT_CONFIGURED_ERROR };
+  }
   const origin = await getOrigin();
   const supabase = await createClient();
 
-  const safeNext = sanitizeNext(next);
+  const safeNext = sanitizeNextPath(next);
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -108,6 +129,9 @@ export async function signInWithGoogle(next?: string): Promise<ActionResult> {
 export async function forgotPassword(
   input: ForgotPasswordInput
 ): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) {
+    return { error: NOT_CONFIGURED_ERROR };
+  }
   const parsed = forgotPasswordSchema.safeParse(input);
   if (!parsed.success) {
     return { error: "Enter a valid email address." };
@@ -126,6 +150,9 @@ export async function forgotPassword(
 export async function resetPassword(
   input: ResetPasswordInput
 ): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) {
+    return { error: NOT_CONFIGURED_ERROR };
+  }
   const parsed = resetPasswordSchema.safeParse(input);
   if (!parsed.success) {
     return { error: "Please check the form for errors." };
@@ -144,6 +171,9 @@ export async function resetPassword(
 }
 
 export async function signOut(): Promise<void> {
+  if (!isSupabaseConfigured()) {
+    redirect("/login");
+  }
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");

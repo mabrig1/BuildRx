@@ -1,7 +1,43 @@
 import type { NextConfig } from "next";
 
+/**
+ * The single source of these headers. Do not also set them in
+ * vercel.json — the platform appends rather than replaces, and a
+ * duplicated X-Frame-Options arrives as "SAMEORIGIN, SAMEORIGIN", which
+ * is not a valid value, so browsers fall back to DENY and block even
+ * same-origin iframes.
+ */
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(), payment=()",
+  },
+];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+      {
+        // WebContainers need cross-origin isolation (SharedArrayBuffer).
+        // Scoped to the dedicated runner route so the rest of the app is
+        // unaffected.
+        source: "/preview/:projectId/container",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+        ],
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

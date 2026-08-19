@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { PostHogPageviews } from "@/lib/analytics/posthog-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { siteConfig } from "@/lib/constants";
@@ -41,6 +43,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <Suspense fallback={null}>
+            <PostHogPageviews />
+          </Suspense>
           {children}
           <Toaster richColors position="bottom-right" />
         </ThemeProvider>

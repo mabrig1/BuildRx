@@ -1,7 +1,9 @@
 import {
+  BookOpen,
   Bot,
   CreditCard,
   FolderKanban,
+  HeartPulse,
   LayoutDashboard,
   Settings,
   ShieldCheck,
@@ -9,14 +11,21 @@ import {
 } from "lucide-react";
 
 export const siteConfig = {
-  name: "App-Creator",
+  name: "BuildRx",
   description:
     "Build production-ready apps by chatting with AI. Describe what you want, watch it come to life.",
   url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   links: {
-    github: "https://github.com/mabrig1/App-Creator",
+    github: "https://github.com/mabrig1/BuildRx",
   },
 } as const;
+
+/** Marketing site navigation (buildrx.online). */
+export const marketingNav = [
+  { title: "Features", href: "/features" },
+  { title: "Pricing", href: "/pricing" },
+  { title: "Docs", href: "/docs" },
+] as const;
 
 export type NavItem = {
   title: string;
@@ -29,18 +38,35 @@ export const dashboardNav: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Projects", href: "/projects", icon: FolderKanban },
   { title: "AI Chat", href: "/chat", icon: Bot },
+  { title: "Guide", href: "/guide", icon: BookOpen },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },
   { title: "Admin", href: "/admin", icon: ShieldCheck, adminOnly: true },
+  { title: "Health", href: "/admin/health", icon: HeartPulse, adminOnly: true },
 ];
 
-export const plans = [
+export interface PlanDefinition {
+  id: "free" | "pro";
+  name: string;
+  price: number;
+  description: string;
+  features: string[];
+  limits: {
+    /** Max projects (Infinity = unlimited). */
+    projects: number;
+    /** Max AI requests per calendar month. */
+    aiRequestsPerMonth: number;
+  };
+}
+
+export const plans: PlanDefinition[] = [
   {
     id: "free",
     name: "Free",
     price: 0,
     description: "For trying things out",
-    features: ["3 projects", "50 AI messages / month", "Community support"],
+    features: ["5 projects", "50 AI requests / month", "Community support"],
+    limits: { projects: 5, aiRequestsPerMonth: 50 },
   },
   {
     id: "pro",
@@ -49,21 +75,14 @@ export const plans = [
     description: "For serious builders",
     features: [
       "Unlimited projects",
-      "2,000 AI messages / month",
+      "2,000 AI requests / month",
       "Custom domains",
       "Priority support",
     ],
+    limits: { projects: Infinity, aiRequestsPerMonth: 2000 },
   },
-  {
-    id: "team",
-    name: "Team",
-    price: 60,
-    description: "For teams shipping together",
-    features: [
-      "Everything in Pro",
-      "10,000 AI messages / month",
-      "Shared workspaces",
-      "Role-based access",
-    ],
-  },
-] as const;
+];
+
+export function planById(id: string | null | undefined): PlanDefinition {
+  return plans.find((plan) => plan.id === id) ?? plans[0];
+}

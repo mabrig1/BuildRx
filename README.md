@@ -1,74 +1,89 @@
 # App-Creator
 
-An AI app builder, similar to Lovable — describe the app you want in plain English and watch it come to life with live preview and one-click deployment.
+An AI app builder in the spirit of Lovable: describe the app you want in plain English, watch a team of AI agents plan, build, debug, and deploy it — then edit the generated code in an in-browser IDE, see it render live, push it to GitHub, and ship it to Vercel, Netlify, or Railway.
 
-> **Status:** project architecture and configuration only. Feature implementation comes next.
+## Features
+
+- **AI chat workspace** — streaming Claude-powered chat per project, with conversation history, message editing, markdown + code-block rendering
+- **Multi-agent build pipeline** — six specialized agents (Planner → UI → Database → Coding → Debug → Deployment) collaborate through a shared context to turn one prompt into a complete project: pages, components, database schema, API routes, styling, and structure files
+- **Virtual project filesystem** — every generated file is stored per project, browsable and editable
+- **In-browser IDE** — Monaco editor (bundled, no CDN) with a file explorer, tabs, auto-save, search & replace, and a simulated terminal
+- **Live preview environment** — instant-refresh static preview, a Sandpack engine, and a WebContainer runner that boots the generated project's real dev server in the browser; device viewports, error console, fullscreen
+- **GitHub integration** — connect an account, create/link repositories, push the whole project as a commit, pull changes back, browse commit history
+- **Zip export** — download any project's files as a zip archive in one click
+- **One-click deployment** — Vercel, Netlify, and Railway with live build logs, deployment history, status tracking, and custom domains
+- **Auth** — Supabase email/password + Google OAuth, secure-cookie JWT sessions, protected routes
+- **Subscriptions** — Free (5 projects) and Pro (unlimited) plans, Paystack & Flutterwave checkouts, invoices, server-enforced usage limits
+- **Admin analytics** — users, activity, AI usage, revenue, login history, and CSV report exports, with optional PostHog tracking
+- **Demo mode** — the entire product works with zero configuration (in-memory stores, simulated providers) so you can explore before adding any keys
 
 ## Tech stack
 
 | Layer | Technology |
 | --- | --- |
-| Framework | [Next.js 15](https://nextjs.org) (App Router, Turbopack) |
-| Language | TypeScript |
+| Framework | [Next.js 15](https://nextjs.org) (App Router, Turbopack) + React 19 + TypeScript |
 | Styling | Tailwind CSS v4 + [Shadcn UI](https://ui.shadcn.com) (Radix primitives) |
-| Auth & Database | [Supabase](https://supabase.com) (PostgreSQL, RLS, Auth) |
-| State management | Zustand |
-| Forms & validation | React Hook Form + Zod |
-| Notifications | Sonner |
-| Deployment | Vercel |
+| Auth & database | [Supabase](https://supabase.com) (PostgreSQL, RLS, Auth) |
+| AI | NVIDIA Inference API (GLM 5.2 reasoning · Step 3.7 Flash chat · Laguna XS 2.1 code) — free tier, no paid balance required. Anthropic Claude is an optional off-by-default tier. |
+| Editor & preview | Monaco · Sandpack · WebContainers |
+| State / forms | Zustand · React Hook Form + Zod |
+| Payments | Paystack · Flutterwave |
+| Analytics | PostHog (optional) + first-party events |
+| Charts | Recharts |
 
-## Getting started
+## Quickstart
 
 ```bash
-# 1. Install dependencies
+git clone <your-fork-url> app-creator && cd app-creator
 npm install
-
-# 2. Configure environment
-cp .env.example .env.local
-# fill in your Supabase / Anthropic / Stripe keys
-
-# 3. Apply the database schema (Supabase CLI)
-npx supabase db push
-
-# 4. Run the dev server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) — the app runs fully in **demo mode** with no environment variables (in-memory data, simulated integrations). To connect real services, follow the [installation guide](docs/installation.md) and the [environment variable reference](docs/environment-variables.md).
 
-The app runs without env vars configured (auth middleware no-ops until Supabase keys are present), so you can explore the UI immediately.
+## Documentation
+
+| Guide | Contents |
+| --- | --- |
+| [Installation](docs/installation.md) | Prerequisites, Supabase setup, migrations, auth providers, first run, troubleshooting |
+| [Environment variables](docs/environment-variables.md) | Every variable, where to get it, what breaks without it |
+| [Deployment](docs/deployment.md) | Deploying App-Creator to Vercel, webhooks, domains, post-deploy checklist |
+| [API reference](docs/api.md) | Every endpoint: auth, request/response shapes, streaming formats, errors |
 
 ## Project structure
 
 ```
+├── docs/                          # Installation, env, deployment, API docs
 ├── supabase/
-│   ├── migrations/            # SQL migrations (schema + RLS policies)
-│   └── seed.sql               # Local development seed data
+│   ├── migrations/                # 12 ordered migrations (schema + RLS)
+│   └── seed.sql                   # Starter templates
 ├── src/
 │   ├── app/
-│   │   ├── (auth)/            # login, signup, forgot-password
-│   │   ├── (dashboard)/       # dashboard, projects, chat, settings, billing, admin
-│   │   ├── preview/[projectId]/  # full-screen live preview
-│   │   ├── auth/callback/     # Supabase OAuth callback
-│   │   └── api/               # chat, projects, stripe webhook endpoints
+│   │   ├── (auth)/                # login, signup, forgot/reset password + actions
+│   │   ├── (dashboard)/           # dashboard, projects, chat, settings, billing, admin, profile
+│   │   ├── (workspace)/projects/[projectId]/   # the build workspace (chat + IDE + preview)
+│   │   ├── preview/[projectId]/   # full-page preview (+ /container WebContainer runner)
+│   │   ├── auth/                  # OAuth callback + email OTP confirm
+│   │   └── api/                   # chat, ai, agents, projects/files, github, deploy, billing, admin
 │   ├── components/
-│   │   ├── ui/                # Shadcn UI primitives
-│   │   ├── layout/            # sidebar, header, user nav, theme toggle
-│   │   ├── providers/         # theme provider
-│   │   └── {auth,chat,projects,preview,billing,admin}/  # feature components
+│   │   ├── ui/                    # Shadcn UI primitives
+│   │   ├── layout/ providers/     # app shell, theme
+│   │   └── {auth,chat,agents,editor,preview,files,github,deploy,billing,admin,projects,dashboard}/
 │   ├── lib/
-│   │   ├── supabase/          # browser / server / admin clients + middleware
-│   │   ├── validations/       # Zod schemas
-│   │   ├── ai/                # AI generation logic (upcoming)
-│   │   ├── constants.ts       # site config, navigation, plans
-│   │   └── utils.ts
-│   ├── stores/                # Zustand stores (projects, chat, preview, ui)
-│   ├── hooks/                 # shared React hooks
-│   ├── types/                 # domain + database types
-│   └── middleware.ts          # session refresh + route protection
-├── components.json            # Shadcn UI configuration
-├── vercel.json                # Vercel deployment configuration
-└── .env.example               # required environment variables
+│   │   ├── agents/                # the six build agents + orchestrator
+│   │   ├── ai/                    # Claude prompts, NVIDIA client, usage metering, route helpers
+│   │   ├── analytics/             # PostHog, event tracking, admin aggregates
+│   │   ├── billing/               # plans/limits, Paystack & Flutterwave, activation
+│   │   ├── deploy/                # Vercel/Netlify/Railway adapters
+│   │   ├── files/                 # virtual filesystem manager
+│   │   ├── github/                # GitHub REST + Git Data API client
+│   │   ├── supabase/              # browser/server/admin clients + session middleware
+│   │   ├── validations/           # Zod schemas
+│   │   └── rate-limit.ts constants.ts utils.ts
+│   ├── stores/                    # Zustand stores
+│   ├── hooks/ types/
+│   └── middleware.ts              # session refresh + route protection
+└── .env.example
 ```
 
 ## Routes
@@ -76,52 +91,34 @@ The app runs without env vars configured (auth middleware no-ops until Supabase 
 | Route | Purpose |
 | --- | --- |
 | `/` | Marketing landing page |
-| `/login`, `/signup`, `/forgot-password` | Authentication |
-| `/dashboard` | Overview of projects and activity |
-| `/projects` | Project management |
-| `/projects/[projectId]` | AI chat + preview workspace |
-| `/chat` | Standalone AI chat interface |
-| `/preview/[projectId]` | Full-screen live preview |
-| `/settings` | Account settings |
-| `/billing` | Plans and usage |
-| `/admin` | Platform administration (admins only) |
+| `/login` `/signup` `/forgot-password` `/reset-password` | Authentication |
+| `/dashboard` | Overview, stats, recent projects |
+| `/projects` | Project management (create/search/duplicate/delete) |
+| `/projects/[id]` | Build workspace: AI chat, agent builds, IDE, live preview, GitHub, deploy |
+| `/preview/[id]` | Full-page live preview (`/container` runs it in a WebContainer) |
+| `/chat` | Jumps into your most recent project's chat |
+| `/settings` `/profile` `/billing` | Account, profile, subscription & invoices |
+| `/admin` | Admin analytics (admin role required) |
 
 ## Database
 
-The initial schema (`supabase/migrations/0001_initial_schema.sql`) defines:
+Twelve ordered migrations in `supabase/migrations/` define the schema — apply with `npx supabase db push`. Tables: `users`, `templates`, `projects`, `project_files`, `chat_messages`, `ai_generations`, `deployments`, `subscriptions`, `invoices`, `usage_logs`, `analytics`, `integration_connections`.
 
-- **profiles** — user profiles, auto-created on signup via trigger
-- **projects** — user-owned app projects
-- **chat_messages** — per-project AI conversation history
-- **deployments** — deployment records per project
-- **subscriptions** — billing state (Stripe)
+Security model:
 
-All tables have row-level security enabled with owner-scoped policies.
-
-## Authentication
-
-Auth is built on Supabase Auth (`@supabase/ssr`). Sessions are JWTs stored in secure cookies, refreshed on every request by `src/middleware.ts`, which also redirects unauthenticated users off protected routes (`/dashboard`, `/projects`, `/chat`, `/settings`, `/billing`, `/admin`, `/profile`) and signed-in users away from the auth pages.
-
-Supported flows:
-
-- **Email + password** — signup (with optional email confirmation), login, password reset via email link
-- **Google OAuth** — enable the Google provider in Supabase (Authentication → Providers) with your OAuth client ID/secret
-
-Supabase dashboard configuration:
-
-1. **Authentication → URL Configuration** — set the Site URL to your deployment URL and add `https://<your-domain>/auth/callback` to the redirect allow list (plus `http://localhost:3000/auth/callback` for local dev).
-2. **Authentication → Providers → Google** — add your Google OAuth credentials; the authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`.
-3. Optional: point email templates at `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=...` — both the code (`/auth/callback`) and token-hash (`/auth/confirm`) flows are supported.
-
-## Deployment
-
-Deploy to [Vercel](https://vercel.com): import the repository, set the environment variables from `.env.example`, and deploy. `vercel.json` configures the framework and security headers.
+- **RLS on every table** — owner-scoped CRUD; public projects readable by anyone; admin reads via a `SECURITY DEFINER is_admin()` helper
+- **Column-level privileges** — clients can never change their own `role` or `plan` (revoked beneath RLS)
+- **Service-role-only writes** for billing, invoices, metering, and generation accounting — usage and payments can't be forged from a browser
+- Full details in the migration files, each validated against Postgres 16
 
 ## Scripts
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start the dev server (Turbopack) |
-| `npm run build` | Production build |
-| `npm run start` | Serve the production build |
-| `npm run lint` | Run ESLint |
+| `npm run dev` | Dev server (Turbopack) |
+| `npm run build` / `npm run start` | Production build / serve |
+| `npm run lint` | ESLint |
+
+## License
+
+Private project — all rights reserved.

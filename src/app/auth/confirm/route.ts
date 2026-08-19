@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
+import { sanitizeNextPath } from "@/lib/auth/redirects";
 import { createClient } from "@/lib/supabase/server";
-
-/** Only allow same-origin relative paths as post-auth redirect targets. */
-function sanitizeNext(next: string | null) {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return "/dashboard";
-  }
-  return next;
-}
 
 /**
  * Email OTP confirmation endpoint (token_hash flow).
@@ -20,7 +13,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = sanitizeNext(searchParams.get("next"));
+  const next = sanitizeNextPath(searchParams.get("next"));
 
   if (tokenHash && type) {
     const supabase = await createClient();

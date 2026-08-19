@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 export const chatMessageSchema = z.object({
-  projectId: z.string().uuid(),
+  // A UUID in production; demo mode (no Supabase) accepts any id.
+  projectId: z.string().min(1).max(100),
   content: z
     .string()
     .min(1, "Message cannot be empty")

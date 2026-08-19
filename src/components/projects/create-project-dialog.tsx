@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FileText, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { createProject } from "@/app/(dashboard)/projects/actions";
@@ -82,8 +82,7 @@ export function CreateProjectDialog({
     resolver: zodResolver(createProjectSchema),
     defaultValues: { name: "", description: "", prompt: "" },
   });
-  const promptValue =
-    useWatch({ control: form.control, name: "prompt" }) ?? "";
+  const promptValue = form.watch("prompt") ?? "";
 
   function onSubmit(values: CreateProjectInput) {
     startTransition(async () => {

@@ -1,10 +1,15 @@
 import { z } from "zod";
 
+import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
+
 export const generateTextSchema = z.object({
   prompt: z
     .string()
     .min(1, "Prompt cannot be empty")
-    .max(8000, "Prompt must be at most 8,000 characters"),
+    .max(
+      MAX_AI_PROMPT_CHARACTERS,
+      `Prompt must be at most ${MAX_AI_PROMPT_CHARACTERS.toLocaleString()} characters`
+    ),
   system: z.string().max(4000).optional(),
   projectId: z.string().uuid().optional(),
   model: z.string().max(120).optional(),
@@ -19,7 +24,10 @@ export const generateCodeSchema = z.object({
   prompt: z
     .string()
     .min(1, "Prompt cannot be empty")
-    .max(8000, "Prompt must be at most 8,000 characters"),
+    .max(
+      MAX_AI_PROMPT_CHARACTERS,
+      `Prompt must be at most ${MAX_AI_PROMPT_CHARACTERS.toLocaleString()} characters`
+    ),
   language: z.string().max(40).optional(),
   context: z
     .string()

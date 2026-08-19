@@ -234,18 +234,18 @@ export function GeneratedWorkspace() {
     </main>
   );
 }
+`,
+  };
+}
 
 function hasDataBoundPage(files: Map<string, GeneratedFile>): boolean {
   return [...files.values()].some(
     (file) =>
       /^src\/app\/(?:.*\/)?page\.tsx$/.test(file.path) &&
-      /(?:fetch\s*\([^)]*\/api\/|@\/lib\/data|GeneratedWorkspace|supabase\.from\s*\()/s.test(
+      /(?:fetch\s*\([^)]*\/api\/|@\/lib\/data|GeneratedWorkspace|supabase\.from\s*\()/.test(
         file.content
       )
   );
-}
-`,
-  };
 }
 
 function statisticsPreview(plan: AppPlan): string {

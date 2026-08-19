@@ -368,7 +368,7 @@ export function runStaticChecks(
       .filter(
         (file) =>
           /^src\/components\/.*\.tsx$/.test(file.path) &&
-          /fetch\s*\([^)]*\/api\//s.test(file.content)
+          /fetch\s*\([^)]*\/api\//.test(file.content)
       )
       .flatMap((file) =>
         [...file.content.matchAll(/export\s+function\s+([A-Za-z_$][\w$]*)/g)].map(
@@ -380,7 +380,7 @@ export function runStaticChecks(
     );
     const hasDataBoundPage = pages.some(
       (file) =>
-        /(?:fetch\s*\([^)]*\/api\/|@\/lib\/data|supabase\.from\s*\()/s.test(
+        /(?:fetch\s*\([^)]*\/api\/|@\/lib\/data|supabase\.from\s*\()/.test(
           file.content
         ) || boundComponentNames.some((name) => file.content.includes(`<${name}`))
     );

@@ -13,8 +13,11 @@ export function fallbackArchitecture(plan: AppPlan): Architecture {
     { path: "src/app/layout.tsx", purpose: "Root layout importing globals.css" },
     { path: "src/app/globals.css", purpose: "Tailwind directives and design tokens" },
     { path: "package.json", purpose: "Project manifest with next/react/tailwind" },
-    { path: "src/lib/data.ts", purpose: "Data access helpers for every table" },
-    { path: "supabase/schema.sql", purpose: "CREATE TABLE statements with RLS" },
+    { path: ".env.example", purpose: "Documented public Supabase environment variables" },
+    { path: "src/lib/supabase/server.ts", purpose: "Authenticated server-side Supabase client" },
+    { path: "src/lib/supabase/client.ts", purpose: "Browser Supabase client" },
+    { path: "src/lib/data.ts", purpose: "Authorized persistent CRUD helpers for every table" },
+    { path: "supabase/schema.sql", purpose: "Tables, indexes, constraints, and owner-scoped RLS policies" },
     { path: "src/lib/database.types.ts", purpose: "TypeScript interfaces mirroring the tables" },
   ];
   for (const page of plan.pages) {
@@ -30,15 +33,19 @@ export function fallbackArchitecture(plan: AppPlan): Architecture {
   for (const table of plan.dataModel) {
     fileMap.push({
       path: `src/app/api/${table.table}/route.ts`,
-      purpose: `GET list + POST create for ${table.table}`,
+      purpose: `Authenticated GET, POST, PATCH, and DELETE for ${table.table}`,
     });
   }
   return {
     conventions: [
       "TypeScript throughout; Tailwind classes for styling",
       "Components are kebab-case files exporting a PascalCase function",
-      "All data access goes through src/lib/data.ts",
-      "API routes validate the request body before writing",
+      "All records persist through Supabase; in-memory arrays and fake CRUD are forbidden",
+      "All data access goes through src/lib/data.ts and verifies the authenticated user",
+      "Every table owned by a user has indexes plus SELECT, INSERT, UPDATE, and DELETE RLS policies",
+      "API routes validate input and return useful 400, 401, 404, and 500 responses",
+      "Operational screens include loading, empty, validation, error, success, and retry states",
+      "The first two product workflows must be complete from entry point to saved outcome",
     ],
     fileMap,
   };

@@ -209,7 +209,7 @@ export function previewFunctionalityIssues(html: string): string[] {
     issues.push("preview does not mutate or persist records");
   }
   if (
-    /(?:full functionality|backend integration|authentication)\s+(?:is\s+)?required|preview\s+(?:only|demo)|coming soon|placeholder\s+(?:page|content|screen|implementation)/i.test(
+    /full functionality\s+(?:requires|is\s+required)|(?:backend integration|authentication)\s+(?:is\s+)?required|preview\s+(?:only|demo)|coming soon|placeholder\s+(?:page|content|screen|implementation)/i.test(
       html
     )
   ) {

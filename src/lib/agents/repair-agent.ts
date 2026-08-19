@@ -20,7 +20,7 @@ import type {
   WorkflowContext,
 } from "@/lib/agents/types";
 
-const SYSTEM = `You are the Repair Agent in an automated app-building pipeline. You receive files with verified defects and output CORRECTED full files. Fix ONLY what the findings describe — do not redesign, rename, or add features. Output nothing for files you cannot improve.
+const SYSTEM = `You are the Repair Agent in an automated app-building pipeline. You receive files with verified defects and output CORRECTED full files. Fix only what the findings describe. For product-depth findings such as shallow-preview, placeholder-page, ephemeral-data-layer, or missing-rls-policies, replace the shallow implementation with a complete production workflow that follows the supplied product plan. Never repair persistence with module arrays or enable RLS without owner-scoped policies. Output nothing for files you cannot improve.
 
 ${FILE_FORMAT_INSTRUCTIONS}`;
 
@@ -205,7 +205,13 @@ export default ${name};
     case "missing-schema": {
       const sql = plan.dataModel
         .map((table) => {
-          const columns = table.columns
+          const ownerColumn = table.columns.some((column) => column.name === "user_id")
+            ? "user_id"
+            : "owner_id";
+          const plannedColumns = table.columns.some((column) => column.name === ownerColumn)
+            ? table.columns
+            : [...table.columns, { name: ownerColumn, type: "uuid" }];
+          const columns = plannedColumns
             .map((column) => {
               if (column.name === "id") {
                 return "  id uuid primary key default gen_random_uuid()";
@@ -213,10 +219,22 @@ export default ${name};
               if (column.name === "created_at") {
                 return "  created_at timestamptz not null default now()";
               }
+              if (column.name === ownerColumn) {
+                return `  ${ownerColumn} uuid not null references auth.users(id) on delete cascade`;
+              }
               return `  ${column.name} ${column.type}`;
             })
             .join(",\n");
-          return `-- ${table.description}\ncreate table public.${table.table} (\n${columns}\n);\n\nalter table public.${table.table} enable row level security;`;
+          return `-- ${table.description}
+create table public.${table.table} (
+${columns}
+);
+create index ${table.table}_${ownerColumn}_idx on public.${table.table} (${ownerColumn});
+alter table public.${table.table} enable row level security;
+create policy "${table.table}_select_own" on public.${table.table} for select using (auth.uid() = ${ownerColumn});
+create policy "${table.table}_insert_own" on public.${table.table} for insert with check (auth.uid() = ${ownerColumn});
+create policy "${table.table}_update_own" on public.${table.table} for update using (auth.uid() = ${ownerColumn}) with check (auth.uid() = ${ownerColumn});
+create policy "${table.table}_delete_own" on public.${table.table} for delete using (auth.uid() = ${ownerColumn});`;
         })
         .join("\n\n");
       writeFile(context, "supabase/schema.sql", `${sql}\n`);
@@ -231,11 +249,14 @@ export default ${name};
         context,
         `src/app/api/${table}/route.ts`,
         `import { NextResponse } from "next/server";
-
-const ${table}: unknown[] = [];
+import { create${type}, list${type} } from "@/lib/data";
 
 export async function GET() {
-  return NextResponse.json({ data: ${table} });
+  try {
+    return NextResponse.json({ data: await list${type}() });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Request failed" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -243,8 +264,11 @@ export async function POST(request: Request) {
   if (!body) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
-  ${table}.push(body as Record<string, unknown>);
-  return NextResponse.json({ success: true }, { status: 201 });
+  try {
+    return NextResponse.json({ data: await create${type}(body) }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Request failed" }, { status: 500 });
+  }
 }
 
 export type ${type} = Record<string, unknown>;
@@ -301,7 +325,7 @@ async function applyLlmFixes(
 
   const text = await runAgentCompletion({
     system: SYSTEM,
-    prompt: `Fix these files:\n\n${bundle}`,
+    prompt: `Product plan:\n${JSON.stringify(context.plan, null, 2)}\n\nOriginal request: ${context.prompt}\n\nFix these files:\n\n${bundle}`,
     role: "codegen",
     maxTokens: 6000,
     timeoutMs: stepBudgetMs(context),

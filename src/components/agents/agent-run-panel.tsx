@@ -138,7 +138,12 @@ export function AgentRunPanel({
       case "workflow_complete": {
         setFinished(true);
         const degradedCount = degradedRef.current.length;
-        if (degradedCount === 0) {
+        if (!event.verified) {
+          toast.error("Build saved but not released", {
+            description:
+              "Functional verification failed. Review the failed checks and run the build again.",
+          });
+        } else if (degradedCount === 0) {
           toast.success(`Build complete — ${event.fileCount} files generated`);
         } else {
           toast.warning(

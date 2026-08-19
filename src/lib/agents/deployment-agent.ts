@@ -28,14 +28,19 @@ async function buildVerification(
 
   const items: VerificationItem[] = [];
 
-  const frontend = rules(["missing-preview", "missing-home-page", "missing-layout", "broken-file", "missing-import", "undeclared-dependency", "invalid-package-json", "missing-package-json", "missing-page"]);
+  const frontend = rules(["missing-preview", "missing-home-page", "missing-layout", "broken-file", "missing-import", "undeclared-dependency", "invalid-package-json", "missing-package-json", "missing-page", "missing-data-bound-ui", "placeholder-page"]);
   items.push({
     label: "Frontend builds (static checks)",
     status: frontend.length === 0 ? "pass" : "fail",
     detail: frontend.length > 0 ? frontend[0].message : undefined,
   });
 
-  const api = rules(["missing-api-route"]);
+  const api = rules([
+    "missing-api-route",
+    "incomplete-crud-route",
+    "missing-server-auth-guard",
+    "ephemeral-data-layer",
+  ]);
   items.push({
     label: "API routes implemented",
     status: api.length === 0 ? "pass" : "fail",
@@ -83,6 +88,16 @@ async function buildVerification(
     detail: `${pages.length}/${plan.pages.length} pages`,
   });
 
+  const workflow = rules(["shallow-preview", "missing-data-bound-ui"]);
+  items.push({
+    label: "Primary workflow is functional",
+    status: workflow.length === 0 ? "pass" : "fail",
+    detail:
+      workflow.length > 0
+        ? workflow[0].message
+        : "create, search, update, delete, feedback, and persistence paths verified",
+  });
+
   // Real fetch of the published preview, from the outside.
   const preview = await verifyPreviewResponds(context.projectId);
   items.push({
@@ -98,7 +113,7 @@ async function buildVerification(
 
   items.push({
     label: "All checks",
-    status: checksPass(findings) ? "pass" : "warn",
+    status: checksPass(findings) ? "pass" : "fail",
     detail: checksPass(findings)
       ? `${context.files.size} files verified`
       : `${findings.filter((f) => f.severity === "error").length} unresolved issue(s) — see the Repair Agent's report`,
@@ -141,6 +156,7 @@ export const deploymentAgent: Agent = {
     emit({ type: "verification", agent: "deployment", items });
     const failures = items.filter((item) => item.status === "fail");
     const verified = failures.length === 0;
+    context.verified = verified;
 
     if (context.persist && isSupabaseConfigured()) {
       const { createClient } = await import("@/lib/supabase/server");

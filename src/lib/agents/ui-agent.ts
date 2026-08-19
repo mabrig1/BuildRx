@@ -10,6 +10,10 @@ import {
   runAgentCompletion,
   stepBudgetMs,
 } from "@/lib/agents/llm";
+import {
+  buildFunctionalPreview,
+  previewFunctionalityIssues,
+} from "@/lib/agents/functional-preview";
 import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
 
 /**
@@ -26,7 +30,7 @@ import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
  */
 const PREVIEW_SYSTEM = `You are the UI Agent in an automated app-building pipeline. Your ONLY job in this call is to produce "preview/index.html".
 
-It must be a SELF-CONTAINED, WORKING PROTOTYPE of the app, not a landing page, card gallery, or decorative dashboard. Build a professional product cockpit that demonstrates at least two complete primary workflows. Show real domain controls such as upload/import, validated forms, tables, filters, status, details, analysis/editor panels, results, and export actions as appropriate. Seed 3-5 realistic records and make the prototype RESPOND to interaction: inline <script> so buttons, forms, filters, tabs and controls work against in-memory preview data. Show loading, empty, validation, error, success, and disabled states where they matter. Inline <style> and <script> only — no external stylesheets, fonts, scripts, or images. Modern, dense but readable, responsive, keyboard accessible. Include a nav linking the plan's pages. Never invent a completed result when the user has not supplied data.
+It must be a SELF-CONTAINED, WORKING PROTOTYPE of the app, not a landing page, card gallery, or decorative dashboard. Build a professional product cockpit that demonstrates at least two complete primary workflows. Show real domain controls such as upload/import, validated forms, tables, filters, status, details, analysis/editor panels, results, and export actions as appropriate. Seed 3-5 realistic records and make the prototype RESPOND to interaction: inline <script> so buttons, forms, filters, tabs and controls work against preview data and persist changes in localStorage. Show loading, empty, validation, error, success, and disabled states where they matter. Inline <style> and <script> only — no external stylesheets, fonts, scripts, or images. Modern, dense but readable, responsive, keyboard accessible. Include a nav linking the plan's product areas. Never invent a completed result when the user has not supplied data. Never include "preview only", "full functionality requires backend integration", "coming soon", or any similar disclaimer: demonstrate the workflow instead.
 
 Emit exactly ONE file block and nothing else. Budget it: finish the whole page rather than perfecting any one section, and stay under ~400 lines.
 
@@ -39,7 +43,7 @@ Requirements:
 2. Generate EVERY component from the plan under "src/components" (kebab-case filenames).
 3. Generate "src/app/globals.css" with Tailwind directives and any custom design tokens the app needs.
 
-Pages must be operational product screens, not a heading plus description. The home page must provide workflow entry points and useful status. Collection pages need search/filter/table/empty states; create or edit flows need validated inputs and submission states; result pages need provenance and export actions. Use the plan's domain language and realistic copy. Fetch from the generated API routes for persistent records, and provide explicit loading/error/retry behavior.
+Pages must be operational product screens, not a heading plus description. The home page must provide workflow entry points and useful status. Collection pages need search/filter/table/empty states; create or edit flows need validated inputs and submission states; result pages need provenance and export actions. Use the plan's domain language and realistic copy. At least one rendered page must bind forms and tables to the generated API routes for persistent GET, POST, PATCH, and DELETE operations, with explicit loading/error/retry behavior. Never substitute a disclaimer for implementation.
 
 Do NOT generate "preview/index.html" — another call is producing it.
 
@@ -55,6 +59,193 @@ function pagePath(routePath: string) {
   return routePath === "/"
     ? "src/app/page.tsx"
     : `src/app${routePath}/page.tsx`;
+}
+
+function generatedWorkspace(plan: AppPlan): GeneratedFile {
+  const resources = [...plan.dataModel]
+    .sort((left, right) => {
+      const infrastructure = /^(?:profiles|workspaces|workspace_members|members|subscriptions)$/;
+      return Number(infrastructure.test(left.table)) - Number(infrastructure.test(right.table));
+    })
+    .map((table) => {
+    const editable = table.columns.filter(
+      (column) =>
+        ![
+          "id",
+          "owner_id",
+          "user_id",
+          "workspace_id",
+          "created_at",
+          "updated_at",
+        ].includes(column.name)
+    );
+      return {
+        key: table.table,
+        label: table.table
+          .replace(/[_-]+/g, " ")
+          .replace(/\b\w/g, (character) => character.toUpperCase()),
+        labelField:
+          editable.find((column) => /name|title|subject|label/.test(column.name))
+            ?.name ?? editable[0]?.name ?? "name",
+        statusField:
+          editable.find((column) =>
+            /status|state|stage|priority|complete|done/.test(column.name)
+          )?.name ?? null,
+      };
+    });
+  if (resources.length === 0) {
+    resources.push({
+      key: "items",
+      label: "Items",
+      labelField: "name",
+      statusField: "status",
+    });
+  }
+
+  return {
+    path: "src/components/generated-workspace.tsx",
+    content: `"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
+
+const resources = ${JSON.stringify(resources, null, 2)} as const;
+const appName = ${JSON.stringify(plan.appName)};
+const appSummary = ${JSON.stringify(plan.summary)};
+type Row = Record<string, unknown> & { id: string };
+
+export function GeneratedWorkspace() {
+  const [activeKey, setActiveKey] = useState(resources[0].key);
+  const [rows, setRows] = useState<Row[]>([]);
+  const [query, setQuery] = useState("");
+  const [value, setValue] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const config = resources.find((item) => item.key === activeKey) ?? resources[0];
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/" + config.key, { cache: "no-store" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Could not load records");
+      setRows(body.data ?? []);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not load records");
+    } finally {
+      setLoading(false);
+    }
+  }, [config.key]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const visible = useMemo(
+    () => rows.filter((row) => JSON.stringify(row).toLowerCase().includes(query.toLowerCase())),
+    [query, rows]
+  );
+
+  async function createRecord(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!value.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/" + config.key, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [config.labelField]: value.trim() }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Could not create record");
+      setRows((current) => [body.data, ...current]);
+      setValue("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not create record");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function advance(row: Row) {
+    if (!config.statusField) return;
+    const response = await fetch("/api/" + config.key, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: row.id, [config.statusField]: "Complete" }),
+    });
+    const body = await response.json();
+    if (!response.ok) return setError(body.error ?? "Could not update record");
+    setRows((current) => current.map((item) => item.id === row.id ? body.data : item));
+  }
+
+  async function remove(id: string) {
+    const response = await fetch("/api/" + config.key + "?id=" + encodeURIComponent(id), {
+      method: "DELETE",
+    });
+    const body = await response.json();
+    if (!response.ok) return setError(body.error ?? "Could not delete record");
+    setRows((current) => current.filter((item) => item.id !== id));
+  }
+
+  return (
+    <main className="min-h-screen bg-zinc-50 px-4 py-8 text-zinc-950 sm:px-6">
+      <div className="mx-auto max-w-6xl">
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-violet-700">Operational workspace</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">{appName}</h1>
+            <p className="mt-2 max-w-2xl text-zinc-600">{appSummary}</p>
+          </div>
+          <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Persistent API connected</span>
+        </header>
+
+        <nav className="mt-7 flex gap-2 overflow-x-auto" aria-label="Product areas">
+          {resources.map((resource) => (
+            <button key={resource.key} onClick={() => { setActiveKey(resource.key); setQuery(""); }} className={"rounded-lg px-3 py-2 text-sm font-semibold " + (resource.key === activeKey ? "bg-violet-600 text-white" : "border bg-white text-zinc-700")}>{resource.label}</button>
+          ))}
+        </nav>
+
+        <section className="mt-5 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 p-5">
+            <div><h2 className="font-semibold">{config.label}</h2><p className="text-sm text-zinc-500">{rows.length} records available</p></div>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Search records" className="rounded-lg border border-zinc-300 px-3 py-2 text-sm" placeholder="Search records…" />
+          </div>
+
+          <form onSubmit={createRecord} className="flex gap-2 border-b border-zinc-200 bg-zinc-50 p-4">
+            <input value={value} onChange={(event) => setValue(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2" placeholder={"New " + config.labelField.replaceAll("_", " ")} aria-label="New record name" />
+            <button disabled={saving || !value.trim()} className="rounded-lg bg-violet-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Create"}</button>
+          </form>
+
+          {error && <div role="alert" className="m-4 flex items-center justify-between rounded-lg bg-red-50 p-3 text-sm text-red-700"><span>{error}</span><button onClick={() => void load()} className="font-semibold">Retry</button></div>}
+          {loading ? <div className="p-10 text-center text-zinc-500">Loading records…</div> : visible.length === 0 ? <div className="p-10 text-center text-zinc-500">No matching records. Create the first one above.</div> : (
+            <div className="divide-y divide-zinc-100">{visible.map((row) => (
+              <article key={row.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div><h3 className="font-medium">{String(row[config.labelField] ?? "Untitled record")}</h3>{config.statusField && <p className="mt-1 text-xs text-zinc-500">Status: {String(row[config.statusField] ?? "New")}</p>}</div>
+                <div className="flex gap-2">{config.statusField && <button onClick={() => void advance(row)} className="rounded-lg border px-3 py-1.5 text-sm font-semibold">Mark complete</button>}<button onClick={() => void remove(row.id)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-red-600">Delete</button></div>
+              </article>
+            ))}</div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function hasDataBoundPage(files: Map<string, GeneratedFile>): boolean {
+  return [...files.values()].some(
+    (file) =>
+      /^src\/app\/(?:.*\/)?page\.tsx$/.test(file.path) &&
+      /(?:fetch\s*\([^)]*\/api\/|@\/lib\/data|GeneratedWorkspace|supabase\.from\s*\()/s.test(
+        file.content
+      )
+  );
+}
+`,
+  };
 }
 
 function statisticsPreview(plan: AppPlan): string {
@@ -78,134 +269,15 @@ const toast=(message)=>{const el=document.getElementById('toast');el.textContent
 }
 
 function mockFiles(plan: AppPlan): GeneratedFile[] {
-  const nav = plan.pages
-    .map((p) => `<a href="${p.path}">${p.name}</a>`)
-    .join("\n      ");
-
-  // The scaffold preview is a working prototype, not a poster. When a
-  // model is unavailable this is the whole app the user sees, and a
-  // static hero page reads as "nothing was built" — so it renders the
-  // plan's primary table as a real list with working add/toggle/delete
-  // against in-memory sample rows.
-  const table = plan.dataModel[0];
-  const labelColumn =
-    table?.columns.find((c) => /title|name|label|subject/.test(c.name))?.name ??
-    table?.columns.find((c) => c.type === "text" && c.name !== "id")?.name ??
-    "title";
-  const statusColumn = table?.columns.find(
-    (c) => c.type === "boolean" || /status|state|done|complete/.test(c.name)
-  )?.name;
-  const samples = [
-    `First ${table?.table ?? "item"}`,
-    `Second ${table?.table ?? "item"}`,
-    `Third ${table?.table ?? "item"}`,
-  ];
-
-  const appScript = `
-  const rows = ${JSON.stringify(
-    samples.map((value, index) => ({ id: index + 1, label: value, done: index === 0 }))
-  )};
-  let nextId = rows.length + 1;
-  const list = document.getElementById("rows");
-  const input = document.getElementById("new-item");
-  const empty = document.getElementById("empty");
-
-  function render() {
-    list.innerHTML = "";
-    empty.hidden = rows.length > 0;
-    for (const row of rows) {
-      const li = document.createElement("li");
-      li.className = "row" + (row.done ? " done" : "");
-      const check = document.createElement("input");
-      check.type = "checkbox";
-      check.checked = row.done;
-      check.addEventListener("change", () => { row.done = check.checked; render(); });
-      const span = document.createElement("span");
-      span.textContent = row.label;
-      const del = document.createElement("button");
-      del.className = "del";
-      del.textContent = "Delete";
-      del.addEventListener("click", () => {
-        rows.splice(rows.indexOf(row), 1);
-        render();
-      });
-      ${statusColumn ? "li.append(check, span, del);" : "li.append(span, del);"}
-      list.append(li);
-    }
-    document.getElementById("count").textContent =
-      rows.length + " ${table?.table ?? "item"}" + (rows.length === 1 ? "" : "s");
-  }
-
-  document.getElementById("add").addEventListener("submit", (event) => {
-    event.preventDefault();
-    const value = input.value.trim();
-    if (!value) return;
-    rows.push({ id: nextId++, label: value, done: false });
-    input.value = "";
-    render();
-  });
-
-  render();`;
-
   const previewHtml = plan.dataModel.some((table) =>
     ["datasets", "analyses", "results"].includes(table.table)
-  ) ? statisticsPreview(plan) : `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${plan.appName}</title>
-<style>
-  * { margin: 0; box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, sans-serif; color: #18181b; background: #fafafa; }
-  .nav { display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; background: #fff; border-bottom: 1px solid #e4e4e7; position: sticky; top: 0; }
-  .brand { font-weight: 700; }
-  .nav .links { display: flex; gap: 18px; }
-  .nav a { color: #52525b; text-decoration: none; font-size: 14px; }
-  .nav a:hover { color: #18181b; }
-  main { max-width: 720px; margin: 0 auto; padding: 32px 24px 64px; }
-  h1 { font-size: 26px; letter-spacing: -0.02em; }
-  .sub { color: #71717a; margin-top: 6px; font-size: 15px; }
-  form { display: flex; gap: 8px; margin: 24px 0 16px; }
-  input[type=text] { flex: 1; padding: 10px 12px; border: 1px solid #d4d4d8; border-radius: 8px; font-size: 14px; }
-  button { border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 600; font-size: 14px; cursor: pointer; }
-  #add button { background: #6d28d9; color: #fff; }
-  ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-  .row { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #e4e4e7; border-radius: 10px; padding: 12px 14px; }
-  .row span { flex: 1; font-size: 14px; }
-  .row.done span { text-decoration: line-through; color: #a1a1aa; }
-  .del { background: transparent; color: #a1a1aa; font-size: 13px; padding: 4px 8px; }
-  .del:hover { color: #dc2626; }
-  #count { color: #71717a; font-size: 13px; }
-  #empty { color: #a1a1aa; font-size: 14px; padding: 24px; text-align: center; border: 1px dashed #d4d4d8; border-radius: 10px; }
-  footer { border-top: 1px solid #e4e4e7; padding: 20px 24px; text-align: center; color: #a1a1aa; font-size: 13px; }
-</style>
-</head>
-<body>
-  <nav class="nav">
-    <span class="brand">${plan.appName}</span>
-    <div class="links">
-      ${nav}
-    </div>
-  </nav>
-  <main>
-    <h1>${plan.pages[0]?.name ?? "Home"}</h1>
-    <p class="sub">${plan.summary}</p>
-    <form id="add">
-      <input id="new-item" type="text" placeholder="Add ${labelColumn}…" aria-label="Add ${labelColumn}" />
-      <button type="submit">Add</button>
-    </form>
-    <p id="count"></p>
-    <ul id="rows"></ul>
-    <p id="empty" hidden>Nothing yet — add your first ${labelColumn}.</p>
-  </main>
-  <footer>${plan.appName} · ${plan.features.slice(0, 3).join(" · ")}</footer>
-  <script>${appScript}</script>
-</body>
-</html>`;
+  )
+    ? statisticsPreview(plan)
+    : buildFunctionalPreview(plan);
 
   const files: GeneratedFile[] = [
     { path: "preview/index.html", content: previewHtml },
+    generatedWorkspace(plan),
     {
       path: "src/app/globals.css",
       content: `@import "tailwindcss";
@@ -227,24 +299,10 @@ body {
     files.push({
       path: pagePath(page.path),
       content: isHome
-        ? // Self-contained on purpose: this file may be filling a gap in
-          // a partly-generated app, where any component it imported
-          // might not exist.
-          `const metrics = ["Active records", "Ready for review", "Updated this week"];
+        ? `import { GeneratedWorkspace } from "@/components/generated-workspace";
 
 export default function HomePage() {
-  return (
-    <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-950">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div><p className="text-sm font-medium text-violet-700">Product workspace</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">${plan.appName}</h1><p className="mt-2 max-w-2xl text-zinc-600">${plan.summary}</p></div>
-          <button className="rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white">Create record</button>
-        </div>
-        <section className="mt-8 grid gap-4 md:grid-cols-3">{metrics.map((metric, index) => <article key={metric} className="rounded-xl border border-zinc-200 bg-white p-5"><p className="text-sm text-zinc-500">{metric}</p><strong className="mt-2 block text-2xl">{[12, 4, 7][index]}</strong></article>)}</section>
-        <section className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white"><div className="flex items-center justify-between border-b border-zinc-200 p-5"><div><h2 className="font-semibold">Recent work</h2><p className="text-sm text-zinc-500">Search, review, and continue your records.</p></div><input aria-label="Search records" className="rounded-lg border border-zinc-300 px-3 py-2 text-sm" placeholder="Search…" /></div><div className="divide-y divide-zinc-100">{["Quarterly review", "Customer discovery", "Launch readiness"].map((name, index) => <div key={name} className="flex items-center justify-between gap-4 p-5"><div><p className="font-medium">{name}</p><p className="text-sm text-zinc-500">Updated {index + 1} day{index ? "s" : ""} ago</p></div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Ready</span></div>)}</div></section>
-      </div>
-    </main>
-  );
+  return <GeneratedWorkspace />;
 }
 `
         : `export default function ${page.name.replace(/\W/g, "")}Page() {
@@ -367,11 +425,42 @@ export const uiAgent: Agent = {
     // preview page, the stylesheet, and any planned page or component
     // missing from the output.
     const byPath = new Map(generated.map((file) => [file.path, file]));
+    const scaffold = mockFiles(plan);
+    const scaffoldByPath = new Map(scaffold.map((file) => [file.path, file]));
     let scaffolded = 0;
-    for (const file of mockFiles(plan)) {
+    for (const file of scaffold) {
       if (byPath.has(file.path)) continue;
       byPath.set(file.path, file);
       scaffolded++;
+    }
+
+    const preview = byPath.get("preview/index.html");
+    const previewIssues = preview
+      ? previewFunctionalityIssues(preview.content)
+      : ["preview is missing"];
+    if (previewIssues.length > 0) {
+      byPath.set("preview/index.html", scaffoldByPath.get("preview/index.html")!);
+      scaffolded++;
+      emit({
+        type: "agent_log",
+        agent: "ui",
+        message: `Rejected a non-functional model preview (${previewIssues[0]}); installed the operational CRUD preview instead`,
+      });
+    }
+
+    if (plan.dataModel.length > 0 && !hasDataBoundPage(byPath)) {
+      byPath.set("src/app/page.tsx", scaffoldByPath.get("src/app/page.tsx")!);
+      byPath.set(
+        "src/components/generated-workspace.tsx",
+        scaffoldByPath.get("src/components/generated-workspace.tsx")!
+      );
+      scaffolded += 2;
+      emit({
+        type: "agent_log",
+        agent: "ui",
+        message:
+          "Replaced a disconnected home screen with the persistent CRUD workspace",
+      });
     }
 
     for (const file of byPath.values()) {

@@ -453,6 +453,40 @@ describe("runStaticChecks", () => {
       ).toBe('table "todos" has no API route');
     });
 
+    it("requires every persistent API route to implement full CRUD", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "supabase/schema.sql":
+            "create table public.todos (id uuid); create policy own on public.todos for all using (true);",
+          "src/app/api/todos/route.ts":
+            "export async function GET() { return null; } export async function POST() { return null; }",
+        }),
+        plan
+      );
+
+      const finding = findings.find(
+        (item) => item.rule === "incomplete-crud-route"
+      );
+      expect(finding?.severity).toBe("error");
+      expect(finding?.message).toContain("PATCH, DELETE");
+    });
+
+    it("requires a rendered page to bind to the persistent API", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "supabase/schema.sql":
+            "create table public.todos (id uuid); create policy own on public.todos for all using (true);",
+          "src/app/api/todos/route.ts":
+            "export function GET(){} export function POST(){} export function PATCH(){} export function DELETE(){}",
+          "src/app/about/page.tsx":
+            "export default function About() { return <button>Create</button>; }",
+        }),
+        plan
+      );
+
+      expect(rules(findings)).toContain("missing-data-bound-ui");
+    });
+
     it("flags a planned table absent from an existing schema", () => {
       const findings = runStaticChecks(
         scaffolded({

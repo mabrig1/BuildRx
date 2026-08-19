@@ -107,6 +107,8 @@ export interface WorkflowContext {
   architecture?: string;
   /** Open findings from the QA Agent, consumed by the Repair Agent. */
   findings?: CheckFinding[];
+  /** Final deployment gate; false means files were saved but the app is not releasable. */
+  verified?: boolean;
   /** Correlates every event and log line of one build run. */
   requestId?: string;
 }
@@ -179,6 +181,7 @@ export type AgentEvent =
       type: "workflow_complete";
       previewUrl: string | null;
       fileCount: number;
+      verified: boolean;
     }
   | {
       type: "error";

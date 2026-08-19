@@ -232,7 +232,9 @@ export function ChatPanel({
               // scaffolds is how you end up with a confused user and an
               // app that isn't what they asked for. Say which one it is.
               lines.push(
-                degraded.length === 0
+                !event.verified
+                  ? `\n❌ **Build saved but not released** — ${event.fileCount} files were written, but the functional verification gate failed. Fix the failed checks above and run the build again.`
+                  : degraded.length === 0
                   ? `\n🚀 **Build complete** — ${event.fileCount} files generated.`
                   : [
                       `\n⚠️ **Build finished with ${degraded.length} step(s) degraded** — ${event.fileCount} files written, but parts of this app are built-in scaffolding rather than generated from your description:`,
@@ -241,7 +243,12 @@ export function ChatPanel({
                     ].join("\n")
               );
               render();
-              if (degraded.length > 0) {
+              if (!event.verified) {
+                setHasBuilt(false);
+                toast.error("Build did not pass functional verification", {
+                  description: "Review the failed checks above, then run it again.",
+                });
+              } else if (degraded.length > 0) {
                 toast.warning(
                   `${degraded.length} build step(s) fell back to scaffolds`,
                   { description: "See the build log for why, and how to fix it." }

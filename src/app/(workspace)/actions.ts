@@ -3,10 +3,11 @@
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
+import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
 
 const editMessageSchema = z.object({
   messageId: z.string().uuid(),
-  content: z.string().min(1).max(8000),
+  content: z.string().min(1).max(MAX_AI_PROMPT_CHARACTERS),
 });
 
 type ActionResult = { error: string } | { success: true };

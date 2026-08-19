@@ -47,6 +47,15 @@ export const AGENT_LABELS: Record<AgentName, string> = {
 export interface AppPlan {
   appName: string;
   summary: string;
+  /** People who use the product and the authority each one has. */
+  userRoles?: Array<{ name: string; permissions: string[] }>;
+  /** End-to-end jobs the generated product must actually complete. */
+  workflows?: Array<{
+    name: string;
+    actor: string;
+    steps: string[];
+    outcome: string;
+  }>;
   pages: Array<{ name: string; path: string; description: string }>;
   components: Array<{ name: string; description: string }>;
   dataModel: Array<{
@@ -55,6 +64,9 @@ export interface AppPlan {
     columns: Array<{ name: string; type: string }>;
   }>;
   features: string[];
+  /** Observable conditions used by QA to judge whether this is a product, not a mock-up. */
+  acceptanceCriteria?: string[];
+  qualityRequirements?: string[];
 }
 
 export interface GeneratedFile {

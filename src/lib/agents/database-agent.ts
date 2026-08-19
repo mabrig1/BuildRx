@@ -15,7 +15,7 @@ import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
 const SYSTEM = `You are the Database Agent in an automated app-building pipeline. Given a build plan's data model, you produce the database layer for a Supabase (PostgreSQL) project.
 
 Generate exactly two files:
-1. "supabase/schema.sql" — CREATE TABLE statements for every table in the plan (uuid primary keys with gen_random_uuid(), created_at timestamptz defaults, sensible foreign keys), plus row level security enabled on each table with owner-scoped policies where a user_id column exists.
+1. "supabase/schema.sql" — production-ready CREATE TABLE statements for every table in the plan. Include UUID primary keys, created_at/updated_at defaults, NOT NULL constraints, sensible foreign keys and indexes. Every user-owned table must include owner_id (or use the planned user_id), enable row level security, and define SELECT, INSERT, UPDATE, and DELETE policies scoped to auth.uid(). Do not merely enable RLS without policies.
 2. "src/lib/database.types.ts" — TypeScript interfaces mirroring the tables (camelCase properties).
 
 ${FILE_FORMAT_INSTRUCTIONS}`;
@@ -25,6 +25,7 @@ function pgToTs(type: string): string {
   if (t.includes("int") || t.includes("numeric") || t.includes("float"))
     return "number";
   if (t.includes("bool")) return "boolean";
+  if (t.includes("json")) return "Record<string, unknown>";
   return "string";
 }
 
@@ -37,24 +38,79 @@ function toPascal(snake: string) {
   return camel.charAt(0).toUpperCase() + camel.slice(1);
 }
 
+function columnsFor(plan: AppPlan, table: AppPlan["dataModel"][number]) {
+  const ownerColumn = table.columns.some((column) => column.name === "owner_id")
+    ? "owner_id"
+    : table.columns.some((column) => column.name === "user_id")
+      ? "user_id"
+      : "owner_id";
+  const columns = [...table.columns];
+  if (!columns.some((column) => column.name === "id")) {
+    columns.unshift({ name: "id", type: "uuid" });
+  }
+  if (!columns.some((column) => column.name === ownerColumn)) {
+    columns.splice(1, 0, { name: ownerColumn, type: "uuid" });
+  }
+  if (!columns.some((column) => column.name === "created_at")) {
+    columns.push({ name: "created_at", type: "timestamptz" });
+  }
+  return { columns, ownerColumn };
+}
+
+function foreignTable(plan: AppPlan, columnName: string): string | null {
+  if (!columnName.endsWith("_id")) return null;
+  const stem = columnName.slice(0, -3);
+  return (
+    plan.dataModel.find(
+      (candidate) =>
+        candidate.table === stem ||
+        candidate.table === `${stem}s` ||
+        candidate.table === `${stem}es`
+    )?.table ?? null
+  );
+}
+
 function mockFiles(plan: AppPlan): GeneratedFile[] {
   const sql = plan.dataModel
     .map((table) => {
-      const columns = table.columns
+      const { columns: plannedColumns, ownerColumn } = columnsFor(plan, table);
+      const columns = plannedColumns
         .map((col) => {
           if (col.name === "id") return `  id uuid primary key default gen_random_uuid()`;
+          if (col.name === ownerColumn)
+            return `  ${ownerColumn} uuid not null references auth.users(id) on delete cascade`;
           if (col.name === "created_at")
             return `  created_at timestamptz not null default now()`;
-          return `  ${col.name} ${col.type}`;
+          const references = foreignTable(plan, col.name);
+          if (references) {
+            return `  ${col.name} uuid not null references public.${references}(id) on delete cascade`;
+          }
+          return `  ${col.name} ${col.type} not null`;
         })
         .join(",\n");
-      return `-- ${table.description}\ncreate table public.${table.table} (\n${columns}\n);\n\nalter table public.${table.table} enable row level security;`;
+      return `-- ${table.description}
+create table public.${table.table} (
+${columns}
+);
+
+create index ${table.table}_${ownerColumn}_idx on public.${table.table} (${ownerColumn});
+alter table public.${table.table} enable row level security;
+
+create policy "${table.table}_select_own" on public.${table.table}
+  for select using (auth.uid() = ${ownerColumn});
+create policy "${table.table}_insert_own" on public.${table.table}
+  for insert with check (auth.uid() = ${ownerColumn});
+create policy "${table.table}_update_own" on public.${table.table}
+  for update using (auth.uid() = ${ownerColumn}) with check (auth.uid() = ${ownerColumn});
+create policy "${table.table}_delete_own" on public.${table.table}
+  for delete using (auth.uid() = ${ownerColumn});`;
     })
     .join("\n\n");
 
   const types = plan.dataModel
     .map((table) => {
-      const props = table.columns
+      const { columns } = columnsFor(plan, table);
+      const props = columns
         .map((col) => `  ${toCamel(col.name)}: ${pgToTs(col.type)};`)
         .join("\n");
       return `export interface ${toPascal(table.table)} {\n${props}\n}`;

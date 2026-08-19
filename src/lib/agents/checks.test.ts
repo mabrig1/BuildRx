@@ -478,6 +478,65 @@ describe("runStaticChecks", () => {
       expect(rules(findings)).not.toContain("missing-schema-table");
       expect(rules(findings)).not.toContain("missing-api-route");
     });
+
+    it("rejects in-memory arrays as a persistent data layer", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "src/lib/data.ts": "const todos: unknown[] = [];",
+          "supabase/schema.sql":
+            "create table public.todos (id uuid); create policy own on public.todos for select using (true);",
+          "src/app/api/todos/route.ts": "export async function GET() { return null; }",
+        }),
+        plan
+      );
+
+      expect(rules(findings)).toContain("ephemeral-data-layer");
+      expect(checksPass(findings)).toBe(false);
+    });
+
+    it("requires RLS policies for generated persistent tables", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "supabase/schema.sql":
+            "create table public.todos (id uuid); alter table public.todos enable row level security;",
+          "src/app/api/todos/route.ts": "export async function GET() { return null; }",
+        }),
+        plan
+      );
+
+      expect(rules(findings)).toContain("missing-rls-policies");
+      expect(checksPass(findings)).toBe(false);
+    });
+
+    it("rejects a data app preview with no real interaction", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "supabase/schema.sql":
+            "create table public.todos (id uuid); create policy own on public.todos for select using (true);",
+          "src/app/api/todos/route.ts": "export async function GET() { return null; }",
+        }),
+        plan
+      );
+
+      expect(findings.find((finding) => finding.rule === "shallow-preview")?.severity).toBe("error");
+      expect(checksPass(findings)).toBe(false);
+    });
+
+    it("rejects planned product pages that are only placeholders", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "supabase/schema.sql":
+            "create table public.todos (id uuid); create policy own on public.todos for select using (true);",
+          "src/app/api/todos/route.ts": "export async function GET() { return null; }",
+          "src/app/about/page.tsx":
+            "export default function Page() { return <h1>About</h1>; }",
+        }),
+        plan
+      );
+
+      expect(rules(findings)).toContain("placeholder-page");
+      expect(checksPass(findings)).toBe(false);
+    });
   });
 });
 

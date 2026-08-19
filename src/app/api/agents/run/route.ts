@@ -7,6 +7,7 @@ import { authorizeAiRequest } from "@/lib/ai/route-helpers";
 import { withTimeout } from "@/lib/health/retry";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
 
 export const maxDuration = 300;
 
@@ -15,7 +16,7 @@ const runSchema = z.object({
   prompt: z
     .string()
     .min(10, "Describe your app in at least 10 characters")
-    .max(4000),
+    .max(MAX_AI_PROMPT_CHARACTERS),
 });
 
 /**

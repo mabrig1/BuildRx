@@ -38,6 +38,7 @@ async function buildVerification(
   const api = rules([
     "missing-api-route",
     "incomplete-crud-route",
+    "non-functional-crud-route",
     "missing-server-auth-guard",
     "ephemeral-data-layer",
   ]);
@@ -47,11 +48,20 @@ async function buildVerification(
     detail: api.length > 0 ? api[0].message : undefined,
   });
 
-  const schemaOk = context.files.has("supabase/schema.sql");
+  const schemaFailures = rules([
+    "missing-schema",
+    "missing-schema-table",
+    "missing-rls-policies",
+    "unscoped-rls-policies",
+  ]);
+  const schemaOk =
+    context.files.has("supabase/schema.sql") && schemaFailures.length === 0;
   items.push({
-    label: "Database schema present",
+    label: "Database schema and tenant security",
     status: schemaOk ? "pass" : plan.dataModel.length === 0 ? "pass" : "fail",
-    detail: schemaOk ? undefined : "supabase/schema.sql missing",
+    detail: schemaOk
+      ? undefined
+      : schemaFailures[0]?.message ?? "supabase/schema.sql missing",
   });
 
   items.push({

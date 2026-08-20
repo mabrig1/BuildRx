@@ -3,7 +3,19 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
 
-const SUPABASE_AUTH_TIMEOUT_MS = 2_000;
+const DEFAULT_SUPABASE_AUTH_TIMEOUT_MS = 5_000;
+const MIN_SUPABASE_AUTH_TIMEOUT_MS = 1_000;
+const MAX_SUPABASE_AUTH_TIMEOUT_MS = 10_000;
+
+function supabaseAuthTimeoutMs() {
+  const configured = Number(process.env.SUPABASE_AUTH_TIMEOUT_MS);
+  if (!Number.isFinite(configured)) return DEFAULT_SUPABASE_AUTH_TIMEOUT_MS;
+
+  return Math.min(
+    MAX_SUPABASE_AUTH_TIMEOUT_MS,
+    Math.max(MIN_SUPABASE_AUTH_TIMEOUT_MS, Math.round(configured))
+  );
+}
 
 /** Routes that require an authenticated session. */
 const protectedPrefixes = [
@@ -45,7 +57,7 @@ async function fetchWithAuthTimeout(
   const controller = new AbortController();
   const timer = setTimeout(
     () => controller.abort("Supabase auth middleware timed out"),
-    SUPABASE_AUTH_TIMEOUT_MS
+    supabaseAuthTimeoutMs()
   );
 
   const upstreamSignal = init?.signal;
@@ -137,8 +149,20 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // A signed-out visitor opening a login page has no session to refresh.
-  if (isAuthPage && !hasSupabaseAuthCookie(request)) {
+  const hasAuthCookie = hasSupabaseAuthCookie(request);
+
+  // No cookie is the normal signed-out state, not an auth-provider outage.
+  // Avoid calling getUser(): Supabase correctly returns "Auth session missing",
+  // which must not be exposed to the user as `auth_unavailable`.
+  if (!hasAuthCookie) {
+    if (isProtected) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      redirectUrl.search = "";
+      redirectUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+
     return supabaseResponse;
   }
 

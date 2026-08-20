@@ -321,6 +321,21 @@ export function runStaticChecks(
       fix: "llm",
     });
   }
+  if (
+    plan.dataModel.length > 0 &&
+    paths.has("supabase/schema.sql") &&
+    /create\s+policy\b/i.test(schema) &&
+    !/auth\.uid\s*\(\s*\)/i.test(schema)
+  ) {
+    findings.push({
+      rule: "unscoped-rls-policies",
+      severity: "error",
+      file: "supabase/schema.sql",
+      message:
+        "RLS policies do not scope records to auth.uid(); permissive policies such as USING (true) expose tenant data",
+      fix: "llm",
+    });
+  }
 
   const dataLayer = context.files.get("src/lib/data.ts")?.content ?? "";
   if (
@@ -437,6 +452,25 @@ export function runStaticChecks(
           message: `API route for "${table.table}" is missing ${missingMethods.join(", ")}`,
           fix: "llm",
         });
+      } else {
+        const operationSignals: Record<string, RegExp> = {
+          GET: /(?:\.(?:select)\s*\(|\b(?:list|read|fetch|get)[A-Z_$][\w$]*\s*\()/,
+          POST: /(?:\.insert\s*\(|\b(?:create|insert|add)[A-Z_$][\w$]*\s*\()/,
+          PATCH: /(?:\.update\s*\(|\b(?:update|patch|edit)[A-Z_$][\w$]*\s*\()/,
+          DELETE: /(?:\.delete\s*\(|\b(?:delete|remove)[A-Z_$][\w$]*\s*\()/,
+        };
+        const missingOperations = Object.entries(operationSignals)
+          .filter(([, signal]) => !signal.test(route))
+          .map(([method]) => method);
+        if (missingOperations.length > 0) {
+          findings.push({
+            rule: "non-functional-crud-route",
+            severity: "error",
+            file: routePath,
+            message: `API route for "${table.table}" exports CRUD handlers but does not implement ${missingOperations.join(", ")} persistence`,
+            fix: "llm",
+          });
+        }
       }
     }
     if (paths.has("supabase/schema.sql") && !schemaTables.has(table.table)) {

@@ -453,6 +453,72 @@ describe("runStaticChecks", () => {
       ).toBe('table "todos" has no API route');
     });
 
+    it("requires every persistent API route to implement full CRUD", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "supabase/schema.sql":
+            "create table public.todos (id uuid); create policy own on public.todos for all using (true);",
+          "src/app/api/todos/route.ts":
+            "export async function GET() { return null; } export async function POST() { return null; }",
+        }),
+        plan
+      );
+
+      const finding = findings.find(
+        (item) => item.rule === "incomplete-crud-route"
+      );
+      expect(finding?.severity).toBe("error");
+      expect(finding?.message).toContain("PATCH, DELETE");
+    });
+
+    it("rejects empty CRUD handlers that never read or mutate persistence", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "supabase/schema.sql":
+            "create table public.todos (id uuid, owner_id uuid); create policy own on public.todos for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());",
+          "src/app/api/todos/route.ts":
+            "export function GET(){} export function POST(){} export function PATCH(){} export function DELETE(){}",
+        }),
+        plan
+      );
+
+      const finding = findings.find(
+        (item) => item.rule === "non-functional-crud-route"
+      );
+      expect(finding?.severity).toBe("error");
+      expect(finding?.message).toContain("GET, POST, PATCH, DELETE");
+    });
+
+    it("accepts CRUD handlers backed by persistent data helpers", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "supabase/schema.sql":
+            "create table public.todos (id uuid, owner_id uuid); create policy own on public.todos for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());",
+          "src/app/api/todos/route.ts":
+            "export function GET(){return listTodos()} export function POST(){return createTodo()} export function PATCH(){return updateTodo()} export function DELETE(){return deleteTodo()}",
+        }),
+        plan
+      );
+
+      expect(rules(findings)).not.toContain("non-functional-crud-route");
+    });
+
+    it("requires a rendered page to bind to the persistent API", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "supabase/schema.sql":
+            "create table public.todos (id uuid); create policy own on public.todos for all using (true);",
+          "src/app/api/todos/route.ts":
+            "export function GET(){} export function POST(){} export function PATCH(){} export function DELETE(){}",
+          "src/app/about/page.tsx":
+            "export default function About() { return <button>Create</button>; }",
+        }),
+        plan
+      );
+
+      expect(rules(findings)).toContain("missing-data-bound-ui");
+    });
+
     it("flags a planned table absent from an existing schema", () => {
       const findings = runStaticChecks(
         scaffolded({
@@ -505,6 +571,21 @@ describe("runStaticChecks", () => {
       );
 
       expect(rules(findings)).toContain("missing-rls-policies");
+      expect(checksPass(findings)).toBe(false);
+    });
+
+    it("rejects permissive RLS policies that are not owner scoped", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          "supabase/schema.sql":
+            "create table public.todos (id uuid); alter table public.todos enable row level security; create policy public_rows on public.todos for all using (true) with check (true);",
+          "src/app/api/todos/route.ts":
+            "export function GET(){return listTodos()} export function POST(){return createTodo()} export function PATCH(){return updateTodo()} export function DELETE(){return deleteTodo()}",
+        }),
+        plan
+      );
+
+      expect(rules(findings)).toContain("unscoped-rls-policies");
       expect(checksPass(findings)).toBe(false);
     });
 

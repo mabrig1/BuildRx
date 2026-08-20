@@ -301,6 +301,27 @@ Copy \`.env.example\` to \`.env.local\` and add the project URL and anonymous ke
   return files;
 }
 
+function runtimeFileIsComplete(file: GeneratedFile, plan: AppPlan): boolean {
+  if (file.path === "src/lib/data.ts") {
+    return plan.dataModel.every((table) => {
+      const type = toPascal(table.table);
+      return ["list", "create", "update", "delete"].every((operation) =>
+        new RegExp(
+          `export\\s+async\\s+function\\s+${operation}${type}\\s*\\(`
+        ).test(file.content)
+      );
+    });
+  }
+  if (/^src\/app\/api\/[^/]+\/route\.ts$/.test(file.path)) {
+    return ["GET", "POST", "PATCH", "DELETE"].every((method) =>
+      new RegExp(
+        `export\\s+(?:async\\s+)?function\\s+${method}\\s*\\(`
+      ).test(file.content)
+    );
+  }
+  return true;
+}
+
 export const codingAgent: Agent = {
   name: "coding",
   async run(context, emit) {
@@ -377,6 +398,29 @@ export const codingAgent: Agent = {
         );
         files = mockFiles(plan, existingPaths);
       }
+    }
+
+    // A model response may be valid but partial (the screenshot that
+    // prompted this fix contained one code file for a multi-table app).
+    // Fill every missing runtime contract deterministically instead of
+    // sending the repair loop a mostly empty backend.
+    const byPath = new Map(files.map((file) => [file.path, file]));
+    let scaffolded = 0;
+    const occupiedPaths = [...existingPaths, ...byPath.keys()];
+    for (const file of mockFiles(plan, occupiedPaths)) {
+      const generatedFile = byPath.get(file.path);
+      if (
+        (generatedFile && runtimeFileIsComplete(generatedFile, plan)) ||
+        existingPaths.includes(file.path)
+      ) {
+        continue;
+      }
+      byPath.set(file.path, file);
+      scaffolded++;
+    }
+    files = [...byPath.values()];
+    if (!note && scaffolded > 0) {
+      note = ` (${scaffolded} missing runtime files completed from the plan)`;
     }
 
     for (const file of files) {

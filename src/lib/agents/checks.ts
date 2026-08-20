@@ -15,6 +15,7 @@ import type {
   GeneratedFile,
   WorkflowContext,
 } from "@/lib/agents/types";
+import { previewFunctionalityIssues } from "@/lib/agents/functional-preview";
 import { inspectSchema, listFiles } from "@/lib/agents/tools";
 
 const CODE_EXT = /\.(tsx?|jsx?)$/;
@@ -320,6 +321,21 @@ export function runStaticChecks(
       fix: "llm",
     });
   }
+  if (
+    plan.dataModel.length > 0 &&
+    paths.has("supabase/schema.sql") &&
+    /create\s+policy\b/i.test(schema) &&
+    !/auth\.uid\s*\(\s*\)/i.test(schema)
+  ) {
+    findings.push({
+      rule: "unscoped-rls-policies",
+      severity: "error",
+      file: "supabase/schema.sql",
+      message:
+        "RLS policies do not scope records to auth.uid(); permissive policies such as USING (true) expose tenant data",
+      fix: "llm",
+    });
+  }
 
   const dataLayer = context.files.get("src/lib/data.ts")?.content ?? "";
   if (
@@ -335,20 +351,64 @@ export function runStaticChecks(
     });
   }
 
-  const preview = context.files.get("preview/index.html")?.content ?? "";
   if (
     plan.dataModel.length > 0 &&
-    (!/<script[\s>]/i.test(preview) ||
-      !/<(?:form|input|select|button|textarea)[\s>]/i.test(preview) ||
-      preview.length < 2500)
+    dataLayer.length > 0 &&
+    !/\.auth\.getUser\s*\(/.test(dataLayer)
   ) {
+    findings.push({
+      rule: "missing-server-auth-guard",
+      severity: "error",
+      file: "src/lib/data.ts",
+      message:
+        "persistent data access does not verify the authenticated user server-side",
+      fix: "llm",
+    });
+  }
+
+  const preview = context.files.get("preview/index.html")?.content ?? "";
+  const previewIssues = previewFunctionalityIssues(preview);
+  if (plan.dataModel.length > 0 && previewIssues.length > 0) {
     findings.push({
       rule: "shallow-preview",
       severity: "error",
       file: "preview/index.html",
-      message: "preview does not yet demonstrate a complete interactive product workflow",
+      message: `preview does not demonstrate a complete interactive product workflow: ${previewIssues[0]}`,
       fix: "llm",
     });
+  }
+
+  if (plan.dataModel.length > 0) {
+    const boundComponentNames = files
+      .filter(
+        (file) =>
+          /^src\/components\/.*\.tsx$/.test(file.path) &&
+          /fetch\s*\([^)]*\/api\//.test(file.content)
+      )
+      .flatMap((file) =>
+        [...file.content.matchAll(/export\s+function\s+([A-Za-z_$][\w$]*)/g)].map(
+          (match) => match[1]
+        )
+      );
+    const pages = files.filter((file) =>
+      /^src\/app\/(?:.*\/)?page\.tsx$/.test(file.path)
+    );
+    const hasDataBoundPage = pages.some(
+      (file) =>
+        /(?:fetch\s*\([^)]*\/api\/|@\/lib\/data|supabase\.from\s*\()/.test(
+          file.content
+        ) || boundComponentNames.some((name) => file.content.includes(`<${name}`))
+    );
+    if (!hasDataBoundPage) {
+      findings.push({
+        rule: "missing-data-bound-ui",
+        severity: "error",
+        file: "src/app/page.tsx",
+        message:
+          "no rendered page connects its forms and records to the generated persistent API",
+        fix: "llm",
+      });
+    }
   }
 
   if (plan.dataModel.length > 0) {
@@ -368,13 +428,50 @@ export function runStaticChecks(
   }
 
   for (const table of plan.dataModel) {
-    if (!paths.has(`src/app/api/${table.table}/route.ts`)) {
+    const routePath = `src/app/api/${table.table}/route.ts`;
+    if (!paths.has(routePath)) {
       findings.push({
         rule: "missing-api-route",
         severity: "error",
         message: `table "${table.table}" has no API route`,
         fix: "auto",
       });
+    } else {
+      const route = context.files.get(routePath)?.content ?? "";
+      const missingMethods = ["GET", "POST", "PATCH", "DELETE"].filter(
+        (method) =>
+          !new RegExp(`export\\s+(?:async\\s+)?function\\s+${method}\\s*\\(`).test(
+            route
+          )
+      );
+      if (missingMethods.length > 0) {
+        findings.push({
+          rule: "incomplete-crud-route",
+          severity: "error",
+          file: routePath,
+          message: `API route for "${table.table}" is missing ${missingMethods.join(", ")}`,
+          fix: "llm",
+        });
+      } else {
+        const operationSignals: Record<string, RegExp> = {
+          GET: /(?:\.(?:select)\s*\(|\b(?:list|read|fetch|get)[A-Z_$][\w$]*\s*\()/,
+          POST: /(?:\.insert\s*\(|\b(?:create|insert|add)[A-Z_$][\w$]*\s*\()/,
+          PATCH: /(?:\.update\s*\(|\b(?:update|patch|edit)[A-Z_$][\w$]*\s*\()/,
+          DELETE: /(?:\.delete\s*\(|\b(?:delete|remove)[A-Z_$][\w$]*\s*\()/,
+        };
+        const missingOperations = Object.entries(operationSignals)
+          .filter(([, signal]) => !signal.test(route))
+          .map(([method]) => method);
+        if (missingOperations.length > 0) {
+          findings.push({
+            rule: "non-functional-crud-route",
+            severity: "error",
+            file: routePath,
+            message: `API route for "${table.table}" exports CRUD handlers but does not implement ${missingOperations.join(", ")} persistence`,
+            fix: "llm",
+          });
+        }
+      }
     }
     if (paths.has("supabase/schema.sql") && !schemaTables.has(table.table)) {
       findings.push({

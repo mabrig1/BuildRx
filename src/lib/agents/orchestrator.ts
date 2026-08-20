@@ -216,6 +216,7 @@ export async function runWorkflow(
       type: "workflow_complete",
       previewUrl: context.previewUrl ?? null,
       fileCount: context.files.size,
+      verified: context.verified === true,
     });
 
     if (context.userId) {

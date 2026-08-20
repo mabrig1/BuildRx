@@ -1,4 +1,5 @@
 import { checksPass, runStaticChecks } from "@/lib/agents/checks";
+import { buildFunctionalPreview } from "@/lib/agents/functional-preview";
 import {
   FILE_FORMAT_INSTRUCTIONS,
   canCallModel,
@@ -20,7 +21,7 @@ import type {
   WorkflowContext,
 } from "@/lib/agents/types";
 
-const SYSTEM = `You are the Repair Agent in an automated app-building pipeline. You receive files with verified defects and output CORRECTED full files. Fix only what the findings describe. For product-depth findings such as shallow-preview, placeholder-page, ephemeral-data-layer, or missing-rls-policies, replace the shallow implementation with a complete production workflow that follows the supplied product plan. Never repair persistence with module arrays or enable RLS without owner-scoped policies. Output nothing for files you cannot improve.
+const SYSTEM = `You are the Repair Agent in an automated app-building pipeline. You receive files with verified defects and output CORRECTED full files. Fix only what the findings describe. For product-depth findings such as shallow-preview, placeholder-page, missing-data-bound-ui, incomplete-crud-route, non-functional-crud-route, ephemeral-data-layer, missing-rls-policies, or unscoped-rls-policies, replace the shallow implementation with a complete production workflow that follows the supplied product plan. A preview must execute create/search/update/delete interactions without disclaimers. A rendered Next.js page must bind to persistent APIs with loading, empty, error, success, and retry states. CRUD handlers must perform real reads and mutations. Never repair persistence with module arrays or enable RLS without policies scoped to auth.uid(). Output nothing for files you cannot improve.
 
 ${FILE_FORMAT_INSTRUCTIONS}`;
 
@@ -85,14 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       writeFile(
         context,
         "preview/index.html",
-        `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${plan.appName}</title>
-<style>body{font-family:system-ui,sans-serif;margin:0;color:#18181b}.hero{text-align:center;padding:96px 24px}.hero p{color:#71717a;max-width:560px;margin:16px auto}</style>
-</head>
-<body><section class="hero"><h1>${plan.appName}</h1><p>${plan.summary}</p></section></body>
-</html>
-`
+        buildFunctionalPreview(plan)
       );
       return "created preview/index.html";
 
@@ -249,29 +243,58 @@ create policy "${table.table}_delete_own" on public.${table.table} for delete us
         context,
         `src/app/api/${table}/route.ts`,
         `import { NextResponse } from "next/server";
-import { create${type}, list${type} } from "@/lib/data";
+import { create${type}, delete${type}, list${type}, update${type} } from "@/lib/data";
+
+function responseError(error: unknown) {
+  const message = error instanceof Error ? error.message : "Request failed";
+  return NextResponse.json(
+    { error: message },
+    { status: message === "UNAUTHENTICATED" ? 401 : 500 }
+  );
+}
 
 export async function GET() {
   try {
     return NextResponse.json({ data: await list${type}() });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Request failed" }, { status: 500 });
+    return responseError(error);
   }
 }
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  if (!body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
   try {
     return NextResponse.json({ data: await create${type}(body) }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Request failed" }, { status: 500 });
+    return responseError(error);
   }
 }
 
-export type ${type} = Record<string, unknown>;
+export async function PATCH(request: Request) {
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body) || !("id" in body) || typeof body.id !== "string") {
+    return NextResponse.json({ error: "A valid id is required" }, { status: 400 });
+  }
+  try {
+    return NextResponse.json({ data: await update${type}(body.id, body) });
+  } catch (error) {
+    return responseError(error);
+  }
+}
+
+export async function DELETE(request: Request) {
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  try {
+    await delete${type}(id);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return responseError(error);
+  }
+}
 `
       );
       return `created src/app/api/${table}/route.ts`;

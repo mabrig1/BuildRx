@@ -74,6 +74,16 @@ function mockFiles(plan: AppPlan): GeneratedFile[] {
   const sql = plan.dataModel
     .map((table) => {
       const { columns: plannedColumns, ownerColumn } = columnsFor(plan, table);
+      const requiredBusinessColumn =
+        plannedColumns.find((column) =>
+          /name|title|subject|label/.test(column.name)
+        )?.name ??
+        plannedColumns.find(
+          (column) =>
+            !["id", ownerColumn, "workspace_id", "created_at", "updated_at"].includes(
+              column.name
+            )
+        )?.name;
       const columns = plannedColumns
         .map((col) => {
           if (col.name === "id") return `  id uuid primary key default gen_random_uuid()`;
@@ -83,9 +93,9 @@ function mockFiles(plan: AppPlan): GeneratedFile[] {
             return `  created_at timestamptz not null default now()`;
           const references = foreignTable(plan, col.name);
           if (references) {
-            return `  ${col.name} uuid not null references public.${references}(id) on delete cascade`;
+            return `  ${col.name} uuid references public.${references}(id) on delete set null`;
           }
-          return `  ${col.name} ${col.type} not null`;
+          return `  ${col.name} ${col.type}${col.name === requiredBusinessColumn ? " not null" : ""}`;
         })
         .join(",\n");
       return `-- ${table.description}

@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { NextResponse } from "next/server";
 
 import { getFileSystem } from "@/lib/files/manager";
+import { storeBuildArtifact } from "@/lib/cloudflare/r2";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -62,11 +63,28 @@ export async function GET(
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") || "project";
 
+  let artifactStatus = "not-configured";
+  try {
+    const artifactKey = await storeBuildArtifact({
+      projectId,
+      slug,
+      archive: new Uint8Array(archive),
+    });
+    if (artifactKey) artifactStatus = "stored";
+  } catch (error) {
+    artifactStatus = "failed";
+    console.warn(
+      "[cloudflare-r2] artifact backup failed:",
+      error instanceof Error ? error.name : "unknown error"
+    );
+  }
+
   return new NextResponse(new Uint8Array(archive), {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${slug}.zip"`,
       "Cache-Control": "private, no-store",
+      "X-BuildRx-Artifact": artifactStatus,
     },
   });
 }

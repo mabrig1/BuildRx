@@ -28,11 +28,27 @@ The recommended host is [Vercel](https://vercel.com); any Node 20+ host that run
    NEXT_PUBLIC_SUPABASE_URL=...
    NEXT_PUBLIC_SUPABASE_ANON_KEY=...
    SUPABASE_SERVICE_ROLE_KEY=...        ← required for billing to activate
-   NVIDIA_API_KEY=...                   ← required for real AI (free key at build.nvidia.com)
+   OPENROUTER_API_KEY=...               ← recommended primary AI provider
+   NVIDIA_API_KEY=...                   ← optional fallback (free at build.nvidia.com)
+   MONGODB_URI=...                      ← durable agent/build-run checkpoints
+   CLOUDFLARE_ACCOUNT_ID=...
+   CLOUDFLARE_API_TOKEN=...
+   CLOUDFLARE_R2_BUCKET=...
+   CLOUDFLARE_R2_ACCESS_KEY_ID=...
+   CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
    ```
 
    Add the optional groups (PostHog, Paystack, Flutterwave) as needed — the [environment variable reference](environment-variables.md) explains each one. `NEXT_PUBLIC_*` values are baked in at build time, so **redeploy after changing them**.
 3. Deploy. Preview deployments work too, but OAuth and payment callbacks will only round-trip cleanly on domains listed in your Supabase redirect allow list.
+
+### Provider boundaries
+
+- **Vercel** runs the Next.js control plane and generated-app deployments. The Deploy panel uploads the complete generated source tree by SHA digest; secret `.env*` files are excluded.
+- **Supabase** is the only authority for authentication, project ownership, relational records, generated source files, and RLS.
+- **MongoDB Atlas** stores only document-shaped `build_runs` checkpoints. Do not replicate users, entitlements, or project authorization into it.
+- **Cloudflare** owns DNS/edge protection and private R2 ZIP artifacts. It is not a second application runtime.
+
+Create the MongoDB and R2 resources first, then copy their server-only values into Vercel. Never put connection strings, service-role keys, API tokens, or R2 secrets in a `NEXT_PUBLIC_` variable.
 
 ### Function duration limits
 
@@ -101,7 +117,12 @@ Add your domain in Vercel (Project → Settings → Domains) and point DNS at it
 - [ ] Sign up with a fresh email — the `users` row is created (trigger)
 - [ ] Google login round-trips through `/auth/callback` (if enabled)
 - [ ] Create a project, run **Build app**, files persist after refresh
+- [ ] The build log includes **FounderOps Agent**, and the generated project contains all four `docs/*.md` evidence files
 - [ ] AI chat streams real responses (not the demo-labeled mock)
+- [ ] `/api/ai/health` reports the configured primary provider as reachable
+- [ ] Admin health reports MongoDB checkpoints and Cloudflare R2 as reachable
+- [ ] Export a project and confirm `X-BuildRx-Artifact: stored`
+- [ ] Deploy a generated project to Vercel and confirm its Next.js routes, API routes, and persistence configuration—not only the static preview—are present
 - [ ] `/billing` shows the Free plan; a test checkout completes and the invoice appears
 - [ ] Provider webhook test event returns `200`
 - [ ] `/admin` is reachable only by an admin user (promote yourself: `update public.users set role = 'admin' where email = '...'`)

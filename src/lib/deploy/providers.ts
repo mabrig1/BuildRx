@@ -13,9 +13,10 @@ export type DeployProviderName = "vercel" | "netlify" | "railway";
 
 export interface DeployInput {
   projectName: string;
-  /** Static site files, keyed by site-relative path (index.html, …). */
+  /** Project files, keyed by deployment-relative path. */
   files: Array<{ path: string; content: string }>;
   githubRepo: string | null;
+  framework?: "nextjs" | null;
 }
 
 export interface DeployOutcome {
@@ -39,8 +40,52 @@ function slugify(name: string) {
 }
 
 // ------------------------------------------------------------------
-// Vercel — inline-file deployment via /v13/deployments
+// Vercel — digest upload followed by /v13/deployments
 // ------------------------------------------------------------------
+
+interface VercelFileDescriptor {
+  file: string;
+  sha: string;
+  size: number;
+}
+
+async function uploadVercelFiles(
+  token: string,
+  files: DeployInput["files"],
+  log: LogFn
+): Promise<VercelFileDescriptor[]> {
+  const descriptors = files.map((file) => {
+    const bytes = Buffer.from(file.content, "utf8");
+    return {
+      file: file.path,
+      sha: createHash("sha1").update(bytes).digest("hex"),
+      size: bytes.byteLength,
+      bytes,
+    };
+  });
+
+  log(`Uploading ${descriptors.length} source files to Vercel…`);
+  for (const descriptor of descriptors) {
+    const response = await fetch("https://api.vercel.com/v2/files", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/octet-stream",
+        "x-vercel-digest": descriptor.sha,
+      },
+      body: descriptor.bytes,
+    });
+    if (!response.ok && response.status !== 409) {
+      const data = await response.json().catch(() => null);
+      throw new DeployError(
+        data?.error?.message ??
+          `Failed to upload ${descriptor.file} to Vercel (${response.status})`
+      );
+    }
+  }
+
+  return descriptors.map(({ file, sha, size }) => ({ file, sha, size }));
+}
 
 export async function deployToVercel(
   token: string,
@@ -49,6 +94,7 @@ export async function deployToVercel(
 ): Promise<DeployOutcome> {
   const name = slugify(input.projectName);
   log(`Creating Vercel deployment for "${name}"…`);
+  const files = await uploadVercelFiles(token, input.files, log);
 
   const response = await fetch("https://api.vercel.com/v13/deployments", {
     method: "POST",
@@ -59,12 +105,8 @@ export async function deployToVercel(
     body: JSON.stringify({
       name,
       target: "production",
-      files: input.files.map((file) => ({
-        file: file.path,
-        data: Buffer.from(file.content, "utf8").toString("base64"),
-        encoding: "base64",
-      })),
-      projectSettings: { framework: null },
+      files,
+      projectSettings: { framework: input.framework ?? null },
     }),
   });
 

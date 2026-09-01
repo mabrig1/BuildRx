@@ -28,6 +28,19 @@ async function buildVerification(
 
   const items: VerificationItem[] = [];
 
+  const evidenceFiles = [
+    "docs/PRODUCT-BRIEF.md",
+    "docs/ARCHITECTURE-DECISION.md",
+    "docs/RELEASE-CHECKLIST.md",
+    "docs/OPERATIONS-RUNBOOK.md",
+  ];
+  const evidenceCount = evidenceFiles.filter((path) => context.files.has(path)).length;
+  items.push({
+    label: "Production evidence pack",
+    status: evidenceCount === evidenceFiles.length ? "pass" : "fail",
+    detail: `${evidenceCount}/${evidenceFiles.length} required documents`,
+  });
+
   const frontend = rules(["missing-preview", "missing-home-page", "missing-layout", "broken-file", "missing-import", "undeclared-dependency", "invalid-package-json", "missing-package-json", "missing-page"]);
   items.push({
     label: "Frontend builds (static checks)",

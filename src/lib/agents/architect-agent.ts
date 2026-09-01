@@ -1,5 +1,5 @@
 import { pause } from "@/lib/agents/llm";
-import type { Agent, AppPlan } from "@/lib/agents/types";
+import type { Agent, AppPlan, FounderOpsSpec } from "@/lib/agents/types";
 
 interface Architecture {
   conventions: string[];
@@ -7,7 +7,10 @@ interface Architecture {
 }
 
 /** Deterministic architecture derived from the plan — always valid. */
-export function fallbackArchitecture(plan: AppPlan): Architecture {
+export function fallbackArchitecture(
+  plan: AppPlan,
+  founderOps?: FounderOpsSpec
+): Architecture {
   const fileMap: Array<{ path: string; purpose: string }> = [
     { path: "preview/index.html", purpose: "Self-contained static preview of the home page" },
     { path: "src/app/layout.tsx", purpose: "Root layout importing globals.css" },
@@ -36,6 +39,12 @@ export function fallbackArchitecture(plan: AppPlan): Architecture {
       purpose: `Authenticated GET, POST, PATCH, and DELETE for ${table.table}`,
     });
   }
+  const providerBoundaries = (founderOps?.infrastructure ?? [])
+    .filter((item) => item.required)
+    .map(
+      (item) =>
+        `${item.provider}: ${item.responsibility}; do not expand beyond this bounded role`
+    );
   return {
     conventions: [
       "TypeScript throughout; Tailwind classes for styling",
@@ -46,6 +55,9 @@ export function fallbackArchitecture(plan: AppPlan): Architecture {
       "API routes validate input and return useful 400, 401, 404, and 500 responses",
       "Operational screens include loading, empty, validation, error, success, and retry states",
       "The first two product workflows must be complete from entry point to saved outcome",
+      "Secrets stay server-side and are referenced by environment-variable name only",
+      "External deployment, migration, billing, and destructive actions require explicit human approval",
+      ...providerBoundaries,
     ],
     fileMap,
   };
@@ -77,7 +89,7 @@ export const architectAgent: Agent = {
     // at the cost of a slice of budget the UI and Coding steps do need.
     // On a free inference tier that trade is decisive: those two steps
     // are the ones that actually write the app.
-    const architecture = fallbackArchitecture(plan);
+    const architecture = fallbackArchitecture(plan, context.founderOps);
     context.architecture = formatArchitecture(architecture);
 
     await pause(200);

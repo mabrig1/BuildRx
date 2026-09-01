@@ -15,6 +15,10 @@ import {
   getProviderToken,
   type DeploymentRecord,
 } from "@/lib/deploy/service";
+import {
+  fileWithEmbeddedCredential,
+  isDeploymentSourcePath,
+} from "@/lib/deploy/source";
 import { getFileSystem } from "@/lib/files/manager";
 import { getSession } from "@/lib/github/service";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -70,7 +74,10 @@ export async function POST(request: Request) {
   }
   const { projectId, provider } = parsed.data;
 
-  // Gather the static site (the generated preview build).
+  // Gather the static preview plus the complete generated project. A
+  // Vercel deployment must receive the Next.js source tree, not only
+  // preview/index.html; the latter is a mock preview with no API or
+  // persistence and was the main reason "deployed" apps were not real.
   const fs = getFileSystem(projectId);
   const preview = await fs.read("preview/index.html").catch(() => null);
   if (!preview) {
@@ -80,6 +87,25 @@ export async function POST(request: Request) {
     );
   }
   const siteFiles = [{ path: "index.html", content: preview.content }];
+  const entries = await fs.list();
+  const projectFiles = (
+    await Promise.all(
+      entries
+        .filter((entry) => isDeploymentSourcePath(entry.path))
+        .map((entry) => fs.read(entry.path))
+    )
+  )
+    .filter((file): file is NonNullable<typeof file> => Boolean(file))
+    .map((file) => ({ path: file.path, content: file.content }));
+  const credentialFile = fileWithEmbeddedCredential(projectFiles);
+  if (credentialFile) {
+    return NextResponse.json(
+      {
+        error: `Deployment blocked: ${credentialFile} contains a credential-like value. Move it to the provider's encrypted environment settings.`,
+      },
+      { status: 400 }
+    );
+  }
 
   // Project metadata.
   let projectName = "app-creator-site";
@@ -145,8 +171,17 @@ export async function POST(request: Request) {
       try {
         const input: DeployInput = {
           projectName,
-          files: siteFiles,
+          files:
+            provider === "vercel" &&
+            projectFiles.some((file) => file.path === "package.json")
+              ? projectFiles
+              : siteFiles,
           githubRepo,
+          framework:
+            provider === "vercel" &&
+            projectFiles.some((file) => file.path === "package.json")
+              ? "nextjs"
+              : null,
         };
         if (!token) {
           outcome = await simulateDeploy(provider, slug, log);

@@ -5,13 +5,13 @@ An AI app builder in the spirit of Lovable: describe the app you want in plain E
 ## Features
 
 - **AI chat workspace** — streaming Claude-powered chat per project, with conversation history, message editing, markdown + code-block rendering
-- **Multi-agent build pipeline** — six specialized agents (Planner → UI → Database → Coding → Debug → Deployment) collaborate through a shared context to turn one prompt into a complete project: pages, components, database schema, API routes, styling, and structure files
+- **Agentic build pipeline** — eleven specialized stages (Planner → FounderOps → Architect → UI → Database → Coding → Debug → Security → QA → Repair → Deployment) generate, verify, repair, and release a complete project with a production evidence pack
 - **Virtual project filesystem** — every generated file is stored per project, browsable and editable
 - **In-browser IDE** — Monaco editor (bundled, no CDN) with a file explorer, tabs, auto-save, search & replace, and a simulated terminal
 - **Live preview environment** — instant-refresh static preview, a Sandpack engine, and a WebContainer runner that boots the generated project's real dev server in the browser; device viewports, error console, fullscreen
 - **GitHub integration** — connect an account, create/link repositories, push the whole project as a commit, pull changes back, browse commit history
-- **Zip export** — download any project's files as a zip archive in one click
-- **One-click deployment** — Vercel, Netlify, and Railway with live build logs, deployment history, status tracking, and custom domains
+- **Zip export** — download any project's files as a zip archive, with optional immutable Cloudflare R2 backup
+- **One-click deployment** — complete generated Next.js projects deploy to Vercel by digest upload; Netlify and Railway remain available with live logs and history
 - **Auth** — Supabase email/password + Google OAuth, secure-cookie JWT sessions, protected routes
 - **Subscriptions** — Free (5 projects) and Pro (unlimited) plans, Paystack & Flutterwave checkouts, invoices, server-enforced usage limits
 - **Admin analytics** — users, activity, AI usage, revenue, login history, and CSV report exports, with optional PostHog tracking
@@ -24,7 +24,9 @@ An AI app builder in the spirit of Lovable: describe the app you want in plain E
 | Framework | [Next.js 15](https://nextjs.org) (App Router, Turbopack) + React 19 + TypeScript |
 | Styling | Tailwind CSS v4 + [Shadcn UI](https://ui.shadcn.com) (Radix primitives) |
 | Auth & database | [Supabase](https://supabase.com) (PostgreSQL, RLS, Auth) |
-| AI | NVIDIA Inference API (GLM 5.2 reasoning · Step 3.7 Flash chat · Laguna XS 2.1 code) — free tier, no paid balance required. Anthropic Claude is an optional off-by-default tier. |
+| Agent state | [MongoDB Atlas](https://www.mongodb.com/atlas) (`build_runs` checkpoints only) |
+| Artifact storage / edge | [Cloudflare](https://www.cloudflare.com/) R2 + DNS/edge protection |
+| AI | OpenRouter primary with NVIDIA fallback; Anthropic Claude is optional and off by default |
 | Editor & preview | Monaco · Sandpack · WebContainers |
 | State / forms | Zustand · React Hook Form + Zod |
 | Payments | Paystack · Flutterwave |
@@ -70,12 +72,14 @@ Open [http://localhost:3000](http://localhost:3000) — the app runs fully in **
 │   │   ├── layout/ providers/     # app shell, theme
 │   │   └── {auth,chat,agents,editor,preview,files,github,deploy,billing,admin,projects,dashboard}/
 │   ├── lib/
-│   │   ├── agents/                # the six build agents + orchestrator
+│   │   ├── agents/                # eleven build stages + orchestrator
 │   │   ├── ai/                    # Claude prompts, NVIDIA client, usage metering, route helpers
 │   │   ├── analytics/             # PostHog, event tracking, admin aggregates
 │   │   ├── billing/               # plans/limits, Paystack & Flutterwave, activation
 │   │   ├── deploy/                # Vercel/Netlify/Railway adapters
 │   │   ├── files/                 # virtual filesystem manager
+│   │   ├── mongodb/               # durable agent/build-run checkpoints
+│   │   ├── cloudflare/            # R2 artifact storage
 │   │   ├── github/                # GitHub REST + Git Data API client
 │   │   ├── supabase/              # browser/server/admin clients + session middleware
 │   │   ├── validations/           # Zod schemas

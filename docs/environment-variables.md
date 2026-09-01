@@ -26,18 +26,45 @@ Get these from **Project Settings → API** in the [Supabase dashboard](https://
 
 **Google Sign-In** requires no extra env vars — the Google OAuth client is configured in the Supabase dashboard. See the [Google OAuth setup guide](google-oauth.md) for the required provider, redirect-URL, and callback-URL configuration.
 
-## AI providers (chat + agent build pipeline)
+## MongoDB Atlas (durable agent state)
 
-`/api/chat` and `/api/agents/run` go through a shared provider chain
-(`src/lib/ai/provider.ts`) built entirely on NVIDIA's Inference API, so
-no AI request depends on a paid balance. The chain tries the NVIDIA
-models in order and falls back automatically: **NVIDIA GLM → NVIDIA Step
-→ NVIDIA Llama**. `NVIDIA_API_KEY` is the only AI key needed; without it
-both return well-formed **mock responses** (still persisted when
-Supabase is connected), clearly labeled as demo output.
+MongoDB has one bounded responsibility: document-shaped checkpoints for agent/build runs. Supabase remains the source of truth for identity, project ownership, relational records, RLS, and generated files.
 
 | Variable | Required | Description |
 | --- | --- | --- |
+| `MONGODB_URI` | For durable checkpoints | Server-only Atlas connection string. Grant read/write only to the BuildRx database. |
+| `MONGODB_DATABASE` | No | Database name. Default: `buildrx`; the app writes the `build_runs` collection. |
+
+Without MongoDB, builds still execute, but workflow checkpoints are not durable across function failure or restart.
+
+## Cloudflare (edge + R2 artifacts)
+
+Cloudflare owns DNS/edge protection and private ZIP artifact backups. Vercel remains the application runtime.
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `CLOUDFLARE_ACCOUNT_ID` | For Cloudflare/R2 | Cloudflare account identifier. |
+| `CLOUDFLARE_API_TOKEN` | For edge administration | Least-privilege server-only API token. |
+| `CLOUDFLARE_R2_BUCKET` | For artifact backups | Private R2 bucket name. |
+| `CLOUDFLARE_R2_ACCESS_KEY_ID` | For artifact backups | R2 S3 API access key ID. |
+| `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | For artifact backups | R2 S3 API secret; server-only. |
+
+Project ZIP downloads still work without R2; the response header `X-BuildRx-Artifact` reports whether the immutable backup was stored.
+
+## AI providers (chat + agent build pipeline)
+
+`/api/chat` and `/api/agents/run` go through a shared provider chain
+(`src/lib/ai/provider.ts`): **OpenRouter first, NVIDIA fallback**, with
+Anthropic available only when explicitly enabled. Either OpenRouter or
+NVIDIA is enough for real generation. With neither, the pipeline uses
+well-formed deterministic fallbacks and labels the build as degraded.
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `OPENROUTER_API_KEY` | Recommended for real AI | Primary provider key. Model routing is resolved against its live catalog. |
+| `OPENROUTER_BASE_URL` | No | Default: `https://openrouter.ai/api/v1`. |
+| `OPENROUTER_MODEL_STRONG` | No | Fixed override for planning, FounderOps, and application code. |
+| `OPENROUTER_MODEL` | No | Fixed override for chat and lighter review tasks. |
 | `NVIDIA_API_KEY` | **Yes, for real AI** | Bearer token for the NIM OpenAI-compatible API. Get a free one at [build.nvidia.com](https://build.nvidia.com). |
 | `NVIDIA_BASE_URL` | No | API base URL (alias: `NVIDIA_API_BASE_URL`). Default: `https://integrate.api.nvidia.com/v1`. |
 | `NVIDIA_GLM_MODEL` | No | Primary provider-chain model. Default: `z-ai/glm-5.2`. |
@@ -49,7 +76,7 @@ Supabase is connected), clearly labeled as demo output.
 | `NVIDIA_MODEL_MISTRAL_LARGE` | No | Code generation/review model (UI, Database, Repair). Falls back to `NVIDIA_CODE_MODEL`. |
 | `NVIDIA_MODEL_MISTRAL_MEDIUM` | No | Lightweight-task model (Security Agent judgment calls). Falls back to `NVIDIA_CHAT_MODEL`. |
 | `NVIDIA_MODEL_KIMI` | No | General-purpose model used as the fallback tier for every agent call. Falls back to `NVIDIA_CHAT_MODEL`. |
-| `AGENT_PIPELINE_BUDGET_MS` | No | Total time the ten-step build pipeline may use, split across the steps by weight. Default: `270000` (270s, leaving 30s of the route's 300s `maxDuration` for saving files). Lower it if your host caps function duration below 300s — steps that run out of budget finish on their built-in scaffolds instead of being cut off mid-build. |
+| `AGENT_PIPELINE_BUDGET_MS` | No | Total time the eleven-stage build pipeline may use, split across the steps by weight. Default: `270000` (270s, leaving 30s for persistence and verification). |
 
 All model routing is server-side only — `NVIDIA_API_KEY` and every model id are read in server code and never shipped to the browser.
 
@@ -111,7 +138,9 @@ GitHub personal access tokens and Vercel / Netlify / Railway API tokens are **no
 | --- | --- |
 | Just explore | nothing |
 | Real accounts + persistence | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| Real AI chat + agent builds | `NVIDIA_API_KEY` |
+| Real AI chat + agent builds | `OPENROUTER_API_KEY` and optionally `NVIDIA_API_KEY` |
+| Durable agent checkpoints | `MONGODB_URI` |
+| Cloudflare artifact backups | `CLOUDFLARE_ACCOUNT_ID` + R2 variables |
 | Billing/subscriptions | `SUPABASE_SERVICE_ROLE_KEY` + Paystack and/or Flutterwave keys |
 | NVIDIA text/code endpoints | `NVIDIA_API_KEY` |
 | Product analytics | `NEXT_PUBLIC_POSTHOG_KEY` |

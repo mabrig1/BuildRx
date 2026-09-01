@@ -15,6 +15,11 @@ import {
   openrouterStrongModel,
 } from "@/lib/ai/openrouter";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isMongoConfigured } from "@/lib/mongodb/config";
+import {
+  isCloudflareApiConfigured,
+  isCloudflareR2Configured,
+} from "@/lib/cloudflare/config";
 
 export type ConfigSeverity = "ok" | "warn" | "fail";
 
@@ -108,6 +113,33 @@ export function validateConfiguration(): ConfigReport {
     detail: has("SUPABASE_SERVICE_ROLE_KEY")
       ? "Service-role key present — billing and usage metering can write."
       : "No service-role key — billing/usage writes are disabled by design.",
+  });
+
+  const mongo = isMongoConfigured();
+  checks.push({
+    key: "MONGODB_URI",
+    status: mongo ? "ok" : "warn",
+    detail: mongo
+      ? "MongoDB is configured for durable agent/build-run checkpoints."
+      : "No durable agent-run store — builds still run, but cannot retain workflow checkpoints.",
+    action: mongo
+      ? undefined
+      : "Set MONGODB_URI and optionally MONGODB_DATABASE; do not copy Supabase auth data into MongoDB.",
+  });
+
+  const cloudflareApi = isCloudflareApiConfigured();
+  const cloudflareR2 = isCloudflareR2Configured();
+  checks.push({
+    key: "Cloudflare",
+    status: cloudflareApi && cloudflareR2 ? "ok" : "warn",
+    detail:
+      cloudflareApi && cloudflareR2
+        ? "Cloudflare API and R2 artifact storage are configured."
+        : "Cloudflare edge/R2 is incomplete — generated ZIP artifacts are not backed up to R2.",
+    action:
+      cloudflareApi && cloudflareR2
+        ? undefined
+        : "Set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, CLOUDFLARE_R2_BUCKET, CLOUDFLARE_R2_ACCESS_KEY_ID, and CLOUDFLARE_R2_SECRET_ACCESS_KEY.",
   });
 
   // --- public URL (needed to verify a deployment from outside) -------

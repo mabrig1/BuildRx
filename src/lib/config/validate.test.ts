@@ -34,6 +34,12 @@ function healthy() {
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://proj.supabase.co";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_test";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-test";
+  process.env.MONGODB_URI = "mongodb://test.example/buildrx";
+  process.env.CLOUDFLARE_ACCOUNT_ID = "account-test";
+  process.env.CLOUDFLARE_API_TOKEN = "cloudflare-token-test";
+  process.env.CLOUDFLARE_R2_BUCKET = "build-artifacts";
+  process.env.CLOUDFLARE_R2_ACCESS_KEY_ID = "r2-access-test";
+  process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY = "r2-secret-test";
   process.env.NEXT_PUBLIC_APP_URL = "https://app.example";
 }
 
@@ -53,6 +59,13 @@ beforeEach(() => {
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
+    "MONGODB_URI",
+    "MONGODB_DATABASE",
+    "CLOUDFLARE_ACCOUNT_ID",
+    "CLOUDFLARE_API_TOKEN",
+    "CLOUDFLARE_R2_BUCKET",
+    "CLOUDFLARE_R2_ACCESS_KEY_ID",
+    "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
     "NEXT_PUBLIC_APP_URL",
     "VERCEL_URL",
     "ANTHROPIC_ENABLED",
@@ -169,6 +182,22 @@ describe("validateConfiguration", () => {
       expect(check(report, "Supabase").status).toBe("warn");
       expect(check(report, "Supabase").detail).toMatch(/Demo mode/);
       expect(report.status).toBe("warn");
+    });
+
+    it("warns when durable MongoDB workflow state is unavailable", async () => {
+      const { validateConfiguration } = await freshModule();
+      healthy();
+      delete process.env.MONGODB_URI;
+
+      expect(check(validateConfiguration(), "MONGODB_URI").status).toBe("warn");
+    });
+
+    it("warns unless both the Cloudflare API and R2 are configured", async () => {
+      const { validateConfiguration } = await freshModule();
+      healthy();
+      delete process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
+
+      expect(check(validateConfiguration(), "Cloudflare").status).toBe("warn");
     });
 
     it("accepts a publishable key in place of the legacy anon key", async () => {
@@ -288,6 +317,9 @@ describe("validateConfiguration", () => {
       expect(serialised).not.toContain(serviceKey);
       expect(serialised).not.toContain("nvapi-testkey");
       expect(serialised).not.toContain("sk-or-testkey");
+      expect(serialised).not.toContain("cloudflare-token-test");
+      expect(serialised).not.toContain("r2-secret-test");
+      expect(serialised).not.toContain("mongodb://test.example/buildrx");
     });
   });
 });

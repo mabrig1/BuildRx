@@ -123,6 +123,25 @@ export function runStaticChecks(
   const paths = new Set(listFiles(context));
   const files = [...context.files.values()];
 
+  if (context.founderOps) {
+    for (const required of [
+      "docs/PRODUCT-BRIEF.md",
+      "docs/ARCHITECTURE-DECISION.md",
+      "docs/RELEASE-CHECKLIST.md",
+      "docs/OPERATIONS-RUNBOOK.md",
+    ]) {
+      if (!paths.has(required)) {
+        findings.push({
+          rule: "missing-production-evidence",
+          severity: "error",
+          file: required,
+          message: `${required} is missing from the production evidence pack`,
+          fix: "none",
+        });
+      }
+    }
+  }
+
   // --- required project structure -----------------------------------
   if (!paths.has("preview/index.html")) {
     findings.push({

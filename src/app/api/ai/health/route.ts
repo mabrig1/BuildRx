@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { announceConfigurationOnce, validateConfiguration } from "@/lib/config/validate";
 import { nvidiaApiKey, nvidiaBaseUrl } from "@/lib/ai/nvidia";
 import { resolvedModelPlan, resolvedOpenRouterPlan } from "@/lib/ai/models";
-import { isOpenRouterConfigured } from "@/lib/ai/openrouter";
+import {
+  isOpenRouterConfigured,
+  openrouterApiKey,
+  openrouterBaseUrl,
+} from "@/lib/ai/openrouter";
 
 export const maxDuration = 30;
 
@@ -26,10 +30,71 @@ function categorize(status: number): ErrorCategory {
   return "upstream_error";
 }
 
+interface ProviderProbe {
+  name: "openrouter" | "nvidia";
+  baseUrl: string;
+  key: string;
+}
+
+interface ProviderHealth {
+  name: ProviderProbe["name"];
+  reachable: boolean;
+  latencyMs: number;
+  httpStatus: number | null;
+  errorCategory: ErrorCategory;
+}
+
+/** Same priority as the actual completion chain: OpenRouter, then NVIDIA. */
+function configuredProbes(): ProviderProbe[] {
+  const probes: ProviderProbe[] = [];
+  const openrouterKey = openrouterApiKey();
+  if (openrouterKey) {
+    probes.push({
+      name: "openrouter",
+      baseUrl: openrouterBaseUrl(),
+      key: openrouterKey,
+    });
+  }
+  const nvidiaKey = nvidiaApiKey();
+  if (nvidiaKey) {
+    probes.push({ name: "nvidia", baseUrl: nvidiaBaseUrl(), key: nvidiaKey });
+  }
+  return probes;
+}
+
+async function probeProvider(provider: ProviderProbe): Promise<ProviderHealth> {
+  const startedAt = Date.now();
+  let httpStatus: number | null = null;
+  let reachable = false;
+  let errorCategory: ErrorCategory = null;
+
+  try {
+    const response = await fetch(`${provider.baseUrl}/models`, {
+      headers: { Authorization: `Bearer ${provider.key}` },
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+    httpStatus = response.status;
+    reachable = response.ok;
+    if (!response.ok) errorCategory = categorize(response.status);
+    await response.arrayBuffer().catch(() => undefined);
+  } catch (error) {
+    const name = error instanceof Error ? error.name : "";
+    errorCategory = name === "TimeoutError" ? "timeout" : "unreachable";
+  }
+
+  return {
+    name: provider.name,
+    reachable,
+    latencyMs: Date.now() - startedAt,
+    httpStatus,
+    errorCategory,
+  };
+}
+
 /**
  * GET /api/ai/health — is the AI provider actually usable right now?
  *
- * Makes one real request to the provider and reports reachability,
+ * Makes one real request to every configured provider and reports reachability,
  * latency and a sanitized failure category. Public by design (it is a
  * liveness probe), which is exactly why it returns no key, no model
  * variable values, and no raw upstream error text — only the category.
@@ -37,10 +102,8 @@ function categorize(status: number): ErrorCategory {
 export async function GET() {
   announceConfigurationOnce();
   const config = validateConfiguration();
-  const startedAt = Date.now();
-
-  const key = nvidiaApiKey();
-  if (!key) {
+  const probes = configuredProbes();
+  if (probes.length === 0) {
     return NextResponse.json(
       {
         status: "not_configured",
@@ -55,41 +118,33 @@ export async function GET() {
     );
   }
 
-  let httpStatus: number | null = null;
-  let reachable = false;
-  let errorCategory: ErrorCategory = null;
-
-  try {
-    const response = await fetch(`${nvidiaBaseUrl()}/models`, {
-      headers: { Authorization: `Bearer ${key}` },
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    });
-    httpStatus = response.status;
-    reachable = response.ok;
-    if (!response.ok) errorCategory = categorize(response.status);
-    // Body is drained but never returned — it is large and unnecessary.
-    await response.arrayBuffer().catch(() => undefined);
-  } catch (error) {
-    const name = error instanceof Error ? error.name : "";
-    errorCategory = name === "TimeoutError" ? "timeout" : "unreachable";
-  }
-
-  const latencyMs = Date.now() - startedAt;
+  const providers = await Promise.all(probes.map(probeProvider));
+  const primary = providers[0];
+  const reachable = providers.some((provider) => provider.reachable);
   const [models, openrouterModels] = await Promise.all([
     resolvedModelPlan().catch(() => null),
     resolvedOpenRouterPlan().catch(() => null),
   ]);
 
-  const status = reachable ? "healthy" : errorCategory === "rate_limited" ? "degraded" : "down";
+  const status = reachable
+    ? providers.every((provider) => provider.reachable)
+      ? "healthy"
+      : "degraded"
+    : providers.some((provider) => provider.errorCategory === "rate_limited")
+      ? "degraded"
+      : "down";
 
   return NextResponse.json(
     {
       status,
       configured: true,
       reachable,
-      latencyMs,
-      httpStatus,
-      errorCategory,
+      /** Backward-compatible summary fields describe the primary provider. */
+      latencyMs: primary.latencyMs,
+      httpStatus: primary.httpStatus,
+      errorCategory: primary.errorCategory,
+      primaryProvider: primary.name,
+      providers,
       /** Model ids are not secrets; the variables that hold them are. */
       models,
       /** Which OpenRouter model each task role resolves to right now. */

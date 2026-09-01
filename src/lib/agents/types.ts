@@ -1,5 +1,6 @@
 export type AgentName =
   | "planner"
+  | "founder_ops"
   | "architect"
   | "ui"
   | "database"
@@ -11,14 +12,15 @@ export type AgentName =
   | "deployment";
 
 /**
- * Pipeline order. The orchestrator (runWorkflow) coordinates these ten:
- * generation (planner → architect → ui → database → coding), review
+ * Pipeline order. The orchestrator (runWorkflow) coordinates these eleven:
+ * definition (planner → FounderOps), generation (architect → ui → database → coding), review
  * (debug → security), then verification with an autonomous repair loop
  * (qa finds issues → repair fixes → qa retests, bounded), and finally
  * deployment, which persists files and verifies the preview.
  */
 export const AGENT_ORDER: AgentName[] = [
   "planner",
+  "founder_ops",
   "architect",
   "ui",
   "database",
@@ -32,6 +34,7 @@ export const AGENT_ORDER: AgentName[] = [
 
 export const AGENT_LABELS: Record<AgentName, string> = {
   planner: "Planner Agent",
+  founder_ops: "FounderOps Agent",
   architect: "Architect Agent",
   ui: "UI Agent",
   database: "Database Agent",
@@ -74,6 +77,29 @@ export interface GeneratedFile {
   content: string;
 }
 
+/** Production constraints established before architecture and code generation. */
+export interface FounderOpsSpec {
+  primaryUser: string;
+  smallestValuableOutcome: string;
+  acceptanceCriteria: string[];
+  excludedScope: string[];
+  dataClassification: Array<{
+    category: "public" | "internal" | "confidential" | "regulated";
+    examples: string[];
+    controls: string[];
+  }>;
+  infrastructure: Array<{
+    provider: "vercel" | "cloudflare" | "mongodb" | "supabase" | "other";
+    responsibility: string;
+    reason: string;
+    required: boolean;
+  }>;
+  riskGates: string[];
+  productionEvidence: string[];
+  costControls: string[];
+  humanApprovals: string[];
+}
+
 /** Shared state that flows through the pipeline. */
 export interface WorkflowContext {
   projectId: string;
@@ -82,6 +108,9 @@ export interface WorkflowContext {
   /** Whether Supabase persistence is available. */
   persist: boolean;
   plan?: AppPlan;
+  /** FounderOps Agent's product boundary, provider ownership, and evidence gates. */
+  founderOps?: FounderOpsSpec;
+  founderOpsSource?: "agent" | "deterministic";
   /** Accumulated generated files, keyed by path (later agents may revise). */
   files: Map<string, GeneratedFile>;
   previewUrl?: string;

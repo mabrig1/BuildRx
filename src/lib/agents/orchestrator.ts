@@ -3,6 +3,7 @@ import { codingAgent } from "@/lib/agents/coding-agent";
 import { databaseAgent } from "@/lib/agents/database-agent";
 import { debugAgent } from "@/lib/agents/debug-agent";
 import { deploymentAgent } from "@/lib/agents/deployment-agent";
+import { founderOpsAgent } from "@/lib/agents/founder-ops-agent";
 import {
   agentModel,
   degradedEvent,
@@ -24,9 +25,15 @@ import {
 import { uiAgent } from "@/lib/agents/ui-agent";
 import { recordAiUsage } from "@/lib/ai/usage";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import {
+  finishBuildRun,
+  markBuildStep,
+  startBuildRun,
+} from "@/lib/mongodb/build-runs";
 
 const agents: Record<string, Agent> = {
   planner: plannerAgent,
+  founder_ops: founderOpsAgent,
   architect: architectAgent,
   ui: uiAgent,
   database: databaseAgent,
@@ -41,7 +48,8 @@ const agents: Record<string, Agent> = {
 /**
  * The Orchestrator Agent — runs the full pipeline:
  *
- *   Planner → Architect → UI → Database → Coding   (generate)
+ *   Planner → FounderOps                              (define)
+ *   → Architect → UI → Database → Coding              (generate)
  *   → Debug → Security                              (review)
  *   → QA → Repair                                   (test → fix → retest)
  *   → Deployment                                    (persist + verify)
@@ -88,6 +96,7 @@ const AGENT_WEIGHTS: Record<AgentName, number> = {
   // share, taken from the two review passes that have full deterministic
   // fallbacks and cost nothing when skipped.
   planner: 4,
+  founder_ops: 1.75,
   architect: 0.05, // deterministic file map — no model call needed
   ui: 3.5,
   database: 1.25,
@@ -132,6 +141,7 @@ export async function runWorkflow(
     context.requestId ??
     `run_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   emit({ type: "workflow_start", agents: AGENT_ORDER });
+  await startBuildRun(context);
 
   // Say up front what this build can actually do. Finding out after five
   // minutes that every step fell back to a scaffold is the difference
@@ -159,6 +169,7 @@ export async function runWorkflow(
   try {
     for (const [index, name] of AGENT_ORDER.entries()) {
       context.stepDeadlineAt = stepDeadline(context, AGENT_ORDER.slice(index));
+      await markBuildStep(context, name);
 
       // The planner is what every later step reads; if it produced
       // nothing (a failure its own fallback couldn't cover), the
@@ -217,6 +228,7 @@ export async function runWorkflow(
       previewUrl: context.previewUrl ?? null,
       fileCount: context.files.size,
     });
+    await finishBuildRun(context, "completed");
 
     if (context.userId) {
       await recordAiUsage({
@@ -250,6 +262,7 @@ export async function runWorkflow(
       cause: diagnosed.cause,
       suggestedFix: diagnosed.suggestedFix,
     });
+    await finishBuildRun(context, "failed", diagnosed.code);
 
     if (context.persist && isSupabaseConfigured()) {
       const { createClient } = await import("@/lib/supabase/server");

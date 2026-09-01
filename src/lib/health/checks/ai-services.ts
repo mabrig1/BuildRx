@@ -4,6 +4,11 @@ import { classifyThrown } from "@/lib/health/error-response";
 import { withCircuitBreaker } from "@/lib/health/retry";
 import type { CheckResult, HealthStatus } from "@/lib/health/types";
 import { isNvidiaConfigured, nvidiaApiKey, nvidiaBaseUrl } from "@/lib/ai/nvidia";
+import {
+  isOpenRouterConfigured,
+  openrouterApiKey,
+  openrouterBaseUrl,
+} from "@/lib/ai/openrouter";
 
 const PROBE_TIMEOUT_MS = 5000;
 
@@ -35,14 +40,31 @@ async function probeNvidia(): Promise<{ ok: boolean; detail: string }> {
   });
 }
 
+async function probeOpenRouter(): Promise<{ ok: boolean; detail: string }> {
+  return withCircuitBreaker("openrouter", async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${openrouterBaseUrl()}/models`, {
+        headers: { Authorization: `Bearer ${openrouterApiKey()}` },
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`OpenRouter API returned ${response.status}`);
+      }
+      return { ok: true, detail: "OpenRouter API reachable." };
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+}
+
 /**
  * AI services check: confirms the AI providers actually in use are
- * reachable with the current keys, not just "an env var is set". NVIDIA
- * is the provider the app runs on; Anthropic is probed only when it has
- * been explicitly enabled (ANTHROPIC_ENABLED=true), so an unused,
- * unfunded Anthropic key can't drag this check to "degraded". No fix
- * proposals here — the only remedy is setting/rotating the provider key
- * in the deployment environment.
+ * reachable with the current keys, not just "an env var is set".
+ * OpenRouter is primary, NVIDIA is the fallback, and Anthropic is probed
+ * only when explicitly enabled (ANTHROPIC_ENABLED=true), so an unused,
+ * unfunded Anthropic key cannot drag this check to "degraded".
  */
 export async function checkAiServices(): Promise<{ result: CheckResult }> {
   const startedAt = Date.now();
@@ -52,17 +74,18 @@ export async function checkAiServices(): Promise<{ result: CheckResult }> {
   const anthropicEnabled =
     (anthropicFlag === "true" || anthropicFlag === "1") &&
     Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+  const openrouterConfigured = isOpenRouterConfigured();
   const nvidiaConfigured = isNvidiaConfigured();
 
-  if (!nvidiaConfigured && !anthropicEnabled) {
+  if (!openrouterConfigured && !nvidiaConfigured && !anthropicEnabled) {
     return {
       result: {
         subsystem: "ai",
         label: "AI services",
         status: "degraded",
         summary:
-          "No AI provider configured — set NVIDIA_API_KEY (free at build.nvidia.com); chat and agent builds run in demo/mock mode until then.",
-        detail: { nvidiaConfigured, anthropicEnabled },
+          "No AI provider configured — set OPENROUTER_API_KEY or NVIDIA_API_KEY; chat and agent builds use deterministic fallbacks until then.",
+        detail: { openrouterConfigured, nvidiaConfigured, anthropicEnabled },
         checkedAt,
         durationMs: Date.now() - startedAt,
       },
@@ -71,6 +94,15 @@ export async function checkAiServices(): Promise<{ result: CheckResult }> {
 
   const probes: Record<string, { ok: boolean; detail: string }> = {};
   const errors: string[] = [];
+
+  if (openrouterConfigured) {
+    try {
+      probes.openrouter = await probeOpenRouter();
+    } catch (error) {
+      probes.openrouter = { ok: false, detail: classifyThrown(error, "ai").cause };
+      errors.push(`OpenRouter: ${probes.openrouter.detail}`);
+    }
+  }
 
   if (nvidiaConfigured) {
     try {
@@ -105,7 +137,7 @@ export async function checkAiServices(): Promise<{ result: CheckResult }> {
       label: "AI services",
       status,
       summary,
-      detail: { nvidiaConfigured, anthropicEnabled, probes },
+      detail: { openrouterConfigured, nvidiaConfigured, anthropicEnabled, probes },
       checkedAt,
       durationMs: Date.now() - startedAt,
     },

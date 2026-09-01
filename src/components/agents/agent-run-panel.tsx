@@ -39,6 +39,7 @@ import { AGENT_LABELS, AGENT_ORDER } from "@/lib/agents/types";
 
 const AGENT_ICONS: Record<AgentName, typeof Brain> = {
   planner: Brain,
+  founder_ops: Hammer,
   architect: Compass,
   ui: Palette,
   database: Database,
@@ -52,6 +53,7 @@ const AGENT_ICONS: Record<AgentName, typeof Brain> = {
 
 const AGENT_DESCRIPTIONS: Record<AgentName, string> = {
   planner: "Understands requirements",
+  founder_ops: "Defines production gates",
   architect: "Designs the structure",
   ui: "Generates pages & components",
   database: "Creates database schema",

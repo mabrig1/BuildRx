@@ -1,5 +1,7 @@
 import { classifyThrown } from "@/lib/health/error-response";
 import type { CheckResult, HealthStatus } from "@/lib/health/types";
+import { isCloudflareApiConfigured } from "@/lib/cloudflare/config";
+import { verifyCloudflareApiToken } from "@/lib/cloudflare/api";
 
 const PING_TIMEOUT_MS = 5000;
 
@@ -29,6 +31,21 @@ export async function checkDeployment(): Promise<{ result: CheckResult }> {
 
   const issues: string[] = [];
   if (!url) issues.push("NEXT_PUBLIC_APP_URL is not set or invalid");
+
+  const cloudflare = {
+    configured: isCloudflareApiConfigured(),
+    reachable: false,
+  };
+  if (cloudflare.configured) {
+    try {
+      await verifyCloudflareApiToken();
+      cloudflare.reachable = true;
+    } catch {
+      issues.push("Cloudflare API token verification failed");
+    }
+  } else {
+    issues.push("Cloudflare edge API is not configured");
+  }
 
   let reachable: boolean | null = null;
   let pingDetail = "Not checked — no app URL configured.";
@@ -76,6 +93,7 @@ export async function checkDeployment(): Promise<{ result: CheckResult }> {
         appUrl: url ?? null,
         reachable,
         pingDetail,
+        cloudflare,
       },
       checkedAt,
       durationMs: Date.now() - startedAt,

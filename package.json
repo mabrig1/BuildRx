@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "certify:generated-app": "vitest run --config vitest.certification.config.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.41",

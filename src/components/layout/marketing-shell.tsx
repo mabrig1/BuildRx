@@ -97,7 +97,7 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
                       {contact.label}
                     </span>
                     <span className="group-hover:text-primary block truncate text-sm font-medium transition-colors">
-                      {"value" in contact ? contact.value : contact.label}
+                      {contact.value}
                     </span>
                   </a>
                 ))}

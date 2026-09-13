@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     headerList.get("origin") ??
     process.env.NEXT_PUBLIC_APP_URL ??
     "http://localhost:3000";
-  const reference = "techplus_" + user.id.slice(0, 8) + "_" + Date.now();
+  const reference = "techplus_" + user.id + "_" + Date.now();
   const callbackUrl = origin + "/api/course/verify?provider=" + provider;
   const metadata = {
     user_id: user.id,

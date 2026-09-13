@@ -50,6 +50,18 @@ The recommended host is [Vercel](https://vercel.com); any Node 20+ host that run
 
 Create the MongoDB and R2 resources first, then copy their server-only values into Vercel. Never put connection strings, service-role keys, API tokens, or R2 secrets in a `NEXT_PUBLIC_` variable.
 
+### Generated-app developer handoff
+
+BuildRx-generated projects are designed to leave the builder as normal, portable Next.js repositories:
+
+1. In the project workspace, connect **GitHub**, create or select a repository, and push the generated source.
+2. Connect **Vercel** in BuildRx for direct deployment, or import the pushed repository in Vercel to get Git-based preview and production deployments.
+3. Copy the generated `.env.example` values into local `.env.local` and Vercel Project Settings → Environment Variables.
+4. For apps that need document-shaped job/session state, create a MongoDB Atlas database and set `MONGODB_URI` plus `MONGODB_DATABASE`. The generated `src/lib/mongodb.ts` helper is server-only and connection-pool safe.
+5. Run `npm run typecheck` and `npm run build` before promotion. Generated Tailwind v4 projects include the required PostCSS package/config, and BuildRx QA blocks or repairs that setup when model output omits it.
+
+Keep Supabase as the authentication and relational-ownership authority unless the generated architecture explicitly assigns a bounded responsibility to MongoDB. Never expose `MONGODB_URI` through a `NEXT_PUBLIC_` variable.
+
 ### Function duration limits
 
 The AI routes declare `maxDuration` of 120–300 seconds (`/api/chat` and `/api/agents/run` are 300s). On Vercel's free (Hobby) tier functions can cap lower than that. The build pipeline budgets itself against `AGENT_PIPELINE_BUDGET_MS` (default 270s) and hands each step a slice of it, so a slow model degrades that step to its built-in scaffold rather than stalling the run — but the budget still has to fit inside the platform's ceiling. If your plan caps functions below 300s, set `AGENT_PIPELINE_BUDGET_MS` to roughly (cap − 30s) so the pipeline finishes and saves its files before the platform kills the function.

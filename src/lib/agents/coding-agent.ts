@@ -18,7 +18,8 @@ const SYSTEM = `You are the Coding Agent in an automated app-building pipeline. 
 - persistent data access helpers ("src/lib/data.ts") matching the schema; never use module arrays, sample-data stores, or fake CRUD
 - a REST API route handler under "src/app/api/<table>/route.ts" with authenticated GET, POST, PATCH, and DELETE for each table in the plan's data model
 - the root layout ("src/app/layout.tsx") importing globals.css, if not already generated
-- project structure files: "package.json" (next/react/tailwind/Supabase deps, dev/build/start/lint/typecheck scripts), ".env.example", and "README.md" describing setup, workflows, schema migration, and verification
+- project structure files: "package.json" (next/react/tailwind/Supabase/MongoDB deps, dev/build/start/lint/typecheck scripts), "postcss.config.mjs", "tsconfig.json", ".env.example", and "README.md" describing setup, workflows, schema migration, GitHub/Vercel deployment, optional MongoDB usage, and verification
+- a server-only "src/lib/mongodb.ts" helper so document/job-state features can be enabled by setting MONGODB_URI without rewriting the app
 - any hooks or utilities the plan's features require
 
 Use TypeScript and keep files focused. Verify the user server-side for every query and mutation. Validate request bodies, never trust owner_id from the client, and return actionable errors. Do NOT regenerate files that already exist (you'll be given the list).
@@ -242,6 +243,7 @@ export default function RootLayout({
           name: plan.appName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
           version: "0.1.0",
           private: true,
+          engines: { node: "22.x" },
           scripts: {
             dev: "next dev",
             build: "next build",
@@ -252,12 +254,17 @@ export default function RootLayout({
           dependencies: {
             "@supabase/ssr": "^0.7.0",
             "@supabase/supabase-js": "^2.50.0",
+            mongodb: "^7.6.0",
             next: "^15.0.0",
             react: "^19.0.0",
             "react-dom": "^19.0.0",
           },
           devDependencies: {
-            tailwindcss: "^4.0.0",
+            "@tailwindcss/postcss": "^4.1.0",
+            "@types/node": "^20.0.0",
+            "@types/react": "^19.0.0",
+            "@types/react-dom": "^19.0.0",
+            tailwindcss: "^4.1.0",
             typescript: "^5.0.0",
           },
         },
@@ -266,9 +273,104 @@ export default function RootLayout({
       )}\n`,
     },
     {
+      path: "postcss.config.mjs",
+      content: `export default {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+`,
+    },
+    {
+      path: "tsconfig.json",
+      content: `{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}\n`,
+    },
+    {
+      path: "src/lib/mongodb.ts",
+      content: `import { MongoClient, type Db } from "mongodb";
+
+const uri = process.env.MONGODB_URI;
+const databaseName = process.env.MONGODB_DATABASE || "app";
+
+const globalMongo = globalThis as unknown as {
+  __generatedMongoClient?: Promise<MongoClient>;
+};
+
+export function isMongoConfigured() {
+  return Boolean(uri);
+}
+
+export async function getMongoDatabase(): Promise<Db> {
+  if (!uri) {
+    throw new Error(
+      "MongoDB is not configured. Add MONGODB_URI in your local .env.local and Vercel project settings."
+    );
+  }
+
+  globalMongo.__generatedMongoClient ??= new MongoClient(uri, {
+    connectTimeoutMS: 5000,
+    serverSelectionTimeoutMS: 5000,
+    maxPoolSize: 10,
+  })
+    .connect()
+    .catch((error) => {
+      globalMongo.__generatedMongoClient = undefined;
+      throw error;
+    });
+
+  const client = await globalMongo.__generatedMongoClient;
+  return client.db(databaseName);
+}
+`,
+    },
+    {
       path: ".env.example",
       content: `NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# Optional MongoDB Atlas integration for document/job-state workloads.
+# Keep this server-only; never prefix it with NEXT_PUBLIC_.
+MONGODB_URI=mongodb+srv://username:password@cluster.example.mongodb.net/?retryWrites=true&w=majority
+MONGODB_DATABASE=app
 `,
     },
     {
@@ -293,7 +395,15 @@ npx supabase db push
 npm run dev
 \`\`\`
 
-Copy \`.env.example\` to \`.env.local\` and add the project URL and anonymous key. Before release, run \`npm run typecheck\`, \`npm run build\`, and verify every acceptance criterion.
+Copy \`.env.example\` to \`.env.local\` and add the project URL and anonymous key.
+
+## Integrations
+
+- **GitHub:** create or connect a repository from BuildRx, then push the generated source as a single commit.
+- **Vercel:** deploy directly from BuildRx, or import the pushed GitHub repository into Vercel for automatic preview and production deployments.
+- **MongoDB Atlas (optional):** set \`MONGODB_URI\` and \`MONGODB_DATABASE\` locally and in Vercel. Use \`getMongoDatabase()\` from \`src/lib/mongodb.ts\` for document-shaped job/session data; keep authentication and relational ownership in Supabase unless the architecture explicitly says otherwise.
+
+Before release, run \`npm run typecheck\`, \`npm run build\`, and verify every acceptance criterion.
 `,
     }
   );

@@ -5,12 +5,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["certification/generated-app-certification.test.ts"],
-    testTimeout: 360_000,
-    hookTimeout: 30_000,
-    sequence: {
-      concurrent: false,
-    },
+    include: ["certification/live-integration-certification.test.ts"],
+    testTimeout: 15 * 60_000,
+    hookTimeout: 60_000,
+    sequence: { concurrent: false },
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

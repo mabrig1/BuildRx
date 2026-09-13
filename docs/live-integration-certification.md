@@ -16,7 +16,7 @@ The workflow runs nightly and can be triggered manually.
 
 ## Required scoped credentials
 
-Use dedicated certification credentials, not broad production credentials.
+Use dedicated certification credentials, not broad production credentials. Store them as **GitHub Environment secrets** in an environment named `live-certification`; the workflow binds the job to that environment so these secrets are not exposed to ordinary CI jobs.
 
 | Secret | Scope |
 | --- | --- |

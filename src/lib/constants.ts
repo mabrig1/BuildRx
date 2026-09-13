@@ -3,6 +3,7 @@ import {
   Bot,
   CreditCard,
   FolderKanban,
+  GraduationCap,
   HeartPulse,
   LayoutDashboard,
   Settings,
@@ -24,6 +25,7 @@ export const siteConfig = {
 export const marketingNav = [
   { title: "Features", href: "/features" },
   { title: "Pricing", href: "/pricing" },
+  { title: "Tech+ Course", href: "/academy" },
   { title: "Docs", href: "/docs" },
 ] as const;
 
@@ -38,6 +40,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Projects", href: "/projects", icon: FolderKanban },
   { title: "AI Chat", href: "/chat", icon: Bot },
+  { title: "Tech+ Course", href: "/course", icon: GraduationCap },
   { title: "Guide", href: "/guide", icon: BookOpen },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },

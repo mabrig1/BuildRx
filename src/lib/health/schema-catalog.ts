@@ -382,6 +382,7 @@ export const SCHEMA_CATALOG: SchemaTableInfo[] = [
     recoverySql: RECOVERY.integration_connections,
   },
   { table: "invoices", migration: "20260715001200_billing_providers.sql" },
+  { table: "course_enrollments", migration: "20260913063000_add_course_enrollments.sql" },
   { table: "user_ai_settings", migration: "20260719094925_ai_platform.sql" },
   { table: "model_comparisons", migration: "20260719094925_ai_platform.sql" },
   { table: "agents", migration: "20260719104152_agents.sql" },

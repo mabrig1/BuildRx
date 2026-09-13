@@ -14,6 +14,7 @@ An AI app builder in the spirit of Lovable: describe the app you want in plain E
 - **One-click deployment** — complete generated Next.js projects deploy to Vercel by digest upload; Netlify and Railway remain available with live logs and history
 - **Auth** — Supabase email/password + Google OAuth, secure-cookie JWT sessions, protected routes
 - **Subscriptions** — Free (5 projects) and Pro (unlimited) plans, Paystack & Flutterwave checkouts, invoices, server-enforced usage limits
+- **MABRIG Tech+ Academy** — premium ₦100,000 BuildRx Full-Stack Launchpad with 8 project-first modules, one-click lab briefs, progress tracking, one-time enrollment checkout, and a production capstone
 - **Admin analytics** — users, activity, AI usage, revenue, login history, and CSV report exports, with optional PostHog tracking
 - **Demo mode** — the entire product works with zero configuration (in-memory stores, simulated providers) so you can explore before adding any keys
 
@@ -96,6 +97,8 @@ Open [http://localhost:3000](http://localhost:3000) — the app runs fully in **
 | --- | --- |
 | `/` | Marketing landing page |
 | `/login` `/signup` `/forgot-password` `/reset-password` | Authentication |
+| `/academy` | Public MABRIG Tech+ Full-Stack Launchpad sales page |
+| `/course` | Premium learner dashboard with BuildRx practical labs |
 | `/dashboard` | Overview, stats, recent projects |
 | `/projects` | Project management (create/search/duplicate/delete) |
 | `/projects/[id]` | Build workspace: AI chat, agent builds, IDE, live preview, GitHub, deploy |

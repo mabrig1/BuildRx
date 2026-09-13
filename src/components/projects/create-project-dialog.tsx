@@ -72,15 +72,22 @@ ACCEPTANCE CRITERIA
 
 export function CreateProjectDialog({
   trigger,
+  defaultValues,
 }: {
   trigger?: React.ReactNode;
+  defaultValues?: Partial<CreateProjectInput>;
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const initialValues: CreateProjectInput = {
+    name: defaultValues?.name ?? "",
+    description: defaultValues?.description ?? "",
+    prompt: defaultValues?.prompt ?? "",
+  };
 
   const form = useForm<CreateProjectInput>({
     resolver: zodResolver(createProjectSchema),
-    defaultValues: { name: "", description: "", prompt: "" },
+    defaultValues: initialValues,
   });
   const promptValue = form.watch("prompt") ?? "";
 
@@ -100,7 +107,7 @@ export function CreateProjectDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) form.reset();
+        if (!next) form.reset(initialValues);
       }}
     >
       <DialogTrigger asChild>

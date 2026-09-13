@@ -23,8 +23,8 @@ export interface VerifiedPayment {
 
 export class BillingError extends Error {}
 
-function currency() {
-  return process.env.BILLING_CURRENCY ?? "USD";
+function currency(override?: string) {
+  return override ?? process.env.BILLING_CURRENCY ?? "USD";
 }
 
 export function isPaystackConfigured() {
@@ -41,10 +41,12 @@ export function isFlutterwaveConfigured() {
 
 export async function paystackInitialize(params: {
   email: string;
-  amountUsd: number;
+  amount: number;
+  currencyCode?: string;
   reference: string;
   callbackUrl: string;
   metadata: Record<string, unknown>;
+  includePlanCode?: boolean;
 }): Promise<CheckoutInit> {
   const response = await fetch("https://api.paystack.co/transaction/initialize", {
     method: "POST",
@@ -55,13 +57,13 @@ export async function paystackInitialize(params: {
     body: JSON.stringify({
       email: params.email,
       // Paystack expects the smallest currency unit.
-      amount: Math.round(params.amountUsd * 100),
-      currency: currency(),
+      amount: Math.round(params.amount * 100),
+      currency: currency(params.currencyCode),
       reference: params.reference,
       callback_url: params.callbackUrl,
       metadata: params.metadata,
       // Optional Paystack Plan code enables provider-side auto-renewal.
-      ...(process.env.PAYSTACK_PLAN_CODE_PRO
+      ...(params.includePlanCode !== false && process.env.PAYSTACK_PLAN_CODE_PRO
         ? { plan: process.env.PAYSTACK_PLAN_CODE_PRO }
         : {}),
     }),
@@ -129,10 +131,12 @@ function constantTimeEquals(a: string, b: string): boolean {
 
 export async function flutterwaveInitialize(params: {
   email: string;
-  amountUsd: number;
+  amount: number;
+  currencyCode?: string;
   reference: string;
   callbackUrl: string;
   metadata: Record<string, unknown>;
+  title?: string;
 }): Promise<CheckoutInit> {
   const response = await fetch("https://api.flutterwave.com/v3/payments", {
     method: "POST",
@@ -142,12 +146,12 @@ export async function flutterwaveInitialize(params: {
     },
     body: JSON.stringify({
       tx_ref: params.reference,
-      amount: params.amountUsd,
-      currency: currency(),
+      amount: params.amount,
+      currency: currency(params.currencyCode),
       redirect_url: params.callbackUrl,
       customer: { email: params.email },
       meta: params.metadata,
-      customizations: { title: "App-Creator Pro" },
+      customizations: { title: params.title ?? "BuildRx Pro" },
     }),
   });
   const data = await response.json().catch(() => null);

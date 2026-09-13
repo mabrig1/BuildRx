@@ -10,6 +10,7 @@ permissions:
 jobs:
   certify:
     runs-on: ubuntu-latest
+    environment: live-certification
     timeout-minutes: 20
     env:
       GITHUB_TOKEN: ${{ github.token }}

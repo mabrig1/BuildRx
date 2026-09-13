@@ -103,10 +103,9 @@ async function githubRequest(
 
 async function pushGeneratedAppToGithub(
   files: GeneratedFile[],
-  runId: string
+  branch: string
 ): Promise<GithubPush> {
   const repository = required("GITHUB_REPOSITORY");
-  const branch = `live-cert/${runId}`;
   const [owner, repo] = repository.split("/");
   if (!owner || !repo) throw new Error(`Invalid GITHUB_REPOSITORY: ${repository}`);
 
@@ -146,7 +145,7 @@ async function pushGeneratedAppToGithub(
     {
       method: "POST",
       body: JSON.stringify({
-        message: `Live certification generated app ${runId} [skip ci]`,
+        message: `Live certification generated app ${branch} [skip ci]`,
         tree: tree.sha,
         parents: [required("GITHUB_SHA")],
       }),
@@ -220,7 +219,7 @@ async function vercelRequest(
   return response;
 }
 
-async function deployToVercel(
+async function createVercelDeployment(
   files: GeneratedFile[],
   github: GithubPush,
   runId: string
@@ -264,10 +263,16 @@ async function deployToVercel(
     throw new Error("Vercel did not return a deployment id and URL.");
   }
 
+  return { id, url: created.url };
+}
+
+async function verifyVercelDeployment(
+  deployment: VercelDeployment
+): Promise<void> {
   const deadline = Date.now() + 8 * 60_000;
   while (Date.now() < deadline) {
     const stateResponse = await vercelRequest(
-      `/v13/deployments/${encodeURIComponent(id)}`
+      `/v13/deployments/${encodeURIComponent(deployment.id)}`
     );
     const state = (await stateResponse.json()) as {
       readyState?: string;
@@ -294,7 +299,7 @@ async function deployToVercel(
     headers["x-vercel-protection-bypass"] = bypass;
     headers["x-vercel-set-bypass-cookie"] = "true";
   }
-  const smoke = await fetch(`https://${created.url}/`, {
+  const smoke = await fetch(`https://${deployment.url}/`, {
     headers,
     redirect: "follow",
     signal: AbortSignal.timeout(30_000),
@@ -303,8 +308,6 @@ async function deployToVercel(
     smoke.status,
     `Vercel preview returned HTTP ${smoke.status}. If deployment protection is enabled, configure LIVE_CERT_VERCEL_AUTOMATION_BYPASS_SECRET.`
   ).toBeLessThan(400);
-
-  return { id, url: created.url };
 }
 
 async function deleteVercelDeployment(id: string): Promise<void> {
@@ -576,6 +579,7 @@ describe("Live Integration Certification", () => {
       delete process.env[key];
     }
 
+    const githubBranch = `live-cert/${runId}`;
     let github: GithubPush | undefined;
     let deployment: VercelDeployment | undefined;
 
@@ -604,12 +608,13 @@ describe("Live Integration Certification", () => {
         content,
       }));
 
-      github = await pushGeneratedAppToGithub(files, runId);
+      github = await pushGeneratedAppToGithub(files, githubBranch);
       await summary(
         `- ✅ GitHub disposable branch push: \`${github.branch}\` @ \`${github.commitSha.slice(0, 8)}\``
       );
 
-      deployment = await deployToVercel(files, github, runId);
+      deployment = await createVercelDeployment(files, github, runId);
+      await verifyVercelDeployment(deployment);
       await summary(
         `- ✅ Vercel preview reached READY and responded successfully: https://${deployment.url}`
       );
@@ -642,16 +647,14 @@ describe("Live Integration Certification", () => {
         }
       }
 
-      if (github) {
-        try {
-          await deleteGithubBranch(github.branch);
+      try {
+          await deleteGithubBranch(github?.branch ?? githubBranch);
           await summary("- 🧹 GitHub disposable branch deleted");
         } catch (error) {
           cleanupErrors.push(
             `GitHub cleanup: ${error instanceof Error ? error.message : String(error)}`
           );
         }
-      }
 
       if (cleanupErrors.length > 0) {
         throw new Error(

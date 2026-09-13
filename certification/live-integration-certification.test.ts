@@ -330,10 +330,18 @@ async function certifyMongo(runId: string): Promise<void> {
   const databaseName =
     optional("LIVE_CERT_MONGODB_DATABASE") ?? "buildrx_certification";
   const id = `buildrx-live-cert-${runId}`;
+  type CertificationDocument = {
+    _id: string;
+    status: string;
+    createdAt: Date;
+    updatedAt?: Date;
+  };
 
   try {
     await client.connect();
-    const collection = client.db(databaseName).collection("live_certification");
+    const collection = client
+      .db(databaseName)
+      .collection<CertificationDocument>("live_certification");
     await collection.insertOne({
       _id: id,
       status: "created",
@@ -355,7 +363,7 @@ async function certifyMongo(runId: string): Promise<void> {
     try {
       await client
         .db(databaseName)
-        .collection("live_certification")
+        .collection<CertificationDocument>("live_certification")
         .deleteOne({ _id: id });
     } catch {
       // Best-effort cleanup if connection/auth failed mid-test.

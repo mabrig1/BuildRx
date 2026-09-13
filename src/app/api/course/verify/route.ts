@@ -26,6 +26,10 @@ export async function GET(request: Request) {
           : null;
 
     if (!payment) throw new Error("Unknown payment provider");
+    const expectedReferencePrefix = "techplus_" + user.id + "_";
+    if (!payment.reference.startsWith(expectedReferencePrefix)) {
+      throw new Error("Payment reference does not belong to this account");
+    }
     if (payment.currency.toUpperCase() !== "NGN") {
       throw new Error("Unexpected payment currency");
     }

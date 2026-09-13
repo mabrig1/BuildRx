@@ -70,14 +70,14 @@ export async function POST(request: Request) {
       provider === "paystack"
         ? await paystackInitialize({
             email: user.email,
-            amountUsd: pro.price,
+            amount: pro.price,
             reference,
             callbackUrl,
             metadata: { user_id: user.id, plan: "pro" },
           })
         : await flutterwaveInitialize({
             email: user.email,
-            amountUsd: pro.price,
+            amount: pro.price,
             reference,
             callbackUrl,
             metadata: { user_id: user.id, plan: "pro" },

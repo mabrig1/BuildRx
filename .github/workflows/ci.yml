@@ -31,6 +31,6 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Generated app certification
-        timeout-minutes: 10
+      - name: Generated app certification matrix
+        timeout-minutes: 15
         run: npm run certify:generated-app

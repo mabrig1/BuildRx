@@ -11,13 +11,86 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+export const brandConfig = {
+  companyName: "MABRIG Technologies",
+  productName: "BuildRx",
+  ownershipLine: "A MABRIG Technologies product",
+  supportLine: "Developed and maintained by MABRIG Technologies",
+  contacts: {
+    phone: {
+      label: "+234 706 534 2818",
+      href: "tel:+2347065342818",
+    },
+    whatsapp: {
+      label: "WhatsApp",
+      value: "+234 706 534 2818",
+      href: "https://wa.me/2347065342818",
+    },
+    primaryEmail: {
+      label: "Email",
+      value: "Mabrig1@gmail.com",
+      href: "mailto:Mabrig1@gmail.com",
+    },
+    contactEmail: {
+      label: "Contact",
+      value: "contact@mabrigkorie.org",
+      href: "mailto:contact@mabrigkorie.org",
+    },
+    website: {
+      label: "Website",
+      value: "mabrigkorie.org",
+      href: "https://mabrigkorie.org",
+    },
+    store: {
+      label: "Store",
+      value: "store.mabrigkorie.org",
+      href: "https://store.mabrigkorie.org",
+    },
+    facebook: {
+      label: "Facebook",
+      value: "Mabrig Korie",
+      href: "https://web.facebook.com/apostlemabrigkorie",
+    },
+    tiktok: {
+      label: "TikTok",
+      value: "@mabrigkorie",
+      href: "https://www.tiktok.com/@mabrigkorie",
+    },
+    youtube: {
+      label: "YouTube",
+      value: "@ApostleEmersonMabrigKorie",
+      href: "https://www.youtube.com/@ApostleEmersonMabrigKorie",
+    },
+    github: {
+      label: "GitHub",
+      value: "mabrig1",
+      href: "https://github.com/mabrig1",
+    },
+  },
+} as const;
+
+export const brandContactLinks = [
+  brandConfig.contacts.phone,
+  brandConfig.contacts.whatsapp,
+  brandConfig.contacts.primaryEmail,
+  brandConfig.contacts.contactEmail,
+  brandConfig.contacts.website,
+  brandConfig.contacts.store,
+  brandConfig.contacts.facebook,
+  brandConfig.contacts.tiktok,
+  brandConfig.contacts.youtube,
+  brandConfig.contacts.github,
+] as const;
+
 export const siteConfig = {
-  name: "BuildRx",
+  name: brandConfig.productName,
   description:
-    "Build production-ready apps by chatting with AI. Describe what you want, watch it come to life.",
+    "Build production-ready apps by chatting with AI. Describe what you want, watch it come to life. Built by MABRIG Technologies.",
   url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   links: {
     github: "https://github.com/mabrig1/BuildRx",
+    website: brandConfig.contacts.website.href,
+    whatsapp: brandConfig.contacts.whatsapp.href,
   },
 } as const;
 

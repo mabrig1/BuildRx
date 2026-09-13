@@ -1,0 +1,70 @@
+name: Live Integration Certification
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+  push:
+    branches:
+      - "codex/live-integration-certification"
+
+permissions:
+  contents: write
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      LIVE_CERT_VERCEL_TOKEN: ${{ secrets.LIVE_CERT_VERCEL_TOKEN }}
+      LIVE_CERT_VERCEL_TEAM_ID: ${{ secrets.LIVE_CERT_VERCEL_TEAM_ID }}
+      LIVE_CERT_VERCEL_PROJECT_ID: ${{ secrets.LIVE_CERT_VERCEL_PROJECT_ID }}
+      LIVE_CERT_VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.LIVE_CERT_VERCEL_AUTOMATION_BYPASS_SECRET }}
+      LIVE_CERT_MONGODB_URI: ${{ secrets.LIVE_CERT_MONGODB_URI }}
+      LIVE_CERT_MONGODB_DATABASE: ${{ vars.LIVE_CERT_MONGODB_DATABASE }}
+      LIVE_CERT_SUPABASE_URL: ${{ secrets.LIVE_CERT_SUPABASE_URL }}
+      LIVE_CERT_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.LIVE_CERT_SUPABASE_PUBLISHABLE_KEY }}
+      LIVE_CERT_SUPABASE_ANON_KEY: ${{ secrets.LIVE_CERT_SUPABASE_ANON_KEY }}
+      LIVE_CERT_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.LIVE_CERT_SUPABASE_SERVICE_ROLE_KEY }}
+      LIVE_CERT_OPENROUTER_API_KEY: ${{ secrets.LIVE_CERT_OPENROUTER_API_KEY }}
+      LIVE_CERT_OPENROUTER_MODEL: ${{ vars.LIVE_CERT_OPENROUTER_MODEL }}
+      LIVE_CERT_NVIDIA_API_KEY: ${{ secrets.LIVE_CERT_NVIDIA_API_KEY }}
+      LIVE_CERT_NVIDIA_MODEL: ${{ vars.LIVE_CERT_NVIDIA_MODEL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Credential preflight
+        shell: bash
+        run: |
+          missing=()
+          for key in             LIVE_CERT_VERCEL_TOKEN             LIVE_CERT_VERCEL_TEAM_ID             LIVE_CERT_VERCEL_PROJECT_ID             LIVE_CERT_MONGODB_URI             LIVE_CERT_SUPABASE_URL             LIVE_CERT_SUPABASE_SERVICE_ROLE_KEY
+          do
+            if [ -z "${!key}" ]; then missing+=("$key"); fi
+          done
+
+          if [ -z "$LIVE_CERT_SUPABASE_PUBLISHABLE_KEY" ] && [ -z "$LIVE_CERT_SUPABASE_ANON_KEY" ]; then
+            missing+=("LIVE_CERT_SUPABASE_PUBLISHABLE_KEY or LIVE_CERT_SUPABASE_ANON_KEY")
+          fi
+
+          if [ -z "$LIVE_CERT_OPENROUTER_API_KEY" ] && [ -z "$LIVE_CERT_NVIDIA_API_KEY" ]; then
+            missing+=("LIVE_CERT_OPENROUTER_API_KEY or LIVE_CERT_NVIDIA_API_KEY")
+          fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "### Live certification is not configured" >> "$GITHUB_STEP_SUMMARY"
+            printf -- "- Missing: \`%s\`\n" "${missing[@]}" >> "$GITHUB_STEP_SUMMARY"
+            printf 'Missing live certification credentials:\n - %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+      - name: Live integration certification
+        run: npm run certify:live-integrations

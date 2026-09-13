@@ -4,7 +4,12 @@ import { ArrowRight } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { marketingNav, siteConfig } from "@/lib/constants";
+import {
+  brandConfig,
+  brandContactLinks,
+  marketingNav,
+  siteConfig,
+} from "@/lib/constants";
 
 /**
  * Shared shell for the marketing pages (home, features, pricing, docs):
@@ -41,28 +46,71 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1">{children}</main>
 
       <footer className="border-t">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 sm:flex-row">
-          <Logo />
-          <nav className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
-            {marketingNav.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="hover:text-foreground transition-colors"
-              >
-                {item.title}
-              </Link>
-            ))}
-            <Link
-              href="/login"
-              className="hover:text-foreground transition-colors"
-            >
-              Sign in
-            </Link>
-          </nav>
-          <p className="text-muted-foreground text-sm">
-            © {new Date().getFullYear()} {siteConfig.name}
-          </p>
+        <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-10">
+          <div className="grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
+            <div className="space-y-4">
+              <Logo />
+              <div className="space-y-1">
+                <p className="font-medium">{brandConfig.ownershipLine}</p>
+                <p className="text-muted-foreground max-w-xl text-sm">
+                  {brandConfig.supportLine}. Build, learn, deploy and get support
+                  through our official channels below.
+                </p>
+              </div>
+              <nav className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                {marketingNav.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="hover:text-foreground transition-colors"
+                  >
+                    {item.title}
+                  </Link>
+                ))}
+                <Link
+                  href="/login"
+                  className="hover:text-foreground transition-colors"
+                >
+                  Sign in
+                </Link>
+              </nav>
+            </div>
+
+            <div>
+              <p className="mb-3 text-sm font-semibold">Contact MABRIG Technologies</p>
+              <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                {brandContactLinks.map((contact) => (
+                  <a
+                    key={contact.href}
+                    href={contact.href}
+                    target={
+                      contact.href.startsWith("http") ? "_blank" : undefined
+                    }
+                    rel={
+                      contact.href.startsWith("http")
+                        ? "noopener noreferrer"
+                        : undefined
+                    }
+                    className="group min-w-0"
+                  >
+                    <span className="text-muted-foreground block text-xs">
+                      {contact.label}
+                    </span>
+                    <span className="group-hover:text-primary block truncate text-sm font-medium transition-colors">
+                      {"value" in contact ? contact.value : contact.label}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-muted-foreground flex flex-col gap-2 border-t pt-5 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              © {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
+            </p>
+            <p>{brandConfig.supportLine}</p>
+          </div>
         </div>
       </footer>
     </div>

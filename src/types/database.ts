@@ -508,6 +508,58 @@ export interface Database {
           },
         ];
       };
+      course_enrollments: {
+        Row: {
+          id: string;
+          user_id: string;
+          course_slug: string;
+          status: "active" | "completed" | "refunded" | "revoked";
+          provider: string | null;
+          provider_ref: string | null;
+          amount: number;
+          currency: string;
+          enrolled_at: string;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          course_slug: string;
+          status?: "active" | "completed" | "refunded" | "revoked";
+          provider?: string | null;
+          provider_ref?: string | null;
+          amount?: number;
+          currency?: string;
+          enrolled_at?: string;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          course_slug?: string;
+          status?: "active" | "completed" | "refunded" | "revoked";
+          provider?: string | null;
+          provider_ref?: string | null;
+          amount?: number;
+          currency?: string;
+          enrolled_at?: string;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "course_enrollments_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       invoices: {
         Row: {
           id: string;

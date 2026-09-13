@@ -12,6 +12,7 @@ BuildRx is part of the MABRIG Technologies ecosystem.
 | Phone | [+234 706 534 2818](tel:+2347065342818) |
 | WhatsApp | [+234 706 534 2818](https://wa.me/2347065342818) |
 | Email | [Mabrig1@gmail.com](mailto:Mabrig1@gmail.com) |
+| MABRIG email | [mabrig@mabrigkorie.org](mailto:mabrig@mabrigkorie.org) |
 | Contact email | [contact@mabrigkorie.org](mailto:contact@mabrigkorie.org) |
 | Website | [mabrigkorie.org](https://mabrigkorie.org) |
 | Store | [store.mabrigkorie.org](https://store.mabrigkorie.org) |

@@ -106,15 +106,56 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             name: plan.appName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
             version: "0.1.0",
             private: true,
-            scripts: { dev: "next dev", build: "next build", start: "next start" },
-            dependencies: { next: "^15.0.0", react: "^19.0.0", "react-dom": "^19.0.0" },
-            devDependencies: { tailwindcss: "^4.0.0", typescript: "^5.0.0" },
+            scripts: {
+              dev: "next dev",
+              build: "next build",
+              start: "next start",
+              typecheck: "tsc --noEmit",
+            },
+            dependencies: {
+              "@supabase/ssr": "^0.7.0",
+              "@supabase/supabase-js": "^2.50.0",
+              mongodb: "^7.6.0",
+              next: "^15.0.0",
+              react: "^19.0.0",
+              "react-dom": "^19.0.0",
+            },
+            devDependencies: {
+              "@tailwindcss/postcss": "^4.1.0",
+              "@types/node": "^20.0.0",
+              "@types/react": "^19.0.0",
+              "@types/react-dom": "^19.0.0",
+              tailwindcss: "^4.1.0",
+              typescript: "^5.0.0",
+            },
           },
           null,
           2
         )}\n`
       );
       return "regenerated package.json";
+
+    case "missing-tailwind-postcss-package":
+      return ensureDependency(
+        context,
+        "@tailwindcss/postcss",
+        "^4.1.0"
+      )
+        ? 'declared dependency @tailwindcss/postcss'
+        : null;
+
+    case "missing-tailwind-postcss-config":
+      writeFile(
+        context,
+        "postcss.config.mjs",
+        `export default {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+`
+      );
+      return "created postcss.config.mjs";
 
     case "missing-build-script": {
       const pkg = readFile(context, "package.json");

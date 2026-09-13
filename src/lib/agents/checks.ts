@@ -210,6 +210,40 @@ export function runStaticChecks(
     }
   }
 
+  // Tailwind v4 requires its dedicated PostCSS plugin and config. A
+  // generated app can pass import/dependency checks yet still fail
+  // `next build` without these two pieces.
+  const globalsCss = context.files.get("src/app/globals.css")?.content ?? "";
+  const tailwindVersion = dependencies.tailwindcss ?? "";
+  const usesTailwindV4 =
+    /(?:^|[^0-9])4(?:\.|$)/.test(tailwindVersion) &&
+    /@(?:import\s+["']tailwindcss["']|tailwind\b)/.test(globalsCss);
+
+  if (usesTailwindV4 && !dependencies["@tailwindcss/postcss"]) {
+    findings.push({
+      rule: "missing-tailwind-postcss-package",
+      severity: "error",
+      file: "package.json",
+      message:
+        'Tailwind v4 is used but package.json does not declare "@tailwindcss/postcss"',
+      fix: "auto",
+    });
+  }
+  if (
+    usesTailwindV4 &&
+    !["postcss.config.mjs", "postcss.config.js", "postcss.config.cjs"].some(
+      (path) => paths.has(path)
+    )
+  ) {
+    findings.push({
+      rule: "missing-tailwind-postcss-config",
+      severity: "error",
+      file: "postcss.config.mjs",
+      message: "Tailwind v4 is used but no PostCSS configuration is present",
+      fix: "auto",
+    });
+  }
+
   // --- per-file structure, imports, and security ---------------------
   for (const file of files) {
     if (CODE_EXT.test(file.path)) {

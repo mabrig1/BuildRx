@@ -243,6 +243,7 @@ export default function RootLayout({
           name: plan.appName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
           version: "0.1.0",
           private: true,
+          engines: { node: "22.x" },
           scripts: {
             dev: "next dev",
             build: "next build",

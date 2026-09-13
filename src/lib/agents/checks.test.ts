@@ -112,6 +112,62 @@ describe("runStaticChecks", () => {
 
       expect(finding?.severity).toBe("warning");
     });
+
+    it("blocks Tailwind v4 when the PostCSS plugin is missing", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          ...withPackage({
+            scripts: { build: "next build" },
+            devDependencies: { tailwindcss: "^4.1.0" },
+          }),
+          "src/app/globals.css": '@import "tailwindcss";',
+        }),
+        EMPTY_PLAN
+      );
+
+      expect(rules(findings)).toContain("missing-tailwind-postcss-package");
+      expect(checksPass(findings)).toBe(false);
+    });
+
+    it("blocks Tailwind v4 when PostCSS config is missing", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          ...withPackage({
+            scripts: { build: "next build" },
+            devDependencies: {
+              tailwindcss: "^4.1.0",
+              "@tailwindcss/postcss": "^4.1.0",
+            },
+          }),
+          "src/app/globals.css": '@import "tailwindcss";',
+        }),
+        EMPTY_PLAN
+      );
+
+      expect(rules(findings)).toContain("missing-tailwind-postcss-config");
+      expect(checksPass(findings)).toBe(false);
+    });
+
+    it("accepts a complete Tailwind v4 PostCSS setup", () => {
+      const findings = runStaticChecks(
+        scaffolded({
+          ...withPackage({
+            scripts: { build: "next build" },
+            devDependencies: {
+              tailwindcss: "^4.1.0",
+              "@tailwindcss/postcss": "^4.1.0",
+            },
+          }),
+          "src/app/globals.css": '@import "tailwindcss";',
+          "postcss.config.mjs":
+            'export default { plugins: { "@tailwindcss/postcss": {} } };',
+        }),
+        EMPTY_PLAN
+      );
+
+      expect(rules(findings)).not.toContain("missing-tailwind-postcss-package");
+      expect(rules(findings)).not.toContain("missing-tailwind-postcss-config");
+    });
   });
 
   describe("file structure", () => {

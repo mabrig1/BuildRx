@@ -19,7 +19,8 @@ export const brandConfig = {
   supportLine: "Developed and maintained by MABRIG Technologies",
   contacts: {
     phone: {
-      label: "+234 706 534 2818",
+      label: "Phone",
+      value: "+234 706 534 2818",
       href: "tel:+2347065342818",
     },
     whatsapp: {

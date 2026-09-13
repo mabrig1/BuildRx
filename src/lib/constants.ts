@@ -33,6 +33,11 @@ export const brandConfig = {
       value: "Mabrig1@gmail.com",
       href: "mailto:Mabrig1@gmail.com",
     },
+    companyEmail: {
+      label: "MABRIG Email",
+      value: "mabrig@mabrigkorie.org",
+      href: "mailto:mabrig@mabrigkorie.org",
+    },
     contactEmail: {
       label: "Contact",
       value: "contact@mabrigkorie.org",
@@ -75,6 +80,7 @@ export const brandContactLinks = [
   brandConfig.contacts.phone,
   brandConfig.contacts.whatsapp,
   brandConfig.contacts.primaryEmail,
+  brandConfig.contacts.companyEmail,
   brandConfig.contacts.contactEmail,
   brandConfig.contacts.website,
   brandConfig.contacts.store,

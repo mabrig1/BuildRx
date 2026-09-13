@@ -4,16 +4,30 @@ import { Suspense } from "react";
 import { PostHogPageviews } from "@/lib/analytics/posthog-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { siteConfig } from "@/lib/constants";
+import { brandConfig, siteConfig } from "@/lib/constants";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: siteConfig.name,
-    template: `%s · ${siteConfig.name}`,
+    default: `${siteConfig.name} · ${brandConfig.companyName}`,
+    template: `%s · ${siteConfig.name} · ${brandConfig.companyName}`,
   },
   description: siteConfig.description,
+  applicationName: siteConfig.name,
+  creator: brandConfig.companyName,
+  publisher: brandConfig.companyName,
+  authors: [{ name: brandConfig.companyName, url: brandConfig.contacts.website.href }],
+  keywords: [
+    "BuildRx",
+    "MABRIG Technologies",
+    "AI app builder",
+    "full-stack development",
+    "Vercel",
+    "GitHub",
+    "MongoDB Atlas",
+    "Supabase",
+  ],
 };
 
 export default function RootLayout({

@@ -18,7 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { siteConfig } from "@/lib/constants";
+import { brandConfig, siteConfig } from "@/lib/constants";
 
 const features = [
   {
@@ -71,7 +71,7 @@ export default function LandingPage() {
         <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-6 px-4 py-24 text-center md:py-36">
           <Badge variant="secondary" className="gap-1.5">
             <Sparkles className="size-3" />
-            AI app builder
+            {brandConfig.companyName} · AI app builder
           </Badge>
           <h1 className="text-4xl font-semibold tracking-tighter text-balance md:text-6xl">
             Build production apps by{" "}
@@ -94,6 +94,23 @@ export default function LandingPage() {
               <Link href="/dashboard">View dashboard</Link>
             </Button>
           </div>
+          <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
+            <span>{brandConfig.ownershipLine}</span>
+            <a
+              href={brandConfig.contacts.whatsapp.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary transition-colors"
+            >
+              WhatsApp {brandConfig.contacts.whatsapp.value}
+            </a>
+            <a
+              href={brandConfig.contacts.primaryEmail.href}
+              className="hover:text-primary transition-colors"
+            >
+              {brandConfig.contacts.primaryEmail.value}
+            </a>
+          </div>
         </div>
       </section>
 
@@ -105,7 +122,8 @@ export default function LandingPage() {
               Everything you need to ship
             </h2>
             <p className="text-muted-foreground mt-3">
-              A complete platform for turning ideas into deployed applications.
+              A complete platform for turning ideas into deployed applications,
+              developed and maintained by {brandConfig.companyName}.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -135,11 +153,13 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="border-t">
         <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-6 px-4 py-20 text-center">
+          <Badge variant="outline">{brandConfig.companyName}</Badge>
           <h2 className="text-3xl font-semibold tracking-tight">
             Ready to build something?
           </h2>
           <p className="text-muted-foreground max-w-xl">
-            Join builders shipping real products with nothing but a prompt.
+            Join builders shipping real products with nothing but a prompt,
+            backed by the MABRIG Technologies ecosystem.
           </p>
           <Button size="lg" asChild>
             <Link href="/signup">

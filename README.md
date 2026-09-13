@@ -1,6 +1,25 @@
-# App-Creator
+# BuildRx by MABRIG Technologies
 
-An AI app builder in the spirit of Lovable: describe the app you want in plain English, watch a team of AI agents plan, build, debug, and deploy it — then edit the generated code in an in-browser IDE, see it render live, push it to GitHub, and ship it to Vercel, Netlify, or Railway.
+**BuildRx is a MABRIG Technologies product, developed and maintained by MABRIG Technologies.** Describe the app you want in plain English, watch a team of AI agents plan, build, debug, and deploy it — then edit the generated code in an in-browser IDE, see it render live, push it to GitHub, and ship it to Vercel, Netlify, or Railway.
+
+
+## MABRIG Technologies
+
+BuildRx is part of the MABRIG Technologies ecosystem.
+
+| Channel | Contact |
+| --- | --- |
+| Phone | [+234 706 534 2818](tel:+2347065342818) |
+| WhatsApp | [+234 706 534 2818](https://wa.me/2347065342818) |
+| Email | [Mabrig1@gmail.com](mailto:Mabrig1@gmail.com) |
+| Contact email | [contact@mabrigkorie.org](mailto:contact@mabrigkorie.org) |
+| Website | [mabrigkorie.org](https://mabrigkorie.org) |
+| Store | [store.mabrigkorie.org](https://store.mabrigkorie.org) |
+| Facebook | [Mabrig Korie](https://web.facebook.com/apostlemabrigkorie) |
+| TikTok | [@mabrigkorie](https://www.tiktok.com/@mabrigkorie) |
+| YouTube | [@ApostleEmersonMabrigKorie](https://www.youtube.com/@ApostleEmersonMabrigKorie) |
+| GitHub | [mabrig1](https://github.com/mabrig1) |
+
 
 ## Features
 

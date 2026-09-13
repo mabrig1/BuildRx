@@ -4,7 +4,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Code2,
-  Github,
+  GitBranch,
   GraduationCap,
   Rocket,
   ShieldCheck,
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 
 const proof = [
   { icon: Code2, title: "8 BuildRx labs", text: "Every module launches a real project brief directly inside BuildRx." },
-  { icon: Github, title: "GitHub evidence", text: "Graduate with repositories, release notes and case studies—not screenshots alone." },
+  { icon: GitBranch, title: "GitHub evidence", text: "Graduate with repositories, release notes and case studies—not screenshots alone." },
   { icon: Rocket, title: "Live deployment", text: "Ship production previews and capstones through a disciplined Vercel workflow." },
   { icon: ShieldCheck, title: "Production mindset", text: "Security, authorization, testing, cost control and recovery are part of the build." },
 ];

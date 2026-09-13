@@ -30,3 +30,7 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: Generated app certification
+        timeout-minutes: 10
+        run: npm run certify:generated-app

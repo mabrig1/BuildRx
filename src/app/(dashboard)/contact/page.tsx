@@ -51,7 +51,7 @@ export default function ContactPage() {
               </div>
               <CardTitle className="text-base">{contact.label}</CardTitle>
               <CardDescription className="break-all">
-                {"value" in contact ? contact.value : contact.label}
+                {contact.value}
               </CardDescription>
             </CardHeader>
             <CardContent>

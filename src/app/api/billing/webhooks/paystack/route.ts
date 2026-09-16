@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { paystackVerifySignature } from "@/lib/billing/providers";
 import { activateProSubscription } from "@/lib/billing/service";
+import { reportMabrigConversion } from "@/lib/mabrig-growth";
 
 /**
  * Paystack webhook: activates/renews the subscription on
@@ -22,7 +23,8 @@ export async function POST(request: Request) {
       amount?: number;
       currency?: string;
       paid_at?: string;
-      metadata?: { user_id?: string };
+      metadata?: { user_id?: string; mabrig_attribution?: string };
+      customer?: { email?: string };
     };
   };
   try {
@@ -33,14 +35,34 @@ export async function POST(request: Request) {
 
   if (event.event === "charge.success" && event.data?.metadata?.user_id) {
     try {
+      const reference = event.data.reference ?? `ps_${Date.now()}`;
+      const paidAt = event.data.paid_at ?? new Date().toISOString();
+      const amount = (event.data.amount ?? 0) / 100;
+      const currency = event.data.currency ?? "USD";
+
       await activateProSubscription({
         userId: event.data.metadata.user_id,
         provider: "paystack",
-        reference: event.data.reference ?? `ps_${Date.now()}`,
-        amount: (event.data.amount ?? 0) / 100,
-        currency: event.data.currency ?? "USD",
-        paidAt: event.data.paid_at ?? new Date().toISOString(),
+        reference,
+        amount,
+        currency,
+        paidAt,
       });
+
+      if (event.data.customer?.email) {
+        await reportMabrigConversion({
+          id: `buildrx:paystack:${reference}`,
+          type: "purchase",
+          email: event.data.customer.email,
+          amount,
+          currency,
+          attributionToken: event.data.metadata.mabrig_attribution,
+          product: "BuildRx Pro",
+          reference,
+          occurredAt: paidAt,
+          source: "buildrx:paystack",
+        });
+      }
     } catch (error) {
       console.error("Paystack webhook activation failed:", error);
       return NextResponse.json({ error: "Activation failed" }, { status: 500 });

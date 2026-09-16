@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 const checkoutSchema = z.object({
   plan: z.literal("pro"),
   provider: z.enum(["paystack", "flutterwave"]),
+  attributionToken: z.string().min(20).max(2048).optional(),
 });
 
 /** POST — start a hosted checkout for the Pro plan. */
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { provider } = parsed.data;
+  const { provider, attributionToken } = parsed.data;
   const pro = planById("pro");
 
   // Demo mode: activate immediately, no real charge.
@@ -73,14 +74,22 @@ export async function POST(request: Request) {
             amount: pro.price,
             reference,
             callbackUrl,
-            metadata: { user_id: user.id, plan: "pro" },
+            metadata: {
+              user_id: user.id,
+              plan: "pro",
+              ...(attributionToken ? { mabrig_attribution: attributionToken } : {}),
+            },
           })
         : await flutterwaveInitialize({
             email: user.email,
             amount: pro.price,
             reference,
             callbackUrl,
-            metadata: { user_id: user.id, plan: "pro" },
+            metadata: {
+              user_id: user.id,
+              plan: "pro",
+              ...(attributionToken ? { mabrig_attribution: attributionToken } : {}),
+            },
           });
     return NextResponse.json({ url: init.checkoutUrl });
   } catch (error) {

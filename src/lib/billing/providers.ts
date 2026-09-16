@@ -19,6 +19,7 @@ export interface VerifiedPayment {
   currency: string;
   paidAt: string;
   customerEmail: string | null;
+  metadata: Record<string, unknown>;
 }
 
 export class BillingError extends Error {}
@@ -103,6 +104,10 @@ export async function paystackVerify(
     currency: data.data.currency ?? currency(),
     paidAt: data.data.paid_at ?? new Date().toISOString(),
     customerEmail: data.data.customer?.email ?? null,
+    metadata:
+      data.data.metadata && typeof data.data.metadata === "object"
+        ? data.data.metadata
+        : {},
   };
 }
 
@@ -188,6 +193,10 @@ export async function flutterwaveVerify(
     currency: data.data.currency ?? currency(),
     paidAt: data.data.created_at ?? new Date().toISOString(),
     customerEmail: data.data.customer?.email ?? null,
+    metadata:
+      data.data.meta && typeof data.data.meta === "object"
+        ? data.data.meta
+        : {},
   };
 }
 

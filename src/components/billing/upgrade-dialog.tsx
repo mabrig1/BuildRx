@@ -6,6 +6,7 @@ import { ArrowUpCircle, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { browserAttributionToken } from "@/lib/mabrig-attribution-client";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +40,11 @@ export function UpgradeDialog({ disabled }: { disabled?: boolean }) {
       const response = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: "pro", provider }),
+        body: JSON.stringify({
+          plan: "pro",
+          provider,
+          attributionToken: browserAttributionToken() || undefined,
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {

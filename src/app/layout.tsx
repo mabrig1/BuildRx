@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { PostHogPageviews } from "@/lib/analytics/posthog-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { MabrigAttributionCapture } from "@/components/providers/mabrig-attribution-capture";
 import { Toaster } from "@/components/ui/sonner";
 import { brandConfig, siteConfig } from "@/lib/constants";
 
@@ -47,6 +48,7 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <PostHogPageviews />
           </Suspense>
+          <MabrigAttributionCapture />
           {children}
           <Toaster richColors position="bottom-right" />
         </ThemeProvider>

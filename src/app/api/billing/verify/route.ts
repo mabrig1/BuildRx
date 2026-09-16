@@ -5,6 +5,7 @@ import {
   paystackVerify,
 } from "@/lib/billing/providers";
 import { activateProSubscription } from "@/lib/billing/service";
+import { reportMabrigConversion } from "@/lib/mabrig-growth";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -39,6 +40,21 @@ export async function GET(request: Request) {
         currency: payment.currency,
         paidAt: payment.paidAt,
       });
+      await reportMabrigConversion({
+        id: `buildrx:paystack:${payment.reference}`,
+        type: "purchase",
+        email: payment.customerEmail || user.email || "",
+        amount: payment.amount,
+        currency: payment.currency,
+        attributionToken:
+          typeof payment.metadata.mabrig_attribution === "string"
+            ? payment.metadata.mabrig_attribution
+            : undefined,
+        product: "BuildRx Pro",
+        reference: payment.reference,
+        occurredAt: payment.paidAt,
+        source: "buildrx:paystack",
+      });
     } else if (provider === "flutterwave") {
       const transactionId = searchParams.get("transaction_id");
       if (!transactionId) throw new Error("Payment was not completed");
@@ -50,6 +66,21 @@ export async function GET(request: Request) {
         amount: payment.amount,
         currency: payment.currency,
         paidAt: payment.paidAt,
+      });
+      await reportMabrigConversion({
+        id: `buildrx:flutterwave:${payment.reference}`,
+        type: "purchase",
+        email: payment.customerEmail || user.email || "",
+        amount: payment.amount,
+        currency: payment.currency,
+        attributionToken:
+          typeof payment.metadata.mabrig_attribution === "string"
+            ? payment.metadata.mabrig_attribution
+            : undefined,
+        product: "BuildRx Pro",
+        reference: payment.reference,
+        occurredAt: payment.paidAt,
+        source: "buildrx:flutterwave",
       });
     } else {
       throw new Error("Unknown provider");

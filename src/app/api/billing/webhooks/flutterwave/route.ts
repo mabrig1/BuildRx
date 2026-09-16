@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { flutterwaveVerifySignature } from "@/lib/billing/providers";
 import { activateProSubscription } from "@/lib/billing/service";
+import { reportMabrigConversion } from "@/lib/mabrig-growth";
 
 /**
  * Flutterwave webhook: activates/renews the subscription on
@@ -22,7 +23,8 @@ export async function POST(request: Request) {
       currency?: string;
       created_at?: string;
       status?: string;
-      meta?: { user_id?: string };
+      meta?: { user_id?: string; mabrig_attribution?: string };
+      customer?: { email?: string };
     };
   } | null;
   if (!event) {
@@ -35,14 +37,34 @@ export async function POST(request: Request) {
     event.data?.meta?.user_id
   ) {
     try {
+      const reference = event.data.tx_ref ?? `flw_${Date.now()}`;
+      const amount = event.data.amount ?? 0;
+      const currency = event.data.currency ?? "USD";
+      const paidAt = event.data.created_at ?? new Date().toISOString();
+
       await activateProSubscription({
         userId: event.data.meta.user_id,
         provider: "flutterwave",
-        reference: event.data.tx_ref ?? `flw_${Date.now()}`,
-        amount: event.data.amount ?? 0,
-        currency: event.data.currency ?? "USD",
-        paidAt: event.data.created_at ?? new Date().toISOString(),
+        reference,
+        amount,
+        currency,
+        paidAt,
       });
+
+      if (event.data.customer?.email) {
+        await reportMabrigConversion({
+          id: `buildrx:flutterwave:${reference}`,
+          type: "purchase",
+          email: event.data.customer.email,
+          amount,
+          currency,
+          attributionToken: event.data.meta.mabrig_attribution,
+          product: "BuildRx Pro",
+          reference,
+          occurredAt: paidAt,
+          source: "buildrx:flutterwave",
+        });
+      }
     } catch (error) {
       console.error("Flutterwave webhook activation failed:", error);
       return NextResponse.json({ error: "Activation failed" }, { status: 500 });

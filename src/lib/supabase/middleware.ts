@@ -3,9 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
 
-const DEFAULT_SUPABASE_AUTH_TIMEOUT_MS = 5_000;
+const DEFAULT_SUPABASE_AUTH_TIMEOUT_MS = 2_500;
 const MIN_SUPABASE_AUTH_TIMEOUT_MS = 1_000;
-const MAX_SUPABASE_AUTH_TIMEOUT_MS = 10_000;
+const MAX_SUPABASE_AUTH_TIMEOUT_MS = 5_000;
 
 function supabaseAuthTimeoutMs() {
   const configured = Number(process.env.SUPABASE_AUTH_TIMEOUT_MS);

@@ -268,7 +268,8 @@ export function AgentRunPanel({
               <h3 className="text-sm font-semibold">Product-to-production roles</h3>
               <p className="text-muted-foreground text-xs">
                 Inspired by the specialist handoffs in the video. Existing agents run
-                sequentially for safe, deterministic file changes.
+                sequentially by default; isolated UI/database parallel tracks
+                are optional after preview validation.
               </p>
               {SDLC_ROLES.map((role) => (
                 <div key={role.name} className="flex flex-wrap gap-x-2 text-xs">

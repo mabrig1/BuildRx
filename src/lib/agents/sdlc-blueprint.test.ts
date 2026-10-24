@@ -32,7 +32,7 @@ describe("Video-inspired SDLC contract", () => {
   it("generates correct owner-reviewed evidence without pretending to run cloud tools", () => {
     const text = renderSdlcBlueprint(plan);
     expect(text).toContain("Make a booking");
-    expect(text).toContain("sequentially");
+    expect(text).toContain("sequential steps");
     expect(text).toContain("BigQuery is **not configured**");
     expect(text).toContain("A preview saved by the BuildRx deployment agent");
     expect(text).toContain("Users can save bookings");

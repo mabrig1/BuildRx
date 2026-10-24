@@ -99,10 +99,11 @@ export function renderSdlcBlueprint(
     ),
     "",
     "## Work tracks",
-    "The video illustrates parallel specialist subagents. BuildRx currently executes",
-    "its eleven agents **sequentially**, to preserve a single deterministic virtual",
-    "filesystem and avoid conflicting edits. The tracks below are parallel-ready",
-    "contracts; their execution is not represented as concurrent.",
+    "The video illustrates parallel specialist subagents.",
+    process.env.AGENT_PARALLEL_TRACKS === "1"
+      ? "BuildRx uses isolated, concurrent UI and data workers with allowlisted merges. Coding starts only after both finish."
+      : "BuildRx defaults to eleven sequential steps. Set AGENT_PARALLEL_TRACKS=1 only after preview validation to enable isolated concurrent UI and database workers.",
+    "The three tracks have explicit dependencies. Backend API coding waits for schema and UI handoffs.",
     ...IMPLEMENTATION_TRACKS.map((track) =>
       `- **${track.id}** — after ${track.dependsOn.join(", ")}: ${track.output}.`
     ),

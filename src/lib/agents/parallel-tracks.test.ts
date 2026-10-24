@@ -9,6 +9,7 @@ describe("parallel subagent isolation", () => {
   it("allows only source paths owned by each specialist", () => {
     expect(isTrackOwnedPath("ui", "src/app/[projectId]/page.tsx")).toBe(true);
     expect(isTrackOwnedPath("ui", "src/app/api/records/route.ts")).toBe(false);
+    expect(isTrackOwnedPath("ui", "src/components/../api/route.tsx")).toBe(false);
     expect(isTrackOwnedPath("database", "supabase/schema.sql")).toBe(true);
     expect(isTrackOwnedPath("database", "src/app/page.tsx")).toBe(false);
   });

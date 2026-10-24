@@ -21,6 +21,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { BuildFeedbackPanel } from "@/components/agents/build-feedback-panel";
+import { appendApprovedFeedback } from "@/lib/agents/build-feedback";
+import { SDLC_ROLES } from "@/lib/agents/sdlc-blueprint";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -253,13 +257,31 @@ export function AgentRunPanel({
             Agent build
           </SheetTitle>
           <SheetDescription>
-            Six specialized agents collaborate to plan, build, debug, and
-            deploy your app.
+            Eleven agents collaborate across product, UX, engineering, security
+            and release review. External production deployment needs your approval.
           </SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-4 p-4">
+            <div className="grid gap-2 rounded-lg border bg-muted/20 p-3">
+              <h3 className="text-sm font-semibold">Product-to-production roles</h3>
+              <p className="text-muted-foreground text-xs">
+                Inspired by the specialist handoffs in the video. Existing agents run
+                sequentially for safe, deterministic file changes.
+              </p>
+              {SDLC_ROLES.map((role) => (
+                <div key={role.name} className="flex flex-wrap gap-x-2 text-xs">
+                  <span className="font-medium">{role.name}</span>
+                  <span className="text-muted-foreground">{role.handoff}</span>
+                </div>
+              ))}
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                Approval gate: external deploys, IAM, paid resources and
+                production migrations are never authorized by a preview build.
+              </p>
+            </div>
+
             {/* Prompt */}
             <div className="grid gap-2">
               <Textarea
@@ -355,6 +377,11 @@ export function AgentRunPanel({
                 );
               })}
             </ol>
+
+            <BuildFeedbackPanel
+              projectId={projectId}
+              onApply={(note) => setPrompt((current) => appendApprovedFeedback(current, note))}
+            />
 
             {/* Generated files */}
             {files.length > 0 ? (

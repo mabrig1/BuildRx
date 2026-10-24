@@ -215,8 +215,14 @@ export function CodeEditorIde({
   function closeTab(path: string) {
     const timer = saveTimers.current.get(path);
     if (timer) clearTimeout(timer);
+    saveTimers.current.delete(path);
     const unsaved = tabs.find((tab) => tab.path === path && tab.dirty);
-    if (unsaved) void saveFile(unsaved.path, unsaved.content);
+    if (unsaved) {
+      // Never discard a failed save: keep the tab open so it can be retried.
+      void saveFile(unsaved.path, unsaved.content);
+      toast.message("Saving changes. Close this tab after the save succeeds.");
+      return;
+    }
     setTabs((prev) => {
       const next = prev.filter((t) => t.path !== path);
       if (activePath === path) {

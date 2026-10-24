@@ -3,6 +3,9 @@ import type { GeneratedFile } from "@/lib/agents/types";
 export type IndependentTrack = "ui" | "database";
 
 export function isTrackOwnedPath(track: IndependentTrack, path: string): boolean {
+  if (path.includes("\\\\") || path.split("/").some((segment) => segment === "." || segment === "..")) {
+    return false;
+  }
   if (track === "database") {
     return path === "supabase/schema.sql" || path === "src/lib/database.types.ts";
   }

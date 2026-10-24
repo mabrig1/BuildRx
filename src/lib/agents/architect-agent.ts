@@ -1,4 +1,6 @@
 import { pause } from "@/lib/agents/llm";
+import { writeFile } from "@/lib/agents/tools";
+import { renderSdlcBlueprint } from "@/lib/agents/sdlc-blueprint";
 import type { Agent, AppPlan, FounderOpsSpec } from "@/lib/agents/types";
 
 interface Architecture {
@@ -96,6 +98,16 @@ export const architectAgent: Agent = {
     // are the ones that actually write the app.
     const architecture = fallbackArchitecture(plan, context.founderOps);
     context.architecture = formatArchitecture(architecture);
+
+    // Each generated project carries a reviewable SDLC handoff and release
+    // contract. This does not grant any cloud, MCP, or deployment permission.
+    const blueprintPath = "docs/SDLC-WORKFLOW.md";
+    writeFile(
+      context,
+      blueprintPath,
+      renderSdlcBlueprint(plan, context.founderOps, context.founderOpsSource)
+    );
+    emit({ type: "file", agent: "architect", path: blueprintPath });
 
     await pause(200);
     emit({

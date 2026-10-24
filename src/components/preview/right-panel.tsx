@@ -49,7 +49,7 @@ export function RightPanel({
   );
   const [codePercent, setCodePercent] = useState(DEFAULT_WORKBENCH_LAYOUT.codePercent);
   const [wide, setWide] = useState(false);
-  const [restored, setRestored] = useState(false);
+  const [restoredKey, setRestoredKey] = useState<string | null>(null);
   const paneRef = useRef<HTMLDivElement>(null);
   const storageKey = `buildrx:workbench:${projectId}`;
 
@@ -70,11 +70,11 @@ export function RightPanel({
       setDesktopMode(DEFAULT_WORKBENCH_LAYOUT.mode);
       setCodePercent(DEFAULT_WORKBENCH_LAYOUT.codePercent);
     }
-    setRestored(true);
+    setRestoredKey(storageKey);
   }, [storageKey]);
 
   useEffect(() => {
-    if (!restored) return;
+    if (restoredKey !== storageKey) return;
     try {
       window.localStorage.setItem(
         storageKey,
@@ -83,7 +83,7 @@ export function RightPanel({
     } catch {
       // Private browsing can disable storage; controls still work in memory.
     }
-  }, [codePercent, desktopMode, restored, storageKey]);
+  }, [codePercent, desktopMode, restoredKey, storageKey]);
 
   const mode: DesktopWorkbenchMode = wide ? desktopMode : compactView;
   const isSplit = mode === "split";

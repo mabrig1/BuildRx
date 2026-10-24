@@ -11,6 +11,7 @@ import {
   isLlmConfigured,
 } from "@/lib/agents/llm";
 import { fallbackPlan, plannerAgent } from "@/lib/agents/planner";
+import { isTrackOwnedPath, mergeIndependentTracks } from "@/lib/agents/parallel-tracks";
 import { qaAgent } from "@/lib/agents/qa-agent";
 import { repairAgent } from "@/lib/agents/repair-agent";
 import { securityAgent } from "@/lib/agents/security-agent";
@@ -131,6 +132,84 @@ function stepDeadline(context: WorkflowContext, remaining: AgentName[]): number 
 /** How often a running step reports that it is still alive. */
 const HEARTBEAT_INTERVAL_MS = 5_000;
 
+const parallelTracksEnabled = () => process.env.AGENT_PARALLEL_TRACKS === "1";
+
+/**
+ * Optional, bounded parallel UI + database generation. Both agents depend
+ * on the immutable architect output, but not on one another. They receive
+ * isolated file maps; coding waits until both outputs are merged.
+ *
+ * Off by default: some free inference providers throttle 3 concurrent
+ * requests (UI itself launches 2). Enable only after preview validation.
+ */
+async function runParallelGeneration(
+  context: WorkflowContext,
+  emit: EmitFn,
+  index: number
+): Promise<void> {
+  const base = new Map(context.files);
+  const remaining = AGENT_ORDER.slice(index);
+  const totalWeight = remaining.reduce((sum, name) => sum + AGENT_WEIGHTS[name], 0);
+  const weight = AGENT_WEIGHTS.ui + AGENT_WEIGHTS.database;
+  const usableMs = Math.max(
+    0,
+    (context.deadlineAt ?? Date.now()) - DEPLOY_RESERVE_MS - Date.now()
+  );
+  const deadline = Math.floor(Date.now() + usableMs * weight / totalWeight);
+  const uiContext: WorkflowContext = {
+    ...context, files: new Map(base), stepDeadlineAt: deadline,
+  };
+  const databaseContext: WorkflowContext = {
+    ...context, files: new Map(base), stepDeadlineAt: deadline,
+  };
+  await markBuildStep(context, "ui");
+  await markBuildStep(context, "database");
+
+  const heartbeat = setInterval(() => {
+    for (const agent of ["ui", "database"] as const) {
+      emit({
+        type: "heartbeat",
+        agent,
+        requestId: context.requestId!,
+        elapsedMs: pipelineBudgetMs() - Math.max(0, (context.deadlineAt ?? Date.now()) - Date.now()),
+        remainingMs: Math.max(0, (context.deadlineAt ?? Date.now()) - Date.now()),
+      });
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+  try {
+    const results = await Promise.allSettled([
+      agents.ui.run(uiContext, (event) => {
+        if (event.type !== "file" || isTrackOwnedPath("ui", event.path)) emit(event);
+      }),
+      agents.database.run(databaseContext, (event) => {
+        if (event.type !== "file" || isTrackOwnedPath("database", event.path)) emit(event);
+      }),
+    ]);
+    for (const [i, result] of results.entries()) {
+      if (result.status === "rejected") {
+        const agent = i === 0 ? "ui" : "database";
+        emit({
+          type: "error", agent,
+          message: `${AGENT_LABELS[agent]} could not complete its parallel track.`,
+          cause: result.reason instanceof Error ? result.reason.name : "Unknown error",
+          suggestedFix: "Review the generated files; run build verification and retry if needed.",
+        });
+      }
+    }
+    const { files, rejected } = mergeIndependentTracks(base, [
+      { track: "ui", files: uiContext.files },
+      { track: "database", files: databaseContext.files },
+    ]);
+    context.files = files;
+    for (const issue of rejected.slice(0, 12)) {
+      emit({ type: "agent_log", agent: "security", message: `Parallel merge rejected: ${issue}` });
+    }
+  } finally {
+    clearInterval(heartbeat);
+  }
+}
+
+
 export async function runWorkflow(
   context: WorkflowContext,
   emit: EmitFn
@@ -168,6 +247,12 @@ export async function runWorkflow(
 
   try {
     for (const [index, name] of AGENT_ORDER.entries()) {
+      if (parallelTracksEnabled() && name === "database") continue;
+      if (parallelTracksEnabled() && name === "ui") {
+        if (!context.plan) context.plan = fallbackPlan(context.prompt);
+        await runParallelGeneration(context, emit, index);
+        continue;
+      }
       context.stepDeadlineAt = stepDeadline(context, AGENT_ORDER.slice(index));
       await markBuildStep(context, name);
 

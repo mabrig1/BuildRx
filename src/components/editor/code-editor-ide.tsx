@@ -148,6 +148,8 @@ export function CodeEditorIde({
     "idle"
   );
   const [showTerminal, setShowTerminal] = useState(false);
+  const [showExplorer, setShowExplorer] = useState(true);
+  const openedInitialFile = useRef(false);
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -175,7 +177,7 @@ export function CodeEditorIde({
 
   const activeTab = tabs.find((t) => t.path === activePath) ?? null;
 
-  async function openFile(path: string) {
+  const openFile = useCallback(async (path: string) => {
     const existing = tabs.find((t) => t.path === path);
     if (existing) {
       setActivePath(path);
@@ -183,23 +185,44 @@ export function CodeEditorIde({
     }
     try {
       const response = await fetch(
-        `/api/projects/${projectId}/files?path=${encodeURIComponent(path)}`
+        `/api/projects/${projectId}/files?path=${encodeURIComponent(path)}`,
+        { cache: "no-store" }
       );
       if (!response.ok) throw new Error();
       const data = await response.json();
-      setTabs((prev) => [
-        ...prev,
-        { path, content: data.file.content, dirty: false },
-      ]);
+      setTabs((prev) =>
+        prev.some((tab) => tab.path === path)
+          ? prev
+          : [...prev, { path, content: data.file.content, dirty: false }]
+      );
       setActivePath(path);
     } catch {
       toast.error(`Failed to open ${path}`);
     }
-  }
+  }, [projectId, tabs]);
+
+  // Open the source behind the instant preview by default. Changing
+  // preview/index.html saves and refreshes the preview in the other pane.
+  useEffect(() => {
+    if (openedInitialFile.current || treeLoading || filePaths.length === 0) return;
+    openedInitialFile.current = true;
+    if (tabs.length > 0 || activePath) return;
+    const preferred = ["preview/index.html", "src/app/page.tsx", "README.md"]
+      .find((candidate) => filePaths.includes(candidate)) ?? filePaths[0];
+    if (preferred) void openFile(preferred);
+  }, [activePath, filePaths, openFile, tabs.length, treeLoading]);
 
   function closeTab(path: string) {
     const timer = saveTimers.current.get(path);
     if (timer) clearTimeout(timer);
+    saveTimers.current.delete(path);
+    const unsaved = tabs.find((tab) => tab.path === path && tab.dirty);
+    if (unsaved) {
+      // Never discard a failed save: keep the tab open so it can be retried.
+      void saveFile(unsaved.path, unsaved.content);
+      toast.message("Saving changes. Close this tab after the save succeeds.");
+      return;
+    }
     setTabs((prev) => {
       const next = prev.filter((t) => t.path !== path);
       if (activePath === path) {
@@ -276,7 +299,7 @@ export function CodeEditorIde({
     <div className={cn("flex min-h-0 flex-col", className)}>
       <div className="flex min-h-0 flex-1">
         {/* Explorer */}
-        <div className="flex w-52 shrink-0 flex-col border-r">
+        <div className={cn("shrink-0 flex-col border-r", showExplorer ? "flex w-40 2xl:w-48" : "hidden")}>
           <div className="flex h-9 shrink-0 items-center justify-between border-b px-2.5">
             <span className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">
               <FolderTree className="size-3.5" />
@@ -352,7 +375,7 @@ export function CodeEditorIde({
                         e.stopPropagation();
                         closeTab(tab.path);
                       }}
-                      className="hover:bg-accent rounded p-0.5 opacity-0 group-hover:opacity-100"
+                      className="hover:bg-accent rounded p-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                       aria-label={`Close ${tab.path}`}
                     >
                       <X className="size-3" />
@@ -362,6 +385,21 @@ export function CodeEditorIde({
               </div>
             </ScrollArea>
             <div className="flex shrink-0 items-center gap-0.5 border-l px-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn("size-7", showExplorer && "bg-accent/50")}
+                    onClick={() => setShowExplorer((visible) => !visible)}
+                    aria-label={showExplorer ? "Hide file explorer" : "Show file explorer"}
+                    aria-pressed={showExplorer}
+                  >
+                    <FolderTree className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{showExplorer ? "Hide" : "Show"} files</TooltipContent>
+              </Tooltip>
               {saveState !== "idle" ? (
                 <span className="text-muted-foreground flex items-center gap-1 px-1 text-xs">
                   {saveState === "saving" ? (

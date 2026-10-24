@@ -145,33 +145,36 @@ export function Workspace({
               defaultPrompt={lastUserMessage}
               onDeployed={handleBuildDeployed}
             />
-            {/* Three independent mobile views; desktop shows resizable Code + Preview. */}
-            <Tabs
-              value={mobileView}
-              onValueChange={(v) => setMobileView(v as "chat" | "code" | "preview")}
-              className="xl:hidden"
-            >
-              <TabsList className="h-8">
-                <TabsTrigger value="chat" className="gap-1.5 px-2.5 text-xs">
-                  <Bot className="size-3.5" />
-                  <span className="hidden sm:inline">Chat</span>
-                </TabsTrigger>
-                <TabsTrigger value="code" className="gap-1.5 px-2.5 text-xs" aria-label="Open code editor">
-                  <Code2 className="size-3.5" />
-                  <span className="hidden sm:inline">Code</span>
-                </TabsTrigger>
-                <TabsTrigger value="preview" className="gap-1.5 px-2.5 text-xs">
-                  <Monitor className="size-3.5" />
-                  <span className="hidden sm:inline">Preview</span>
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
             <div className="hidden sm:block">
               <ThemeToggle />
             </div>
             <UserNav />
           </div>
         </header>
+
+        {/* Code and Preview are separate full-width views on small screens. */}
+        <nav aria-label="Workspace views" className="shrink-0 border-b bg-muted/20 px-2 py-1 xl:hidden">
+          <Tabs
+            value={mobileView}
+            onValueChange={(value) => setMobileView(value as "chat" | "code" | "preview")}
+            className="w-full"
+          >
+            <TabsList className="grid h-10 w-full grid-cols-3 bg-transparent">
+              <TabsTrigger value="chat" className="gap-1.5 text-xs">
+                <Bot className="size-4" aria-hidden />
+                Chat
+              </TabsTrigger>
+              <TabsTrigger value="code" className="gap-1.5 text-xs">
+                <Code2 className="size-4" aria-hidden />
+                Code
+              </TabsTrigger>
+              <TabsTrigger value="preview" className="gap-1.5 text-xs">
+                <Monitor className="size-4" aria-hidden />
+                Preview
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </nav>
 
         {/* Panels */}
         <div className="flex min-h-0 flex-1">

@@ -74,6 +74,7 @@ export function PreviewPanel({
   const [engine, setEngine] = useState<Engine>("static");
   const [reloadKey, setReloadKey] = useState(0);
   const [showConsole, setShowConsole] = useState(false);
+  const [sourceUpdated, setSourceUpdated] = useState(false);
   const [entries, setEntries] = useState<ConsoleEntry[]>([]);
   const shellRef = useRef<HTMLDivElement>(null);
 
@@ -99,7 +100,17 @@ export function PreviewPanel({
   // Instant refresh: reload the static iframe whenever files change
   // (IDE auto-save or agent build).
   useEffect(() => {
-    const onChange = () => setReloadKey((k) => k + 1);
+    const onChange = (event: Event) => {
+      const path = (event as CustomEvent<{ path?: string }>).detail?.path;
+      if (!path || path === "preview/index.html") {
+        setReloadKey((key) => key + 1);
+        setSourceUpdated(false);
+      } else {
+        // The Instant/Sandpack iframe is a saved HTML prototype, not a
+        // running Next.js server. Don't present a source edit as live.
+        setSourceUpdated(true);
+      }
+    };
     window.addEventListener("vfs-changed", onChange);
     return () => window.removeEventListener("vfs-changed", onChange);
   }, []);
@@ -111,8 +122,8 @@ export function PreviewPanel({
   return (
     <div ref={shellRef} className={cn("bg-background flex min-h-0 flex-col", className)}>
       {/* Browser chrome */}
-      <div className="bg-muted/50 flex h-12 shrink-0 items-center gap-2 border-b px-3">
-        <div className="hidden gap-1.5 sm:flex">
+      <div className="bg-muted/50 flex min-h-12 shrink-0 flex-wrap items-center gap-1.5 border-b px-2 py-1.5">
+        <div className="hidden gap-1.5 2xl:flex">
           <span className="size-2.5 rounded-full bg-red-400" />
           <span className="size-2.5 rounded-full bg-yellow-400" />
           <span className="size-2.5 rounded-full bg-green-400" />
@@ -134,11 +145,11 @@ export function PreviewPanel({
           </SelectContent>
         </Select>
 
-        <div className="bg-background text-muted-foreground mx-1 hidden h-7 min-w-0 flex-1 items-center justify-center truncate rounded-md border px-3 text-xs md:flex">
+        <div className="bg-background text-muted-foreground mx-1 hidden h-7 min-w-0 flex-1 items-center justify-center truncate rounded-md border px-3 text-xs 2xl:flex">
           {previewUrl ?? `preview.app-creator.dev/${projectId.slice(0, 8)}`}
         </div>
 
-        <div className="ml-auto flex items-center">
+        <div className="ml-auto flex flex-wrap items-center gap-0.5">
           {(
             [
               ["desktop", Monitor],
@@ -245,6 +256,22 @@ export function PreviewPanel({
             <TooltipContent>Open in new tab</TooltipContent>
           </Tooltip>
         </div>
+      </div>
+
+      <div className="text-muted-foreground shrink-0 border-b bg-muted/20 px-2 py-1.5 text-[11px]" role="status">
+        {sourceUpdated ? (
+          <span>
+            Source saved. Instant/Sandpack show <code>preview/index.html</code> only.
+            Use <Link className="ml-1 underline underline-offset-2" href={`/preview/${projectId}/container`} target="_blank">
+              WebContainer
+            </Link> to run the actual application.
+          </span>
+        ) : (
+          <span>
+            Prototype preview · Edit <code>preview/index.html</code> for instant updates.
+            <span className="hidden sm:inline"> Use WebContainer for the full Next.js app.</span>
+          </span>
+        )}
       </div>
 
       {/* Engine viewport */}

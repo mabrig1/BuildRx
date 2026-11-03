@@ -27,6 +27,8 @@ describe("prepareCloudflareSource", () => {
     expect(pkg.scripts.build).toBe("next build");
     expect(pkg.scripts["cloudflare:build"]).toMatch(/opennextjs-cloudflare build/);
     expect(pkg.scripts["cloudflare:setup"]).toContain("1.20.15");
+    const withExample = prepareCloudflareSource([...initial, { path: ".env.example", content: "NEXT_PUBLIC_API_BASE_URL=\n" }], "test");
+    expect(withExample.files.some(f => f.path === ".env.example")).toBe(true);
   });
 
   it("keeps the deployment workflow manual and never embeds cloud credentials", () => {
@@ -60,6 +62,7 @@ describe("prepareCloudflareSource", () => {
     const result = prepareCloudflareSource(initial, "../🚀" + "Z".repeat(200));
     expect(result.workerName).toMatch(/^buildrx-[a-z0-9-]+$/);
     expect(result.workerName.length).toBeLessThanOrEqual(63);
+    expect(prepareCloudflareSource(initial, "🚀🚀").workerName).toBe("buildrx-app");
     const huge = [...initial, { path: "big.txt", content: "a".repeat(3_000_001) }];
     expect(() => prepareCloudflareSource(huge, "site")).toThrow(/3 MB/);
   });

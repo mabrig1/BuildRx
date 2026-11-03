@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bot, Download, Menu, Monitor } from "lucide-react";
 
@@ -47,6 +47,8 @@ export function Workspace({
 }) {
   const router = useRouter();
   const [mobileView, setMobileView] = useState<"chat" | "preview">("chat");
+  const [projectName, setProjectName] = useState(project.name);
+  const isDemoProject = /^demo-[0-9a-f-]{36}$/i.test(project.id);
   const [templatePrompt, setTemplatePrompt] = useState<{
     text: string;
     nonce: number;
@@ -54,6 +56,25 @@ export function Workspace({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(project.previewUrl);
   const [filesRefreshKey, setFilesRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (!isDemoProject) return;
+    try {
+      const raw = window.sessionStorage.getItem(`buildrx-demo-draft:${project.id}`);
+      if (!raw) return;
+      const draft: unknown = JSON.parse(raw);
+      if (!draft || typeof draft !== "object") return;
+      const { name, prompt } = draft as { name?: unknown; prompt?: unknown };
+      if (typeof name === "string" && name.length <= 60) setProjectName(name);
+      // Prefill rather than auto-submit: a build can consume AI credits.
+      if (typeof prompt === "string" && prompt.length >= 10 && prompt.length <= 12_000) {
+        setTemplatePrompt({ text: prompt, nonce: Date.now() });
+      }
+    } catch {
+      // If the browser cleared session storage, the empty demo workspace
+      // is still usable; never expose draft contents in the URL.
+    }
+  }, [project.id, isDemoProject]);
 
   const lastUserMessage = [...initialMessages]
     .reverse()
@@ -113,7 +134,7 @@ export function Workspace({
           </Sheet>
 
           <h1 className="min-w-0 truncate text-sm font-semibold">
-            {project.name}
+            {projectName}
           </h1>
           <Badge
             variant="secondary"
@@ -169,6 +190,11 @@ export function Workspace({
           </div>
         </header>
 
+        {isDemoProject && (
+          <p role="status" className="border-b bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:bg-amber-900/20 dark:text-amber-100">
+            Demo workspace — draft text is stored in this tab; generated files may disappear when the server restarts. Send the prepared prompt to start a build.
+          </p>
+        )}
         {/* Panels */}
         <div className="flex min-h-0 flex-1">
           <ChatPanel

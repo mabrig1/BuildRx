@@ -45,8 +45,8 @@ export async function POST(request: Request) {
   if (project.status !== "ready") {
     return NextResponse.json({ error: "This project has not passed its build checks. Repair and verify the project before deploying." }, { status: 409 });
   }
-  if (!project.github_repo || !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(project.github_repo)) {
-    return NextResponse.json({ error: "Link a GitHub repository in the GitHub panel first." }, { status: 400 });
+  if (project.github_repo && !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(project.github_repo)) {
+    return NextResponse.json({ error: "The linked GitHub repository name is invalid. Review the GitHub connection." }, { status: 400 });
   }
   const connection = await getConnection();
   if (!connection) {
@@ -65,7 +65,24 @@ export async function POST(request: Request) {
       .map(({ path, content }) => ({ path, content }));
     const prepared = prepareCloudflareSource(source, project.name);
     const client = new GitHubClient(connection.token);
-    const repository = await client.getRepo(project.github_repo);
+    // An explicit Prepare click may create a PRIVATE repository if this
+    // project has never been linked. Avoid making project source public.
+    const repositoryCreated = !project.github_repo;
+    const slug = project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "").slice(0, 48).replace(/-$/g, "") || "app";
+    const repository = project.github_repo
+      ? await client.getRepo(project.github_repo)
+      : await client.createRepo(`buildrx-${slug}`, {
+          isPrivate: true,
+          description: "Generated application prepared for Cloudflare Workers",
+        });
+    if (repositoryCreated) {
+      const { error: linkError } = await supabase.from("projects")
+        .update({ github_repo: repository.fullName })
+        .eq("id", parsed.data.projectId)
+        .eq("owner_id", session.userId);
+      if (linkError) throw new Error("GitHub repository created, but BuildRx could not link it. Link it in the GitHub panel before retrying.");
+    }
     const pushed = await client.pushFiles(
       repository.fullName, prepared.files,
       "chore: prepare app for Cloudflare Workers deployment",
@@ -75,6 +92,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       prepared: true,
       deployed: false,
+      repositoryCreated,
       workerName: prepared.workerName,
       repositoryUrl: repository.htmlUrl,
       commitUrl: pushed.commitUrl,
@@ -82,7 +100,7 @@ export async function POST(request: Request) {
       secretsUrl: `${repository.htmlUrl}/settings/secrets/actions`,
       dashboardUrl: "https://dash.cloudflare.com/",
       instructions: [
-        "Your Next.js source and Cloudflare configuration are now in GitHub.",
+        "Your Next.js source and Cloudflare configuration are now in the linked GitHub repository.",
         "Option A: connect this repository to Cloudflare Workers Builds; build with npm run cloudflare:build and deploy with npm run cloudflare:publish.",
         "Option B: add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as GitHub Actions secrets, then use Run workflow.",
         "Verify deployment and configure app/database secrets in Cloudflare before serving customers.",

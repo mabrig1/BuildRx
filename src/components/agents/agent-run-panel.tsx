@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useChatStore } from "@/stores/chat-store";
 import type { AgentEvent, AgentName } from "@/lib/agents/types";
 import { AgentEventStream } from "@/lib/agents/event-stream";
 import { AGENT_LABELS, AGENT_ORDER } from "@/lib/agents/types";
@@ -96,6 +97,8 @@ export function AgentRunPanel({
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState(defaultPrompt ?? "");
   const [running, setRunning] = useState(false);
+  const workspaceBusy = useChatStore((state) => state.isStreaming);
+  const setWorkspaceBusy = useChatStore((state) => state.setStreaming);
   const [steps, setSteps] = useState(initialSteps);
   const [files, setFiles] = useState<string[]>([]);
   const [finished, setFinished] = useState(false);
@@ -195,10 +198,17 @@ export function AgentRunPanel({
   }
 
   async function run() {
+    // The panel and the conversational composer share the same workspace.
+    // Block duplicate build requests from both controls in this tab.
+    if (useChatStore.getState().isStreaming || running) {
+      toast.warning("A workspace request is already running.");
+      return;
+    }
     if (prompt.trim().length < 10) {
       toast.error("Describe your app in at least 10 characters.");
       return;
     }
+    setWorkspaceBusy(true);
     setRunning(true);
     setFinished(false);
     setSteps(initialSteps());
@@ -234,6 +244,7 @@ export function AgentRunPanel({
       );
     } finally {
       setRunning(false);
+      setWorkspaceBusy(false);
     }
   }
 
@@ -268,7 +279,7 @@ export function AgentRunPanel({
                 className="min-h-20 resize-none"
                 disabled={running}
               />
-              <Button onClick={run} disabled={running} className="w-full">
+              <Button onClick={run} disabled={running || workspaceBusy} className="w-full">
                 {running ? (
                   <>
                     <Loader2 className="animate-spin" />

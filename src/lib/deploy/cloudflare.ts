@@ -108,7 +108,6 @@ export function prepareCloudflareSource(
     "      - uses: actions/setup-node@v4",
     "        with:",
     "          node-version: '22'",
-    "          cache: npm",
     "      - name: Install project",
     "        run: |",
     "          if [ -f package-lock.json ]; then npm ci; else npm install; fi",

@@ -152,6 +152,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
     secretsUrl: string;
     dashboardUrl: string;
     workerName: string;
+    repositoryCreated?: boolean;
     instructions: string[];
   }>(null);
   const [busy, setBusy] = useState(false);
@@ -355,7 +356,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
             {provider === "cloudflare" && (
               <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3 text-xs leading-5">
                 <strong className="block text-sm">Cloudflare Workers — guided deployment</strong>
-                <p className="mt-1 text-muted-foreground">Connect GitHub and link a project repository in the GitHub panel first. Preparing will commit the application and its Cloudflare configuration to that repository. If you already enabled automatic Cloudflare Builds for the repository, this push may trigger a build.</p>
+                <p className="mt-1 text-muted-foreground">Connect your GitHub account in the GitHub panel first. Preparing will use the linked repository or automatically create a private repository, then commit the application and its Cloudflare configuration. If you already enabled automatic Cloudflare Builds for the repository, this push may trigger a build.</p>
                 <p className="mt-2 font-medium">This step prepares deployment; it does not claim a live site or create a custom domain.</p>
               </div>
             )}
@@ -408,6 +409,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
               <section aria-live="polite" className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
                 <p className="font-semibold">Source prepared — not yet deployed</p>
                 <p className="mt-1 text-muted-foreground text-xs">Worker name: {cloudflareHandoff.workerName}</p>
+                {cloudflareHandoff.repositoryCreated && <p className="mt-1 text-xs">A private GitHub repository was created and linked automatically.</p>}
                 <div className="mt-3 grid gap-2 text-xs">
                   <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.repositoryUrl} target="_blank" rel="noopener noreferrer">View source on GitHub ↗</a>
                   <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.workflowUrl} target="_blank" rel="noopener noreferrer">Run deployment workflow ↗</a>

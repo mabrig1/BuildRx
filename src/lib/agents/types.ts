@@ -114,6 +114,8 @@ export interface WorkflowContext {
   /** Accumulated generated files, keyed by path (later agents may revise). */
   files: Map<string, GeneratedFile>;
   previewUrl?: string;
+  /** Final blocking verification result set by the deployment agent. */
+  verificationPassed?: boolean;
   /**
    * Absolute timestamp (ms) the whole pipeline must finish by, set once
    * by the orchestrator. Agents divide their remaining slice of it
@@ -208,6 +210,8 @@ export type AgentEvent =
       type: "workflow_complete";
       previewUrl: string | null;
       fileCount: number;
+      /** True only when the blocking verification checklist passed. */
+      verificationPassed: boolean;
     }
   | {
       type: "error";

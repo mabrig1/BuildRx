@@ -79,11 +79,15 @@ async function buildVerification(
     isNvidiaConfigured() ? "NVIDIA" : null,
   ].filter(Boolean);
   items.push({
-    label: "Environment variables",
-    status: isAnyProviderConfigured() ? "pass" : "fail",
+    label: "AI generation provider",
+    // No model is expected in the temporary demo: its built-in scaffolds
+    // remain labelled as scaffolds. Production still requires a provider.
+    status: isAnyProviderConfigured() ? "pass" : context.persist ? "fail" : "warn",
     detail: isAnyProviderConfigured()
       ? `AI provider key present server-side (${providers.join(", ") || "Anthropic"})`
-      : "no AI provider key — set OPENROUTER_API_KEY or NVIDIA_API_KEY",
+      : context.persist
+        ? "AI generation unavailable — configure a server-side provider key"
+        : "Demo mode: built-in scaffolds only, not model-generated features",
   });
 
   const pages = plan.pages.filter((page) => {
@@ -111,7 +115,8 @@ async function buildVerification(
 
   items.push({
     label: "All checks",
-    status: checksPass(findings) ? "pass" : "warn",
+    // Any unresolved error is a release blocker, not an advisory warning.
+    status: checksPass(findings) ? "pass" : "fail",
     detail: checksPass(findings)
       ? `${context.files.size} files verified`
       : `${findings.filter((f) => f.severity === "error").length} unresolved issue(s) — see the Repair Agent's report`,
@@ -154,6 +159,7 @@ export const deploymentAgent: Agent = {
     emit({ type: "verification", agent: "deployment", items });
     const failures = items.filter((item) => item.status === "fail");
     const verified = failures.length === 0;
+    context.verificationPassed = verified;
 
     if (context.persist && isSupabaseConfigured()) {
       const { createClient } = await import("@/lib/supabase/server");
@@ -183,7 +189,7 @@ export const deploymentAgent: Agent = {
       await supabase.from("deployments").insert({
         project_id: context.projectId,
         triggered_by: context.userId,
-        status: "live",
+        status: verified ? "live" : "failed",
         url: previewUrl,
         completed_at: new Date().toISOString(),
       });
@@ -219,7 +225,7 @@ export const deploymentAgent: Agent = {
       agent: "deployment",
       message: verified
         ? `Deployed and verified — preview live at ${previewUrl}`
-        : `NOT verified: ${failures.map((f) => f.label).join(", ")} — files saved, preview at ${previewUrl}`,
+        : `Verification failed: ${failures.map((f) => f.label).join(", ")} — files saved for repair, preview at ${previewUrl}`,
     });
   },
 };

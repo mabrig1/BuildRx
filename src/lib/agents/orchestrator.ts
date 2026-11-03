@@ -223,19 +223,26 @@ export async function runWorkflow(
       }
     }
 
+    // Persist the run outcome before announcing completion. A saved
+    // preview that failed verification is still a failed release.
+    await finishBuildRun(
+      context,
+      context.verificationPassed === true ? "completed" : "failed",
+      context.verificationPassed === true ? null : "VERIFICATION_FAILED"
+    );
     emit({
       type: "workflow_complete",
       previewUrl: context.previewUrl ?? null,
       fileCount: context.files.size,
+      verificationPassed: context.verificationPassed === true,
     });
-    await finishBuildRun(context, "completed");
 
     if (context.userId) {
       await recordAiUsage({
         userId: context.userId,
         projectId: context.persist ? context.projectId : undefined,
         model: agentModel(),
-        status: "completed",
+        status: context.verificationPassed === true ? "completed" : "failed",
         promptTokens: 0,
         completionTokens: 0,
         durationMs: Date.now() - startedAt,

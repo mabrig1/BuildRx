@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { runWorkflow } from "@/lib/agents/orchestrator";
+import { acquireBuildLease } from "@/lib/agents/build-lease";
 import type { AgentEvent, WorkflowContext } from "@/lib/agents/types";
 import { authorizeAiRequest } from "@/lib/ai/route-helpers";
 import { withTimeout } from "@/lib/health/retry";
@@ -57,6 +58,14 @@ export async function POST(request: Request) {
     }
   }
 
+  const releaseBuildLease = acquireBuildLease(projectId, auth.userId);
+  if (!releaseBuildLease) {
+    return NextResponse.json(
+      { error: "A build is already running for this project. Check its progress before starting another." },
+      { status: 409 }
+    );
+  }
+
   const context: WorkflowContext = {
     projectId,
     userId: auth.userId,
@@ -101,11 +110,13 @@ export async function POST(request: Request) {
           cause: diagnosed.cause,
           suggestedFix: diagnosed.suggestedFix,
         });
-      }
-      try {
-        controller.close();
-      } catch {
-        // Already closed by the client disconnecting — nothing to do.
+      } finally {
+        releaseBuildLease();
+        try {
+          controller.close();
+        } catch {
+          // Already closed by the client disconnecting — nothing to do.
+        }
       }
     },
   });
@@ -113,7 +124,8 @@ export async function POST(request: Request) {
   return new Response(stream, {
     headers: {
       "Content-Type": "application/x-ndjson; charset=utf-8",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-store, no-transform",
+      "X-Accel-Buffering": "no",
       ...auth.limitHeaders,
     },
   });

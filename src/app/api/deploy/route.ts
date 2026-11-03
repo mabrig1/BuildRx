@@ -37,7 +37,12 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    providers: ["vercel", "netlify", "railway"],
+    providers: ["cloudflare", "vercel", "netlify", "railway"],
+    cloudflare: {
+      strategy: "GitHub source handoff (not a live deployment)",
+      requires: ["verified project", "linked GitHub repository", "Cloudflare account to publish"],
+      prepare: "POST /api/deploy/cloudflare/prepare { projectId }",
+    },
     connections,
     ...(session.demo ? { simulated: true } : {}),
     endpoints: {

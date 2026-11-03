@@ -97,7 +97,7 @@ export class GitHubClient {
 
   async createRepo(
     name: string,
-    options: { description?: string; isPrivate?: boolean } = {}
+    options: { description?: string; isPrivate?: boolean; autoInit?: boolean } = {}
   ): Promise<GitHubRepo> {
     const repo = await this.request<{
       full_name: string;
@@ -108,7 +108,7 @@ export class GitHubClient {
       name,
       description: options.description,
       private: options.isPrivate ?? true,
-      auto_init: false,
+      auto_init: options.autoInit ?? false,
     });
     return {
       fullName: repo.full_name,

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Check,
+  Cloud,
   ChevronDown,
   ChevronRight,
   ExternalLink,
@@ -32,7 +33,7 @@ import {
 } from "@/components/ui/sheet";
 import { cn, timeAgo } from "@/lib/utils";
 
-type Provider = "vercel" | "netlify" | "railway";
+type Provider = "cloudflare" | "vercel" | "netlify" | "railway";
 
 const PROVIDERS: Array<{
   id: Provider;
@@ -40,6 +41,12 @@ const PROVIDERS: Array<{
   icon: LucideIcon;
   tokenHint: string;
 }> = [
+  {
+    id: "cloudflare",
+    name: "Cloudflare",
+    icon: Cloud,
+    tokenHint: "Connect a GitHub repository for Workers Builds",
+  },
   {
     id: "vercel",
     name: "Vercel",
@@ -127,8 +134,9 @@ function HistoryItem({ deployment }: { deployment: DeploymentEntry }) {
 
 export function DeployPanel({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState(false);
-  const [provider, setProvider] = useState<Provider>("vercel");
+  const [provider, setProvider] = useState<Provider>("cloudflare");
   const [connections, setConnections] = useState<Record<Provider, boolean>>({
+    cloudflare: false,
     vercel: false,
     netlify: false,
     railway: false,
@@ -138,6 +146,15 @@ export function DeployPanel({ projectId }: { projectId: string }) {
   const [liveLog, setLiveLog] = useState<string[]>([]);
   const [history, setHistory] = useState<DeploymentEntry[]>([]);
   const [domain, setDomain] = useState("");
+  const [cloudflareHandoff, setCloudflareHandoff] = useState<null | {
+    repositoryUrl: string;
+    workflowUrl: string;
+    secretsUrl: string;
+    dashboardUrl: string;
+    workerName: string;
+    repositoryCreated?: boolean;
+    instructions: string[];
+  }>(null);
   const [busy, setBusy] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
 
@@ -192,6 +209,26 @@ export function DeployPanel({ projectId }: { projectId: string }) {
     setDeploying(true);
     setLiveLog([]);
     try {
+      if (provider === "cloudflare") {
+        // This action pushes real app source and a manual deployment workflow
+        // to the linked GitHub repository. It is not a production deployment.
+        setCloudflareHandoff(null);
+        const prepared = await fetch("/api/deploy/cloudflare/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId }),
+        });
+        const data = await prepared.json().catch(() => null);
+        if (!prepared.ok || !data?.prepared) {
+          throw new Error(data?.error ?? "Unable to prepare Cloudflare Workers source");
+        }
+        setCloudflareHandoff(data);
+        setLiveLog(data.instructions ?? []);
+        toast.info("Cloudflare files prepared in GitHub", {
+          description: "Deploy in Cloudflare Workers Builds or run the manual GitHub workflow.",
+        });
+        return;
+      }
       const response = await fetch("/api/deploy/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -260,14 +297,14 @@ export function DeployPanel({ projectId }: { projectId: string }) {
     }
   }
 
-  const connected = connections[provider];
+  const connected = provider === "cloudflare" || connections[provider];
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5">
           <Rocket className="size-4" />
-          <span className="hidden sm:inline">Deploy</span>
+          <span>Deploy</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
@@ -277,19 +314,19 @@ export function DeployPanel({ projectId }: { projectId: string }) {
             One-click deployment
           </SheetTitle>
           <SheetDescription>
-            Ship your generated app to Vercel, Netlify, or Railway.
+            Deploy your generated app with Cloudflare Workers, Vercel, Netlify, or Railway.
           </SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-5 p-4">
             {/* Provider picker */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {PROVIDERS.map((p) => (
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => setProvider(p.id)}
+                  onClick={() => { setProvider(p.id); setCloudflareHandoff(null); }}
                   className={cn(
                     "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-sm transition-colors",
                     provider === p.id
@@ -299,7 +336,9 @@ export function DeployPanel({ projectId }: { projectId: string }) {
                 >
                   <p.icon className="size-5" />
                   {p.name}
-                  {connections[p.id] ? (
+                  {p.id === "cloudflare" ? (
+                    <span className="text-muted-foreground text-[10px]">GitHub handoff</span>
+                  ) : connections[p.id] ? (
                     <span className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
                       <Check className="size-3" />
                       connected
@@ -314,6 +353,13 @@ export function DeployPanel({ projectId }: { projectId: string }) {
             </div>
 
             {/* Connect */}
+            {provider === "cloudflare" && (
+              <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3 text-xs leading-5">
+                <strong className="block text-sm">Cloudflare Workers — guided deployment</strong>
+                <p className="mt-1 text-muted-foreground">Connect your GitHub account in the GitHub panel first. Preparing will use the linked repository or automatically create a private repository, then commit the application and its Cloudflare configuration. If you already enabled automatic Cloudflare Builds for the repository, this push may trigger a build.</p>
+                <p className="mt-2 font-medium">This step prepares deployment; it does not claim a live site or create a custom domain.</p>
+              </div>
+            )}
             {!connected ? (
               <div className="grid gap-2 rounded-lg border p-3">
                 <Label htmlFor="deploy-token" className="text-sm">
@@ -349,15 +395,30 @@ export function DeployPanel({ projectId }: { projectId: string }) {
               {deploying ? (
                 <>
                   <Loader2 className="animate-spin" />
-                  Deploying…
+                  {provider === "cloudflare" ? "Preparing source…" : "Deploying…"}
                 </>
               ) : (
                 <>
                   <Rocket />
-                  Deploy to {PROVIDERS.find((p) => p.id === provider)?.name}
+                  {provider === "cloudflare" ? "Prepare for Cloudflare Workers" : `Deploy to ${PROVIDERS.find((p) => p.id === provider)?.name}`}
                 </>
               )}
             </Button>
+
+            {provider === "cloudflare" && cloudflareHandoff && (
+              <section aria-live="polite" className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
+                <p className="font-semibold">Source prepared — not yet deployed</p>
+                <p className="mt-1 text-muted-foreground text-xs">Worker name: {cloudflareHandoff.workerName}</p>
+                {cloudflareHandoff.repositoryCreated && <p className="mt-1 text-xs">A private GitHub repository was created and linked automatically.</p>}
+                <div className="mt-3 grid gap-2 text-xs">
+                  <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.repositoryUrl} target="_blank" rel="noopener noreferrer">View source on GitHub ↗</a>
+                  <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.workflowUrl} target="_blank" rel="noopener noreferrer">Run deployment workflow ↗</a>
+                  <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.secretsUrl} target="_blank" rel="noopener noreferrer">Set repository Cloudflare secrets ↗</a>
+                  <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.dashboardUrl} target="_blank" rel="noopener noreferrer">Open Cloudflare Workers ↗</a>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">Choose Workers Builds to connect GitHub for automatic updates, or add GitHub Actions secrets and run the prepared workflow manually. Verify the live URL in Cloudflare after deployment succeeds.</p>
+              </section>
+            )}
 
             {/* Live log */}
             {liveLog.length > 0 ? (
@@ -372,7 +433,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
             <Separator />
 
             {/* Custom domain */}
-            <div className="grid gap-2">
+            {provider !== "cloudflare" ? <div className="grid gap-2">
               <Label htmlFor="custom-domain" className="flex items-center gap-1.5">
                 <Globe className="size-4" />
                 Custom domain
@@ -392,7 +453,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
                   Save
                 </Button>
               </div>
-            </div>
+            </div> : <p className="text-xs text-muted-foreground">Set your custom domain in Cloudflare after the Worker is successfully deployed. No DNS changes are performed here.</p>}
 
             <Separator />
 

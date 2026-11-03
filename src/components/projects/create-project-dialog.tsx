@@ -57,7 +57,7 @@ export function CreateProjectDialog({
   });
   const promptValue = form.watch("prompt") ?? "";
 
-  function useStarter(id: string) {
+  function applyStarter(id: string) {
     const starter = APP_STARTERS.find((item) => item.id === id);
     if (!starter) return;
     // Preserve explicitly supplied names/descriptions; only fill blank
@@ -134,7 +134,7 @@ export function CreateProjectDialog({
                       key={starter.id}
                       type="button"
                       aria-pressed={selectedStarter === starter.id}
-                      onClick={() => useStarter(starter.id)}
+                      onClick={() => applyStarter(starter.id)}
                       className={`relative min-h-24 rounded-xl border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${selectedStarter === starter.id ? "border-primary bg-primary/5" : "hover:border-primary/50 hover:bg-muted/30"}`}
                     >
                       {selectedStarter === starter.id && <Check className="text-primary absolute right-2 top-2 size-4" aria-hidden="true" />}

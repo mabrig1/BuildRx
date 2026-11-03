@@ -228,7 +228,7 @@ export async function runWorkflow(
     await finishBuildRun(
       context,
       context.verificationPassed === true ? "completed" : "failed",
-      context.verificationPassed === true ? undefined : "VERIFICATION_FAILED"
+      context.verificationPassed === true ? null : "VERIFICATION_FAILED"
     );
     emit({
       type: "workflow_complete",

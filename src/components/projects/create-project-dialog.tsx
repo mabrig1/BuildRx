@@ -38,9 +38,11 @@ import {
 export function CreateProjectDialog({
   trigger,
   defaultValues,
+  demoMode = false,
 }: {
   trigger?: React.ReactNode;
   defaultValues?: Partial<CreateProjectInput>;
+  demoMode?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -80,6 +82,23 @@ export function CreateProjectDialog({
   }
 
   function onSubmit(values: CreateProjectInput) {
+    if (demoMode) {
+      const id = `demo-${crypto.randomUUID()}`;
+      try {
+        window.sessionStorage.setItem(
+          `buildrx-demo-draft:${id}`,
+          JSON.stringify({
+            name: values.name,
+            prompt: values.prompt ?? "",
+          })
+        );
+      } catch {
+        toast.error("Your browser blocked temporary storage. Please enable session storage to open a draft with its specification.");
+        return;
+      }
+      window.location.assign(`/projects/${id}`);
+      return;
+    }
     startTransition(async () => {
       const result = await createProject(values);
       // On success the action redirects to the new workspace, so only
@@ -122,6 +141,11 @@ export function CreateProjectDialog({
             className="flex min-h-0 flex-1 flex-col"
           >
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
+              {demoMode && (
+                <p role="status" className="rounded-lg border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-950 dark:bg-amber-900/20 dark:text-amber-100">
+                  Demo mode: drafts stay in this browser session. Generated files are temporary on the server; connect a database before creating real customer projects.
+                </p>
+              )}
               <section aria-label="Starter app ideas" className="space-y-2">
                 <div className="flex items-center gap-2">
                   <LayoutTemplate className="size-4 text-primary" aria-hidden="true" />

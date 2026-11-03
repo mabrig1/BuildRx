@@ -243,7 +243,7 @@ export function AgentRunPanel({
       <SheetTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <Hammer className="size-4" />
-          <span className="hidden sm:inline">Build app</span>
+          <span>Build app</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
@@ -253,7 +253,7 @@ export function AgentRunPanel({
             Agent build
           </SheetTitle>
           <SheetDescription>
-            Six specialized agents collaborate to plan, build, debug, and
+            Eleven specialized agents collaborate to plan, build, debug, and
             deploy your app.
           </SheetDescription>
         </SheetHeader>

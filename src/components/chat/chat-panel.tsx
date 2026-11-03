@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiErrorFrom } from "@/lib/health/client-error";
 import { AGENT_LABELS } from "@/lib/agents/types";
+import { AgentEventStream } from "@/lib/agents/event-stream";
 import type { AgentEvent, AgentName } from "@/lib/agents/types";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/chat-store";
@@ -102,7 +103,7 @@ export function ChatPanel({
   }, []);
 
   /**
-   * Runs the six-agent build pipeline (the same request the "Build app"
+   * Runs the eleven-agent build pipeline (the same request the "Build app"
    * panel sends) and renders its progress inline as the assistant's
    * reply. This is what makes describing an app in chat actually build
    * it, instead of only getting a conversational response back.
@@ -112,7 +113,6 @@ export function ChatPanel({
     { announceUser }: { announceUser: boolean }
   ) {
     if (isStreaming) return;
-    setHasBuilt(true);
     setStickToBottom(true);
 
     if (announceUser) {
@@ -172,22 +172,8 @@ export function ChatPanel({
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        keepAlive();
-        buffer += decoder.decode(value, { stream: true });
-        const chunks = buffer.split("\n");
-        buffer = chunks.pop() ?? "";
-        for (const raw of chunks) {
-          if (!raw.trim()) continue;
-          let event: AgentEvent;
-          try {
-            event = JSON.parse(raw) as AgentEvent;
-          } catch {
-            continue;
-          }
+      const events = new AgentEventStream();
+      const applyEvent = (event: AgentEvent) => {
           switch (event.type) {
             case "agent_start":
             case "agent_complete": {
@@ -227,29 +213,30 @@ export function ChatPanel({
               render();
               break;
             }
-            case "workflow_complete":
-              // "Build complete" after four steps silently fell back to
-              // scaffolds is how you end up with a confused user and an
-              // app that isn't what they asked for. Say which one it is.
-              lines.push(
-                degraded.length === 0
-                  ? `\n🚀 **Build complete** — ${event.fileCount} files generated.`
-                  : [
-                      `\n⚠️ **Build finished with ${degraded.length} step(s) degraded** — ${event.fileCount} files written, but parts of this app are built-in scaffolding rather than generated from your description:`,
-                      ...degraded.map((item) => `- ${item}`),
-                      "\nSee the **Fix** notes above, then run the build again.",
-                    ].join("\n")
-              );
-              render();
-              if (degraded.length > 0) {
-                toast.warning(
-                  `${degraded.length} build step(s) fell back to scaffolds`,
-                  { description: "See the build log for why, and how to fix it." }
-                );
+            case "workflow_complete": {
+              // Only a verified build advances chat into modification mode.
+              // A failed verification must remain retryable from the composer.
+              setHasBuilt(event.verificationPassed === true);
+              if (!event.verificationPassed) {
+                lines.push(`\n⚠️ **Files saved, but verification failed** — ${event.fileCount} files. Review the failed checks above and retry; the preview is not certified.`);
+                toast.error("Build saved but failed verification", {
+                  description: "Review the failed checks; you can retry from chat.",
+                });
+              } else if (degraded.length > 0) {
+                lines.push([
+                  `\n⚠️ **Build passed blocking checks with ${degraded.length} degraded step(s)** — ${event.fileCount} files saved.`,
+                  ...degraded.map((item) => `- ${item}`),
+                  "\nReview scaffolded parts before production use.",
+                ].join("\n"));
+                toast.warning("Build passed checks with fallback content");
+              } else {
+                lines.push(`\n✅ **Build saved; blocking checks passed** — ${event.fileCount} files. Run the preview and integration tests before publishing.`);
               }
+              render();
               window.dispatchEvent(new CustomEvent("vfs-changed", { detail: {} }));
               onBuildDeployed?.(event.previewUrl);
               break;
+            }
             case "agent_degraded": {
               // A degraded step still produces files, so it must not read
               // like a success. Say what was lost, why, and what to do —
@@ -277,8 +264,17 @@ export function ChatPanel({
               break;
             }
           }
+      };
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        keepAlive();
+        for (const event of events.push(decoder.decode(value, { stream: true }))) {
+          applyEvent(event);
         }
       }
+      for (const event of events.push(decoder.decode())) applyEvent(event);
+      for (const event of events.end()) applyEvent(event);
     } catch (error) {
       const isWatchdogAbort = error instanceof DOMException && error.name === "AbortError";
       // The build keeps running on the server even after this connection

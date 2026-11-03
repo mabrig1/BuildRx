@@ -35,7 +35,7 @@ export function prepareCloudflareSource(
     if (file.path.startsWith(".github/") || file.path.startsWith(".git/")) {
       throw new DeployError("Generated GitHub workflow files are not accepted for deployment.");
     }
-    if (/(^|\/)(\.env(?:\..*)?|\.dev\.vars(?:\..*)?|\.npmrc|\.pnp\.cjs)$/i.test(file.path)) {
+    if (file.path !== ".env.example" && /(^|\/)(\.env(?:\..*)?|\.dev\.vars(?:\..*)?|\.npmrc|\.pnp\.cjs)$/i.test(file.path)) {
       throw new DeployError("Private configuration files cannot be uploaded for deployment.");
     }
     paths.add(file.path);
@@ -77,8 +77,9 @@ export function prepareCloudflareSource(
     `npm install --no-save --no-package-lock --no-audit --no-fund ${ADAPTER} ${WRANGLER}`;
   scripts["cloudflare:build"] = "npm run cloudflare:setup && npx opennextjs-cloudflare build";
   scripts["cloudflare:publish"] = "npx opennextjs-cloudflare deploy";
-  const workerName = ("buildrx-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "").slice(0, 48).replace(/-$/g, "")) || "buildrx-app";
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "").slice(0, 48).replace(/-$/g, "") || "app";
+  const workerName = `buildrx-${slug}`;
 
   const wrangler = JSON.stringify({
     name: workerName,

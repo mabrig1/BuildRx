@@ -32,9 +32,8 @@ describe("build lease", () => {
     first?.();
     expect(acquireBuildLease("project-c", null)).toBeNull();
     second?.();
-    expect(acquireBuildLease("project-c", null)).toBeTypeOf("function");
-    // Release the final acquisition to avoid leaking process test state.
-    const final = acquireBuildLease("another-project", null);
-    final?.();
+    const third = acquireBuildLease("project-c", null);
+    expect(third).toBeTypeOf("function");
+    third?.();
   });
 });

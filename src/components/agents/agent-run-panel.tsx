@@ -35,6 +35,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { AgentEvent, AgentName } from "@/lib/agents/types";
+import { AgentEventStream } from "@/lib/agents/event-stream";
 import { AGENT_LABELS, AGENT_ORDER } from "@/lib/agents/types";
 
 const AGENT_ICONS: Record<AgentName, typeof Brain> = {
@@ -129,7 +130,10 @@ export function AgentRunPanel({
       case "agent_complete":
         setSteps((prev) => ({
           ...prev,
-          [event.agent]: { status: "done", message: event.message },
+          [event.agent]: {
+            status: prev[event.agent].status === "degraded" ? "degraded" : "done",
+            message: event.message,
+          },
         }));
         break;
       case "file":
@@ -140,16 +144,17 @@ export function AgentRunPanel({
       case "workflow_complete": {
         setFinished(true);
         const degradedCount = degradedRef.current.length;
-        if (degradedCount === 0) {
-          toast.success(`Build complete — ${event.fileCount} files generated`);
+        if (!event.verificationPassed) {
+          setSteps((prev) => ({ ...prev, deployment: { status: "error", message: "Verification failed. Review the checklist and retry." } }));
+          toast.error("Build saved, but verification failed", {
+            description: "A preview may be available, but the project is not certified.",
+          });
+        } else if (degradedCount > 0) {
+          toast.warning(`Build passed checks with ${degradedCount} degraded step(s)`, {
+            description: "Review scaffolded content before deploying externally.",
+          });
         } else {
-          toast.warning(
-            `Build finished with ${degradedCount} step(s) degraded`,
-            {
-              description:
-                "Parts of this app are built-in scaffolding, not generated from your description. See each step for why.",
-            }
-          );
+          toast.success(`Build checks passed — ${event.fileCount} files saved`);
         }
         window.dispatchEvent(new CustomEvent("vfs-changed", { detail: {} }));
         onDeployed?.(event.previewUrl);
@@ -213,22 +218,16 @@ export function AgentRunPanel({
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
+      const events = new AgentEventStream();
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            applyEvent(JSON.parse(line) as AgentEvent);
-          } catch {
-            // ignore malformed lines
-          }
+        for (const event of events.push(decoder.decode(value, { stream: true }))) {
+          applyEvent(event);
         }
       }
+      for (const event of events.push(decoder.decode())) applyEvent(event);
+      for (const event of events.end()) applyEvent(event);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to start the build"

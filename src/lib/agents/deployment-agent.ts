@@ -111,7 +111,8 @@ async function buildVerification(
 
   items.push({
     label: "All checks",
-    status: checksPass(findings) ? "pass" : "warn",
+    // Any unresolved error is a release blocker, not an advisory warning.
+    status: checksPass(findings) ? "pass" : "fail",
     detail: checksPass(findings)
       ? `${context.files.size} files verified`
       : `${findings.filter((f) => f.severity === "error").length} unresolved issue(s) — see the Repair Agent's report`,

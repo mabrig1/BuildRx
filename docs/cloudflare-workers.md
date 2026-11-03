@@ -11,7 +11,7 @@ GitHub repository already linked to the project.
 ## 1. From the BuildRx workspace
 
 1. Complete your build, resolve blocking errors and confirm its status is **Ready**.
-2. Select **GitHub**, connect your GitHub account, and link or create a repository.
+2. Select **GitHub** and connect your GitHub account. Linking a repository is optional: BuildRx creates a **private** one automatically when none is linked.
 3. Select **Deploy → Cloudflare → Prepare for Cloudflare Workers**.
 4. The app uploads its own Next.js sources, `wrangler.jsonc`,
    `open-next.config.ts`, an optional GitHub Actions workflow, and
@@ -73,6 +73,8 @@ Official docs:
 
 - BuildRx requires a signed-in project owner, passing project status, and a
   GitHub connection before publishing source. Demo-mode projects are excluded.
+- A missing repository is automatically created **private** and linked on the explicit
+  Prepare action; an existing linked repository is reused.
 - Generated `.env`, `.dev.vars`, and untrusted GitHub workflows are excluded.
   Embedded credential-like values block preparation. No secrets are returned
   in the response.

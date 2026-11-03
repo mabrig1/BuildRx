@@ -79,11 +79,15 @@ async function buildVerification(
     isNvidiaConfigured() ? "NVIDIA" : null,
   ].filter(Boolean);
   items.push({
-    label: "Environment variables",
-    status: isAnyProviderConfigured() ? "pass" : "fail",
+    label: "AI generation provider",
+    // No model is expected in the temporary demo: its built-in scaffolds
+    // remain labelled as scaffolds. Production still requires a provider.
+    status: isAnyProviderConfigured() ? "pass" : context.persist ? "fail" : "warn",
     detail: isAnyProviderConfigured()
       ? `AI provider key present server-side (${providers.join(", ") || "Anthropic"})`
-      : "no AI provider key — set OPENROUTER_API_KEY or NVIDIA_API_KEY",
+      : context.persist
+        ? "AI generation unavailable — configure a server-side provider key"
+        : "Demo mode: built-in scaffolds only, not model-generated features",
   });
 
   const pages = plan.pages.filter((page) => {

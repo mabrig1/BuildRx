@@ -114,7 +114,7 @@ export default async function DashboardPage() {
         }
         description="An overview of your projects and activity."
       >
-        <CreateProjectDialog />
+        <CreateProjectDialog demoMode={!configured} />
       </PageHeader>
 
       {!configured ? <ConnectSupabaseNotice /> : null}
@@ -158,7 +158,7 @@ export default async function DashboardPage() {
             </Button>
           ) : null}
         </div>
-        <ProjectsGrid projects={data.recentProjects} />
+        <ProjectsGrid projects={data.recentProjects} demoMode={!configured} />
       </section>
     </div>
   );

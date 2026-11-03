@@ -13,9 +13,11 @@ import { Input } from "@/components/ui/input";
 export function ProjectsGrid({
   projects,
   searchable = true,
+  demoMode = false,
 }: {
   projects: ProjectSummary[];
   searchable?: boolean;
+  demoMode?: boolean;
 }) {
   const [query, setQuery] = useState("");
 
@@ -41,7 +43,7 @@ export function ProjectsGrid({
             Create your first project and start building with AI.
           </p>
         </div>
-        <CreateProjectDialog />
+        <CreateProjectDialog demoMode={demoMode} />
       </div>
     );
   }

@@ -51,12 +51,12 @@ export default async function ProjectsPage() {
         title="Projects"
         description="Create, manage, and deploy your AI-built apps."
       >
-        <CreateProjectDialog />
+        <CreateProjectDialog demoMode={!configured} />
       </PageHeader>
 
       {!configured ? <ConnectSupabaseNotice /> : null}
 
-      <ProjectsGrid projects={projects} />
+      <ProjectsGrid projects={projects} demoMode={!configured} />
     </div>
   );
 }

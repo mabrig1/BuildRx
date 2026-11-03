@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     try {
       const { data: project } = await withTimeout(
-        () => supabase.from("projects").select("id").eq("id", projectId).single(),
+        () => supabase.from("projects").select("id").eq("id", projectId).eq("owner_id", auth.userId!).single(),
         20_000,
         "project lookup"
       );

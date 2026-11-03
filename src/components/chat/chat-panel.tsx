@@ -112,7 +112,7 @@ export function ChatPanel({
     prompt: string,
     { announceUser }: { announceUser: boolean }
   ) {
-    if (isStreaming) return;
+    if (useChatStore.getState().isStreaming) return;
     setStickToBottom(true);
 
     if (announceUser) {
@@ -296,7 +296,7 @@ export function ChatPanel({
 
   async function sendMessage(content: string) {
     const trimmed = content.trim();
-    if (!trimmed || isStreaming) return;
+    if (!trimmed || useChatStore.getState().isStreaming) return;
 
     if (!hasBuilt) {
       setInput("");

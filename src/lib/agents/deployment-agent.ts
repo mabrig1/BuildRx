@@ -154,6 +154,7 @@ export const deploymentAgent: Agent = {
     emit({ type: "verification", agent: "deployment", items });
     const failures = items.filter((item) => item.status === "fail");
     const verified = failures.length === 0;
+    context.verificationPassed = verified;
 
     if (context.persist && isSupabaseConfigured()) {
       const { createClient } = await import("@/lib/supabase/server");
@@ -183,7 +184,7 @@ export const deploymentAgent: Agent = {
       await supabase.from("deployments").insert({
         project_id: context.projectId,
         triggered_by: context.userId,
-        status: "live",
+        status: verified ? "live" : "failed",
         url: previewUrl,
         completed_at: new Date().toISOString(),
       });
@@ -219,7 +220,7 @@ export const deploymentAgent: Agent = {
       agent: "deployment",
       message: verified
         ? `Deployed and verified — preview live at ${previewUrl}`
-        : `NOT verified: ${failures.map((f) => f.label).join(", ")} — files saved, preview at ${previewUrl}`,
+        : `Verification failed: ${failures.map((f) => f.label).join(", ")} — files saved for repair, preview at ${previewUrl}`,
     });
   },
 };

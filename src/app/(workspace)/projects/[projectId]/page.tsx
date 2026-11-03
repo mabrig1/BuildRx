@@ -60,6 +60,7 @@ async function loadWorkspace(projectId: string): Promise<WorkspaceData> {
     .from("projects")
     .select("id, name, status, preview_url")
     .eq("id", projectId)
+    .eq("owner_id", user.id)
     .single();
 
   if (!project) {
@@ -76,6 +77,7 @@ async function loadWorkspace(projectId: string): Promise<WorkspaceData> {
     supabase
       .from("projects")
       .select("id, name")
+      .eq("owner_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(10),
     supabase

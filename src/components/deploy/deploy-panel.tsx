@@ -42,6 +42,12 @@ const PROVIDERS: Array<{
   tokenHint: string;
 }> = [
   {
+    id: "cloudflare",
+    name: "Cloudflare",
+    icon: Cloud,
+    tokenHint: "Connect a GitHub repository for Workers Builds",
+  },
+  {
     id: "vercel",
     name: "Vercel",
     icon: Triangle,

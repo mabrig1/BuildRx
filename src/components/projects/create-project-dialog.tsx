@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FileText, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Check, FileText, LayoutTemplate, Loader2, Plus, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -28,47 +28,12 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { APP_STARTERS } from "@/lib/projects/app-starters";
 import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
 import {
   createProjectSchema,
   type CreateProjectInput,
 } from "@/lib/validations/project";
-
-const SAAS_BLUEPRINT = `Build a production-ready multi-tenant SaaS application.
-
-PRODUCT
-- Purpose: [describe the problem and target customer]
-- Plans: Free, Pro, and Business
-
-ROLES
-- Workspace Owner: billing, settings, team, and all records
-- Administrator: operational management
-- Member: assigned work only
-- Platform Administrator: system health and account oversight
-
-CORE WORKFLOWS
-1. Sign up, create a workspace, choose a plan, and complete onboarding.
-2. Create, search, update, and archive the primary business records.
-3. Invite team members and assign role-based permissions.
-4. Upgrade, downgrade, or cancel a Stripe subscription.
-
-DATA AND SECURITY
-- Use Supabase Auth, PostgreSQL, and owner/workspace-scoped Row-Level Security.
-- Generate foreign keys, indexes, constraints, and SELECT/INSERT/UPDATE/DELETE policies.
-- Authenticate and authorize every query and mutation server-side.
-
-PRODUCT QUALITY
-- Use real persistent CRUD; never use in-memory arrays or fake data storage.
-- Include responsive navigation, onboarding, search, filters, pagination, and export.
-- Include loading, empty, validation, error, success, disabled, and retry states.
-- Integrate Stripe Checkout, verified webhooks, and the customer portal.
-- Generate environment examples, migrations, setup documentation, and tests.
-
-ACCEPTANCE CRITERIA
-- Records persist after refresh and are isolated by workspace.
-- Every role sees only authorized pages and records.
-- Billing status is verified server-side.
-- No placeholder pages, non-functional buttons, missing imports, or undeclared dependencies.`;
 
 export function CreateProjectDialog({
   trigger,
@@ -79,6 +44,7 @@ export function CreateProjectDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [selectedStarter, setSelectedStarter] = useState<string | null>(null);
   const initialValues: CreateProjectInput = {
     name: defaultValues?.name ?? "",
     description: defaultValues?.description ?? "",
@@ -90,6 +56,28 @@ export function CreateProjectDialog({
     defaultValues: initialValues,
   });
   const promptValue = form.watch("prompt") ?? "";
+
+  function useStarter(id: string) {
+    const starter = APP_STARTERS.find((item) => item.id === id);
+    if (!starter) return;
+    // Preserve explicitly supplied names/descriptions; only fill blank
+    // fields or the name/description from the previous starter choice.
+    const previous = APP_STARTERS.find((item) => item.id === selectedStarter);
+    const name = form.getValues("name").trim();
+    const description = (form.getValues("description") ?? "").trim();
+    if (!name || (previous && name === previous.name)) {
+      form.setValue("name", starter.name, { shouldDirty: true, shouldValidate: true });
+    }
+    if (!description || (previous && description === previous.description)) {
+      form.setValue("description", starter.description, { shouldDirty: true, shouldValidate: true });
+    }
+    form.setValue("prompt", starter.prompt, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    setSelectedStarter(id);
+  }
 
   function onSubmit(values: CreateProjectInput) {
     startTransition(async () => {
@@ -107,7 +95,10 @@ export function CreateProjectDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) form.reset(initialValues);
+        if (!next) {
+          form.reset(initialValues);
+          setSelectedStarter(null);
+        }
       }}
     >
       <DialogTrigger asChild>
@@ -122,7 +113,7 @@ export function CreateProjectDialog({
         <DialogHeader className="shrink-0 border-b px-6 py-5 pr-12">
           <DialogTitle>Create a new project</DialogTitle>
           <DialogDescription>
-            Start with a short idea or paste a complete product specification.
+            Choose a starter brief or describe your own app. Starters prefill the form; they are not deployed products.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -130,7 +121,34 @@ export function CreateProjectDialog({
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex min-h-0 flex-1 flex-col"
           >
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
+              <section aria-label="Starter app ideas" className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <LayoutTemplate className="size-4 text-primary" aria-hidden="true" />
+                  <h3 className="text-sm font-semibold">Choose a starting point</h3>
+                  <span className="text-muted-foreground text-xs">Optional</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {APP_STARTERS.map((starter) => (
+                    <button
+                      key={starter.id}
+                      type="button"
+                      aria-pressed={selectedStarter === starter.id}
+                      onClick={() => useStarter(starter.id)}
+                      className={`relative min-h-24 rounded-xl border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${selectedStarter === starter.id ? "border-primary bg-primary/5" : "hover:border-primary/50 hover:bg-muted/30"}`}
+                    >
+                      {selectedStarter === starter.id && <Check className="text-primary absolute right-2 top-2 size-4" aria-hidden="true" />}
+                      <strong className="block pr-3 text-sm">{starter.name}</strong>
+                      <span className="text-muted-foreground mt-1 block text-xs leading-4">
+                        {starter.description}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  Each option provides a full editable product brief. Real builds and external integrations still require their normal setup.
+                </p>
+              </section>
               <FormField
                 control={form.control}
                 name="name"
@@ -175,32 +193,18 @@ export function CreateProjectDialog({
                         </span>
                       </FormLabel>
                       <div className="flex items-center gap-1.5">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            form.setValue("prompt", SAAS_BLUEPRINT, {
-                              shouldDirty: true,
-                              shouldTouch: true,
-                              shouldValidate: true,
-                            })
-                          }
-                        >
-                          <Sparkles />
-                          SaaS blueprint
-                        </Button>
                         {promptValue.length > 0 && (
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() =>
+                            onClick={() => {
                               form.setValue("prompt", "", {
                                 shouldDirty: true,
                                 shouldValidate: true,
-                              })
-                            }
+                              });
+                              setSelectedStarter(null);
+                            }}
                             aria-label="Clear app specification"
                           >
                             <Trash2 />
@@ -215,6 +219,10 @@ export function CreateProjectDialog({
                         className="min-h-64 max-h-[42dvh] resize-y [field-sizing:fixed]"
                         maxLength={MAX_AI_PROMPT_CHARACTERS}
                         {...field}
+                        onChange={(event) => {
+                          field.onChange(event);
+                          setSelectedStarter(null);
+                        }}
                       />
                     </FormControl>
                     <div className="flex flex-wrap items-center justify-between gap-2">

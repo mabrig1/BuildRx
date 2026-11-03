@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       ? await client.getRepo(project.github_repo)
       : await client.createRepo(`buildrx-${slug}`, {
           isPrivate: true,
+          autoInit: true,
           description: "Generated application prepared for Cloudflare Workers",
         });
     if (repositoryCreated) {

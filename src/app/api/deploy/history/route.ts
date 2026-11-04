@@ -25,6 +25,14 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createClient();
+  const { data: owned, error: ownerError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .eq("owner_id", session.userId!)
+    .maybeSingle();
+  if (ownerError) return NextResponse.json({ error: "Unable to verify project ownership." }, { status: 503 });
+  if (!owned) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   const { data, error } = await supabase
     .from("deployments")
     .select("id, provider, status, url, domain, logs, created_at, completed_at")

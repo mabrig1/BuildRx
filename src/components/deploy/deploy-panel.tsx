@@ -405,6 +405,17 @@ export function DeployPanel({ projectId }: { projectId: string }) {
                   <Globe className="size-4" /> Open my published app <ExternalLink className="size-3.5" />
                 </a>
               )}
+              <button type="button" disabled={checkingCloudflare} className="text-xs font-medium text-primary underline underline-offset-4 disabled:opacity-50" onClick={() => void checkCloudflareBuild()}>
+                {checkingCloudflare ? "Checking Cloudflare…" : "Check my Cloudflare launch"}
+              </button>
+              {cloudflareBuild && (
+                <div role="status" className="space-y-1 text-xs leading-5">
+                  <p>{cloudflareBuild.message}</p>
+                  {cloudflareBuild.checksUrl && (
+                    <a className="text-primary underline underline-offset-4" href={cloudflareBuild.checksUrl} target="_blank" rel="noopener noreferrer">Open build details ↗</a>
+                  )}
+                </div>
+              )}
               <button type="button" className="text-xs text-muted-foreground underline underline-offset-4" onClick={() => setShowAdvanced((value) => !value)}>
                 {showAdvanced ? "Hide advanced hosting options" : "Advanced hosting options (optional)"}
               </button>

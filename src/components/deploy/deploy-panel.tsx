@@ -310,7 +310,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
       `Production branch: ${cloudflareHandoff.branch}`,
       `Build command: ${cloudflareHandoff.buildCommand}`,
       `Deploy command: ${cloudflareHandoff.deployCommand}`,
-    ].join("\\n");
+    ].join("\n");
     try {
       await navigator.clipboard.writeText(settings);
       toast.success("Cloudflare Workers setup copied");

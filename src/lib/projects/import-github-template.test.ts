@@ -49,7 +49,7 @@ describe("curated GitHub app templates", () => {
     const fileNames = files.map((f, i) => ({ ...f, sha: String(i + 1).repeat(40), size: Buffer.byteLength(f.content) }));
     const license = "The MIT License (MIT)\nCopyright (c) 2025 Vercel, Inc.\nPermission is hereby granted...";
     const responses: Record<string, unknown> = {
-      `/repos/vercel/next.js/git/commits/${source.commit}`: { tree: { sha: "a".repeat(40) } },
+      [`/repos/vercel/next.js/git/commits/${source.commit}`]: { tree: { sha: "a".repeat(40) } },
       [`/repos/vercel/next.js/git/trees/${"a".repeat(40)}`]: { tree: [{ path: "examples", type: "tree", sha: "b".repeat(40) }], truncated: false },
       [`/repos/vercel/next.js/git/trees/${"b".repeat(40)}`]: { tree: [{ path: "blog-starter", type: "tree", sha: "c".repeat(40) }], truncated: false },
       [`/repos/vercel/next.js/git/trees/${"c".repeat(40)}?recursive=1`]: {
@@ -58,7 +58,7 @@ describe("curated GitHub app templates", () => {
           { path: "cover.png", sha: "8".repeat(40), size: 1250, type: "blob" }],
         truncated: false,
       },
-      `/repos/vercel/next.js/contents/license.md?ref=${source.commit}`: {
+      [`/repos/vercel/next.js/contents/license.md?ref=${source.commit}`]: {
         encoding: "base64", content: Buffer.from(license).toString("base64"),
       },
     };

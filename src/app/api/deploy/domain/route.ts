@@ -74,6 +74,11 @@ export async function POST(request: Request) {
 
   // Provider-side attachment (Railway domains are managed in its UI).
   const token = await getProviderToken(provider);
+  if (!token && provider !== "railway") {
+    return NextResponse.json({
+      error: `Connect ${provider} before linking your domain. No DNS or hosting change was made.`,
+    }, { status: 409 });
+  }
   let instructions = `Point a CNAME record for ${domain} at your ${provider} site.`;
   try {
     if (token && provider === "vercel") {

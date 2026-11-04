@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { APP_STARTERS } from "@/lib/projects/app-starters";
+import { GITHUB_APP_TEMPLATES } from "@/lib/projects/github-app-templates";
 import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
 import {
   createProjectSchema,
@@ -47,6 +48,9 @@ export function CreateProjectDialog({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [selectedStarter, setSelectedStarter] = useState<string | null>(null);
+  const [starterSearch, setStarterSearch] = useState("");
+  const [starterCategory, setStarterCategory] = useState("All");
+  const [importingGithub, setImportingGithub] = useState<string | null>(null);
   const initialValues: CreateProjectInput = {
     name: defaultValues?.name ?? "",
     description: defaultValues?.description ?? "",
@@ -58,6 +62,12 @@ export function CreateProjectDialog({
     defaultValues: initialValues,
   });
   const promptValue = form.watch("prompt") ?? "";
+  const starterCategories = ["All", ...Array.from(new Set(APP_STARTERS.map((s) => s.category ?? "Other"))).sort()];
+  const starterResults = APP_STARTERS.filter((starter) => {
+    const categoryMatches = starterCategory === "All" || (starter.category ?? "Other") === starterCategory;
+    const text = `${starter.name} ${starter.description} ${starter.audience}`.toLowerCase();
+    return categoryMatches && text.includes(starterSearch.trim().toLowerCase());
+  });
 
   function applyStarter(id: string) {
     const starter = APP_STARTERS.find((item) => item.id === id);
@@ -79,6 +89,31 @@ export function CreateProjectDialog({
       shouldValidate: true,
     });
     setSelectedStarter(id);
+  }
+
+  async function importGithubTemplate(templateId: string) {
+    if (demoMode) {
+      toast.error("Sign in to clone real GitHub source into a permanent app project.");
+      return;
+    }
+    setImportingGithub(templateId);
+    try {
+      const response = await fetch("/api/projects/import-github-starter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.projectId) {
+        throw new Error(data.error ?? "Unable to import this template");
+      }
+      toast.success("Source imported. Review and customize before publishing.");
+      window.location.assign(`/projects/${encodeURIComponent(data.projectId)}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "GitHub import failed");
+    } finally {
+      setImportingGithub(null);
+    }
   }
 
   function onSubmit(values: CreateProjectInput) {
@@ -132,7 +167,7 @@ export function CreateProjectDialog({
         <DialogHeader className="shrink-0 border-b px-6 py-5 pr-12">
           <DialogTitle>Create a new project</DialogTitle>
           <DialogDescription>
-            Choose a starter brief or describe your own app. Starters prefill the form; they are not deployed products.
+            Search ready-to-customize app ideas, import approved open-source GitHub code, or describe your own product.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -152,8 +187,30 @@ export function CreateProjectDialog({
                   <h3 className="text-sm font-semibold">Choose a starting point</h3>
                   <span className="text-muted-foreground text-xs">Optional</span>
                 </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    value={starterSearch}
+                    onChange={(event) => setStarterSearch(event.target.value)}
+                    placeholder="Search app ideas (school, POS, church, booking...)"
+                    aria-label="Search app starters"
+                    className="min-w-40 flex-1"
+                  />
+                  <select
+                    aria-label="Filter app category"
+                    value={starterCategory}
+                    onChange={(event) => setStarterCategory(event.target.value)}
+                    className="bg-background h-9 max-w-full rounded-md border px-2 text-sm"
+                  >
+                    {starterCategories.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-muted-foreground text-xs" role="status">
+                  Showing {starterResults.length} of {APP_STARTERS.length} app ideas.
+                </p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {APP_STARTERS.map((starter) => (
+                  {starterResults.map((starter) => (
                     <button
                       key={starter.id}
                       type="button"
@@ -162,16 +219,49 @@ export function CreateProjectDialog({
                       className={`relative min-h-24 rounded-xl border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${selectedStarter === starter.id ? "border-primary bg-primary/5" : "hover:border-primary/50 hover:bg-muted/30"}`}
                     >
                       {selectedStarter === starter.id && <Check className="text-primary absolute right-2 top-2 size-4" aria-hidden="true" />}
-                      <strong className="block pr-3 text-sm">{starter.name}</strong>
+                      <span className="text-muted-foreground block text-[10px] font-medium">{starter.category ?? "Starter"}</span>
+                      <strong className="mt-1 block pr-3 text-sm">{starter.name}</strong>
                       <span className="text-muted-foreground mt-1 block text-xs leading-4">
                         {starter.description}
                       </span>
                     </button>
                   ))}
                 </div>
+                {starterResults.length === 0 && (
+                  <p className="text-muted-foreground text-sm">No matching starter. Clear the search or describe your own app below.</p>
+                )}
                 <p className="text-muted-foreground text-xs">
-                  Each option provides a full editable product brief. Real builds and external integrations still require their normal setup.
+                  These {APP_STARTERS.length} original briefs prefill an editable specification; the AI still needs to build and verify your app.
                 </p>
+              </section>
+              <section aria-label="Clone vetted GitHub template source" className="space-y-3 rounded-xl border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">Clone real open-source code from GitHub</h3>
+                  <span className="rounded bg-muted px-2 py-1 text-[10px]">MIT-licensed · pinned version</span>
+                </div>
+                <p className="text-muted-foreground text-xs leading-5">
+                  Unlike app ideas, these copy actual editable Next.js source files into a new project.
+                  BuildRx preserves original GitHub attribution and licensing. You can edit the code, but must verify it before going live.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {GITHUB_APP_TEMPLATES.map((template) => (
+                    <div key={template.id} className="flex flex-col gap-2 rounded-lg border p-3">
+                      <span className="text-muted-foreground text-[10px]">{template.category} · GitHub</span>
+                      <strong className="text-sm">{template.name}</strong>
+                      <p className="text-muted-foreground flex-1 text-xs leading-5">{template.description}</p>
+                      <a href={template.sourceUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-primary underline underline-offset-4">View original source ↗</a>
+                      <Button type="button" variant="outline" className="w-full" size="sm"
+                        disabled={Boolean(importingGithub) || isPending || demoMode}
+                        onClick={() => void importGithubTemplate(template.id)}>
+                        {importingGithub === template.id ? <Loader2 className="size-4 animate-spin" /> : <LayoutTemplate className="size-4" />}
+                        {importingGithub === template.id ? "Cloning source…" : "Clone to my project"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                {demoMode && <p className="text-xs text-amber-700">Sign in and connect permanent storage to clone code.</p>}
+                <p className="text-muted-foreground text-xs">Import does not install dependencies, activate databases, or deploy a live website. Binary images are excluded from the text-only editor.</p>
               </section>
               <FormField
                 control={form.control}

@@ -112,8 +112,12 @@ export async function POST(request: Request) {
     .map((file) => ({ path: file.path, content: file.content }));
   if (!session.demo && (
     !projectFiles.some((file) => file.path === "package.json") ||
-    !projectFiles.some((file) => file.path === "src/app/page.tsx") ||
-    !projectFiles.some((file) => file.path === "src/app/layout.tsx")
+    !(
+      projectFiles.some((file) => file.path === "src/app/page.tsx") &&
+      projectFiles.some((file) => file.path === "src/app/layout.tsx") ||
+      projectFiles.some((file) => file.path === "app/page.tsx") &&
+      projectFiles.some((file) => file.path === "app/layout.tsx")
+    )
   )) {
     return NextResponse.json(
       { error: "Your app source is incomplete. Run Repair and verify a real application before publishing." },

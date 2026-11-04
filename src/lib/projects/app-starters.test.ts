@@ -4,9 +4,14 @@ import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
 import { createProjectSchema } from "@/lib/validations/project";
 
 describe("credential-free project starters", () => {
-  it("offers six distinct product briefs", () => {
-    expect(APP_STARTERS).toHaveLength(6);
-    expect(new Set(APP_STARTERS.map((s) => s.id)).size).toBe(6);
+  it("offers 24 diverse, searchable app briefs", () => {
+    expect(APP_STARTERS).toHaveLength(24);
+    expect(new Set(APP_STARTERS.map((s) => s.id)).size).toBe(24);
+    expect(new Set(APP_STARTERS.map((s) => s.category)).size).toBeGreaterThan(7);
+    expect(APP_STARTERS.some(s => s.id === "inventory")).toBe(true);
+    expect(APP_STARTERS.some(s => s.id === "printing")).toBe(true);
+    expect(APP_STARTERS.some(s => s.id === "grants")).toBe(true);
+    expect(APP_STARTERS.some(s => s.id === "church")).toBe(true);
   });
 
   it.each(APP_STARTERS.map((starter) => [starter.id, starter] as const))(

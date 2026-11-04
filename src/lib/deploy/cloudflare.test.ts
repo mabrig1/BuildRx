@@ -31,6 +31,17 @@ describe("prepareCloudflareSource", () => {
     expect(withExample.files.some(f => f.path === ".env.example")).toBe(true);
   });
 
+  it("accepts imported Next.js examples with a root app directory", () => {
+    const rootApp = initial.map(file => ({
+      ...file,
+      path: file.path.startsWith("src/app/") ? file.path.slice(4) : file.path,
+    }));
+    const result = prepareCloudflareSource(rootApp, "Imported Project");
+    expect(result.files.some(file => file.path === "app/page.tsx")).toBe(true);
+    expect(result.files.some(file => file.path === "app/layout.tsx")).toBe(true);
+    expect(result.workerName).toBe("buildrx-imported-project");
+  });
+
   it("keeps the deployment workflow manual and never embeds cloud credentials", () => {
     const files = prepareCloudflareSource(initial, "My Shop").files;
     const workflow = files.find(f => f.path.endsWith("cloudflare-deploy.yml"))!.content;

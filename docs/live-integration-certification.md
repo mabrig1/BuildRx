@@ -12,7 +12,11 @@ This workflow validates BuildRx against real external providers without reusing 
 6. Sends one minimal request to OpenRouter or NVIDIA and verifies a real model response.
 7. Deletes the Vercel deployment and temporary GitHub branch even when a later assertion fails.
 
-The workflow runs nightly and can be triggered manually.
+The workflow is **available for manual execution at any time**. Scheduled nightly certification is **opt-in**: until it has a dedicated, fully configured `live-certification` environment, the nightly job is skipped rather than failing every morning for missing secrets. A skipped run is **not** evidence that integrations passed certification.
+
+To enable nightly certification, first add the scoped secrets listed below in **Settings → Environments → live-certification → Environment secrets**. Then create a **repository-level Actions variable** named `LIVE_CERT_ENABLED` with the exact value `true` under **Settings → Secrets and variables → Actions → Variables**. (Environment-level variables are not used for this job-level gate.) Once enabled, any missing secrets will again cause a genuine failure with the exact list of missing credentials.
+
+Manual **Run workflow** executions bypass the opt-in gate, so the credential preflight continues to fail visibly when external providers are not configured; no live calls are made before that preflight passes. To pause future scheduled checks without editing code, change `LIVE_CERT_ENABLED` to `false` or remove the repository variable.
 
 ## Required scoped credentials
 

@@ -476,27 +476,37 @@ export function DeployPanel({ projectId }: { projectId: string }) {
             )}
 
             {provider === "cloudflare" && cloudflareHandoff && (
-              <section aria-live="polite" className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
-                <p className="font-semibold">Source prepared — not yet deployed</p>
-                <p className="mt-1 text-muted-foreground text-xs">GitHub source committed. Cloudflare has not yet confirmed a deployment.</p>
-                {cloudflareHandoff.repositoryCreated && <p className="mt-1 text-xs">A private GitHub repository was created and linked automatically.</p>}
-                <div className="mt-3 space-y-1.5 rounded border bg-background/70 p-2 font-mono text-xs break-all">
-                  <p><span className="font-sans font-semibold">Worker name:</span> {cloudflareHandoff.workerName}</p>
-                  <p><span className="font-sans font-semibold">Branch:</span> {cloudflareHandoff.branch}</p>
-                  <p><span className="font-sans font-semibold">Build:</span> {cloudflareHandoff.buildCommand}</p>
-                  <p><span className="font-sans font-semibold">Deploy:</span> {cloudflareHandoff.deployCommand}</p>
+              <section aria-live="polite" className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3 text-sm">
+                <p className="font-semibold">Your app is ready for its first launch</p>
+                <p className="text-muted-foreground">BuildRx has saved your application and prepared it for hosting. Your app is <strong>not yet public</strong> until Cloudflare finishes its build.</p>
+                <div className="space-y-2">
+                  <p className="font-medium">One-time setup:</p>
+                  <p>1. Open Cloudflare using the button below.</p>
+                  <p>2. Choose GitHub and select the app repository BuildRx created.</p>
+                  <p>3. Confirm the settings and choose Save and Deploy.</p>
                 </div>
-                <Button type="button" variant="outline" size="sm" className="mt-2 w-full gap-2" onClick={() => void copyCloudflareSetup()}>
-                  <Copy className="size-3.5" /> Copy Cloudflare setup
-                </Button>
-                <div className="mt-3 grid gap-2 text-xs">
-                  <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.repositoryUrl} target="_blank" rel="noopener noreferrer">View source on GitHub ↗</a>
-                  <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.workflowUrl} target="_blank" rel="noopener noreferrer">Run deployment workflow ↗</a>
-                  <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.secretsUrl} target="_blank" rel="noopener noreferrer">Set repository Cloudflare secrets ↗</a>
-                  <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.dashboardUrl} target="_blank" rel="noopener noreferrer">Open Cloudflare Workers ↗</a>
-                  <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.githubInstallationsUrl} target="_blank" rel="noopener noreferrer">Allow Cloudflare to access this private GitHub repository ↗</a>
-                </div>
-                <p className="mt-3 text-xs text-muted-foreground">Cloudflare → Workers &amp; Pages → Create application → GitHub → select the prepared repository. Match the Worker name exactly, paste the build and deploy commands above, and choose the shown branch. If you installed Cloudflare with selected-repository access, add this private repository in GitHub installations first. Verify the live URL in Cloudflare before connecting a custom domain. Manual GitHub Actions publishing is an alternative.</p>
+                <a href={cloudflareHandoff.dashboardUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-10 items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">
+                  Finish on Cloudflare <ExternalLink className="size-4" />
+                </a>
+                <p className="text-xs text-muted-foreground">Your saved app: <a href={cloudflareHandoff.repositoryUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-4">Open its GitHub repository ↗</a></p>
+                <details className="rounded-md border p-3">
+                  <summary className="cursor-pointer text-xs font-medium">Technical settings (only if Cloudflare asks)</summary>
+                  <div className="mt-3 space-y-1.5 font-mono text-xs break-all">
+                    <p>Worker: {cloudflareHandoff.workerName}</p>
+                    <p>Branch: {cloudflareHandoff.branch}</p>
+                    <p>Build: {cloudflareHandoff.buildCommand}</p>
+                    <p>Deploy: {cloudflareHandoff.deployCommand}</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="mt-3 w-full gap-2" onClick={() => void copyCloudflareSetup()}>
+                    <Copy className="size-3.5" /> Copy settings
+                  </Button>
+                  <div className="mt-3 grid gap-2 text-xs">
+                    <a className="text-primary underline" href={cloudflareHandoff.githubInstallationsUrl} target="_blank" rel="noopener noreferrer">Allow Cloudflare access to this repository ↗</a>
+                    <a className="text-primary underline" href={cloudflareHandoff.workflowUrl} target="_blank" rel="noopener noreferrer">Optional GitHub deployment workflow ↗</a>
+                    <a className="text-primary underline" href={cloudflareHandoff.secretsUrl} target="_blank" rel="noopener noreferrer">Optional GitHub deployment secrets ↗</a>
+                  </div>
+                </details>
+                <p className="text-xs text-muted-foreground">After Cloudflare confirms deployment, open the link it provides and test your app before adding a custom domain.</p>
               </section>
             )}
 

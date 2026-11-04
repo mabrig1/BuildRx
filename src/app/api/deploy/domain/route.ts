@@ -50,11 +50,26 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: project } = await supabase
     .from("projects")
-    .select("name")
+.select("name")
     .eq("id", projectId)
+    .eq("owner_id", session.userId!)
     .maybeSingle();
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  // Do not claim or register a domain before the app is deployed live.
+  // This prevents consuming another user's provider credits/domain quota.
+  const { data: liveDeployment } = await supabase
+    .from("deployments")
+    .select("id")
+    .eq("project_id", projectId)
+    .eq("provider", provider)
+    .eq("status", "live")
+    .limit(1)
+    .maybeSingle();
+  if (!liveDeployment) {
+    return NextResponse.json({ error: "Publish your app successfully before adding a custom domain." }, { status: 409 });
   }
 
   // Provider-side attachment (Railway domains are managed in its UI).
@@ -82,8 +97,9 @@ export async function POST(request: Request) {
 
   const { error } = await supabase
     .from("projects")
-    .update({ custom_domain: domain })
-    .eq("id", projectId);
+.update({ custom_domain: domain })
+    .eq("id", projectId)
+    .eq("owner_id", session.userId!);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

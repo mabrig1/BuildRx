@@ -209,6 +209,8 @@ export async function POST(request: Request) {
         if (session.demo) {
           outcome = await simulateDeploy(provider, log);
           log("(Demo only — no real app was published.)");
+        } else if (!token) {
+          throw new DeployError("Connect your hosting account before publishing.");
         } else if (provider === "vercel") {
           outcome = await deployToVercel(token, input, log);
         } else if (provider === "netlify") {
@@ -219,7 +221,9 @@ export async function POST(request: Request) {
         log(
           outcome.status === "live"
             ? `Deployed: ${outcome.url}`
-            : "Deployment queued."
+            : outcome.status === "failed"
+              ? "Not published."
+              : "Deployment queued."
         );
       } catch (error) {
         const message =

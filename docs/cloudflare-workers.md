@@ -52,6 +52,33 @@ Each generated application should have its own prepared repository.
 Do not attach a production domain before verifying auth, CRUD, payments
 and other required runtime secrets on the new Worker.
 
+## Launch monitoring inside BuildRx (new)
+
+After the app is prepared, select **Check my launch progress** in the
+launch panel. BuildRx reads the latest GitHub check-runs for the specific
+linked repository and looks only for Cloudflare-related checks.
+
+- **Building:** Cloudflare has started a build; refresh progress.
+- **Build error:** follow the Cloudflare check's build details to correct
+  the specific failure.
+- **Build checks passed:** Cloudflare's Git check completed successfully,
+  **not** a claim that authentication, database operations, API routes, or
+  the public Worker URL were verified.
+- **Setup not verified:** no Cloudflare check was found, or the connected
+  GitHub credential cannot read checks. Import the correct repo into
+  Workers Builds or grant GitHub check-read permission.
+
+Once Workers Builds has been configured for automatic deployment on the
+production branch, clicking **Start my launch** again pushes the latest
+verified source to the app repository and may automatically trigger its
+next deployment. BuildRx never fabricates a public URL. Obtain the
+confirmed `workers.dev` hostname from Cloudflare and test live app
+functions before sharing.
+
+Build status can be read directly from BuildRx without giving users
+Cloudflare credentials. This is a transitional path; an eventual
+BuildRx-managed hosting service is tracked separately in issue #42.
+
 ## 2. Cloudflare Workers Builds — recommended for ongoing automatic publishing
 
 Open the [Cloudflare dashboard](https://dash.cloudflare.com/) → Workers &

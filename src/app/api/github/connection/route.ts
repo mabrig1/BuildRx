@@ -35,6 +35,7 @@ export async function GET(request: Request) {
       .from("projects")
       .select("github_repo")
       .eq("id", projectId)
+      .eq("owner_id", session.userId!)
       .maybeSingle();
     repo = project?.github_repo ?? null;
   }
@@ -118,6 +119,7 @@ export async function DELETE() {
   await supabase
     .from("integration_connections")
     .delete()
-    .eq("provider", "github");
+    .eq("provider", "github")
+    .eq("user_id", session.userId!);
   return NextResponse.json({ connected: false });
 }

@@ -148,6 +148,14 @@ export function DeployPanel({ projectId }: { projectId: string }) {
   const [liveLog, setLiveLog] = useState<string[]>([]);
   const [history, setHistory] = useState<DeploymentEntry[]>([]);
   const [domain, setDomain] = useState("");
+  const [cloudflareBuild, setCloudflareBuild] = useState<null | {
+    state: "not_connected" | "building" | "passed" | "failed" | "unknown";
+    message: string;
+    checksUrl?: string | null;
+    commitUrl?: string | null;
+    checkCount: number;
+  }>(null);
+  const [checkingCloudflare, setCheckingCloudflare] = useState(false);
   const [cloudflareHandoff, setCloudflareHandoff] = useState<null | {
     repositoryUrl: string;
     workflowUrl: string;
@@ -220,6 +228,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
         // This action pushes real app source and a manual deployment workflow
         // to the linked GitHub repository. It is not a production deployment.
         setCloudflareHandoff(null);
+        setCloudflareBuild(null);
         const prepared = await fetch("/api/deploy/cloudflare/prepare", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -231,6 +240,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
         }
         setCloudflareHandoff(data);
         setLiveLog(data.instructions ?? []);
+        void checkCloudflareBuild();
         toast.info("Cloudflare files prepared in GitHub", {
           description: "Deploy in Cloudflare Workers Builds or run the manual GitHub workflow.",
         });
@@ -281,6 +291,22 @@ export function DeployPanel({ projectId }: { projectId: string }) {
       );
     } finally {
       setDeploying(false);
+    }
+  }
+
+  async function checkCloudflareBuild() {
+    setCheckingCloudflare(true);
+    try {
+      const response = await fetch(`/api/deploy/cloudflare/status?projectId=${encodeURIComponent(projectId)}`, {
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error ?? "Unable to check Cloudflare");
+      setCloudflareBuild(data);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to check build status");
+    } finally {
+      setCheckingCloudflare(false);
     }
   }
 
@@ -506,7 +532,26 @@ export function DeployPanel({ projectId }: { projectId: string }) {
                     <a className="text-primary underline" href={cloudflareHandoff.secretsUrl} target="_blank" rel="noopener noreferrer">Optional GitHub deployment secrets ↗</a>
                   </div>
                 </details>
-                <p className="text-xs text-muted-foreground">After Cloudflare confirms deployment, open the link it provides and test your app before adding a custom domain.</p>
+                <div className="rounded-md border bg-background/70 p-3 space-y-2">
+                  <Button type="button" variant="outline" size="sm" disabled={checkingCloudflare} className="w-full gap-2" onClick={() => void checkCloudflareBuild()}>
+                    {checkingCloudflare && <Loader2 className="size-4 animate-spin" />}
+                    Check my launch progress
+                  </Button>
+                  {cloudflareBuild && (
+                    <div role="status" className="space-y-2 text-xs leading-5">
+                      <Badge variant={cloudflareBuild.state === "passed" ? "default" : "outline"}>
+                        {cloudflareBuild.state === "passed" ? "Build checks passed" :
+                         cloudflareBuild.state === "building" ? "Building" :
+                         cloudflareBuild.state === "failed" ? "Build error" : "Setup not verified"}
+                      </Badge>
+                      <p>{cloudflareBuild.message}</p>
+                      {cloudflareBuild.checksUrl && (
+                        <a href={cloudflareBuild.checksUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-4">View Cloudflare build details ↗</a>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">A passing build check is not yet proof your app works. Open the link provided by Cloudflare and test your app before sharing it or adding a custom domain.</p>
               </section>
             )}
 

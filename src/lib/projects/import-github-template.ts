@@ -48,6 +48,7 @@ function validateSourceRef(template: GithubAppTemplate) {
 export function isAllowedGithubTemplateFile(path: string): boolean {
   if (!isSafeFilePath(path) || !isDeploymentSourcePath(path)) return false;
   if (/(^|\/)(?:\.github|\.git|\.vercel|\.next|node_modules|\.turbo|coverage)(?:\/|$)/i.test(path)) return false;
+  if (/(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|npm-shrinkwrap\.json)$/i.test(path)) return false;
   if (/\.(?:lock|map|min\.js)$/i.test(path)) return false;
   // Binary assets cannot be represented in the editable text file system.
   if (path === ".gitignore" || path === ".env.example" ||
@@ -142,7 +143,13 @@ export async function importGithubTemplateSource(
 ): Promise<GithubImportedProject> {
   validateSourceRef(template);
 
-  let subtreeSha = template.commit;
+  const pinnedCommit = await githubGet<{ tree: { sha: string } }>(
+    `/repos/${template.repository}/git/commits/${template.commit}`
+  );
+  let subtreeSha = pinnedCommit.tree?.sha;
+  if (!/^[a-f0-9]{40}$/.test(subtreeSha ?? "")) {
+    throw new GithubTemplateImportError("The pinned GitHub snapshot is not valid.");
+  }
   for (const part of template.subdirectory.split("/")) {
     const parent = await gitTree(template.repository, subtreeSha);
     if (parent.truncated) throw new GithubTemplateImportError("Template directory listing was truncated.");

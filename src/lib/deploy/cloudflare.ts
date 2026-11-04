@@ -48,7 +48,9 @@ export function prepareCloudflareSource(
   if (credentials) throw new DeployError(`Credential-like content found in ${credentials}. Remove it and use encrypted Cloudflare secrets.`);
 
   const packageFile = source.find(file => file.path === "package.json");
-  if (!packageFile || !paths.has("src/app/page.tsx") || !paths.has("src/app/layout.tsx")) {
+  const usesSrcApp = paths.has("src/app/page.tsx") && paths.has("src/app/layout.tsx");
+  const usesRootApp = paths.has("app/page.tsx") && paths.has("app/layout.tsx");
+  if (!packageFile || (!usesSrcApp && !usesRootApp)) {
     throw new DeployError("A real Next.js App Router project is required. Build the app before preparing Workers.");
   }
   let pkg: Record<string, unknown>;

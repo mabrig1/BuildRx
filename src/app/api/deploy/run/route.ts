@@ -91,13 +91,15 @@ export async function POST(request: Request) {
   // persistence and was the main reason "deployed" apps were not real.
   const fs = getFileSystem(projectId);
   const preview = await fs.read("preview/index.html").catch(() => null);
-  if (!preview) {
+  // A verified Next.js app can be published directly even when its optional
+  // static preview has not been generated.
+  if (!preview && (provider !== "vercel" || session.demo)) {
     return NextResponse.json(
       { error: "Nothing to deploy — run a build first." },
       { status: 400 }
     );
   }
-  const siteFiles = [{ path: "index.html", content: preview.content }];
+  const siteFiles = preview ? [{ path: "index.html", content: preview.content }] : [];
   const entries = await fs.list();
   const projectFiles = (
     await Promise.all(
@@ -150,7 +152,7 @@ export async function POST(request: Request) {
     projectName = `demo-${projectId}`;
   }
 
-  const token = await getProviderToken(provider);
+  const token = session.demo ? null : await getProviderToken(provider);
   if (!session.demo && !token) {
     return NextResponse.json(
       { error: `Connect your ${provider} account first.` },

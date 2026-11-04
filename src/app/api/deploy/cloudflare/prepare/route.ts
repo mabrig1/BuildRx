@@ -95,6 +95,13 @@ export async function POST(request: Request) {
       deployed: false,
       repositoryCreated,
       workerName: prepared.workerName,
+      // Workers Builds must follow the exact branch and worker name pushed
+      // during preparation; the Cloudflare GitHub App installation alone
+      // does not select a repository or deploy it.
+      branch: repository.defaultBranch,
+      buildCommand: "npm run cloudflare:build",
+      deployCommand: "npm run cloudflare:publish",
+      githubInstallationsUrl: "https://github.com/settings/installations",
       repositoryUrl: repository.htmlUrl,
       commitUrl: pushed.commitUrl,
       workflowUrl: `${repository.htmlUrl}/actions/workflows/cloudflare-deploy.yml`,
@@ -102,7 +109,8 @@ export async function POST(request: Request) {
       dashboardUrl: "https://dash.cloudflare.com/",
       instructions: [
         "Your Next.js source and Cloudflare configuration are now in the linked GitHub repository.",
-        "Option A: connect this repository to Cloudflare Workers Builds; build with npm run cloudflare:build and deploy with npm run cloudflare:publish.",
+        "After installing the Cloudflare GitHub App, select or authorize this exact repository in Workers Builds (private repositories need access granted).",
+        "Choose the repository default branch shown above, set the Worker name to match wrangler.jsonc, build with npm run cloudflare:build and deploy with npm run cloudflare:publish.",
         "Option B: add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as GitHub Actions secrets, then use Run workflow.",
         "Verify deployment and configure app/database secrets in Cloudflare before serving customers.",
       ],

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Check,
   Cloud,
+  Copy,
   ChevronDown,
   ChevronRight,
   ExternalLink,
@@ -152,6 +153,10 @@ export function DeployPanel({ projectId }: { projectId: string }) {
     secretsUrl: string;
     dashboardUrl: string;
     workerName: string;
+    branch: string;
+    buildCommand: string;
+    deployCommand: string;
+    githubInstallationsUrl: string;
     repositoryCreated?: boolean;
     instructions: string[];
   }>(null);
@@ -297,6 +302,23 @@ export function DeployPanel({ projectId }: { projectId: string }) {
     }
   }
 
+  async function copyCloudflareSetup() {
+    if (!cloudflareHandoff) return;
+    const settings = [
+      `Worker name: ${cloudflareHandoff.workerName}`,
+      `GitHub repository: ${cloudflareHandoff.repositoryUrl}`,
+      `Production branch: ${cloudflareHandoff.branch}`,
+      `Build command: ${cloudflareHandoff.buildCommand}`,
+      `Deploy command: ${cloudflareHandoff.deployCommand}`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(settings);
+      toast.success("Cloudflare Workers setup copied");
+    } catch {
+      toast.error("Copy unavailable — select the settings shown below");
+    }
+  }
+
   const connected = provider === "cloudflare" || connections[provider];
 
   return (
@@ -357,6 +379,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
               <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3 text-xs leading-5">
                 <strong className="block text-sm">Cloudflare Workers — guided deployment</strong>
                 <p className="mt-1 text-muted-foreground">Connect your GitHub account in the GitHub panel first. Preparing will use the linked repository or automatically create a private repository, then commit the application and its Cloudflare configuration. If you already enabled automatic Cloudflare Builds for the repository, this push may trigger a build.</p>
+                <p className="mt-2">Already clicked <strong>Install</strong> in Cloudflare? That authorizes Cloudflare to see GitHub repositories; it does not sign you into GitHub inside BuildRx. After preparing, select the exact generated app repository in Cloudflare Workers Builds.</p>
                 <p className="mt-2 font-medium">This step prepares deployment; it does not claim a live site or create a custom domain.</p>
               </div>
             )}
@@ -408,15 +431,25 @@ export function DeployPanel({ projectId }: { projectId: string }) {
             {provider === "cloudflare" && cloudflareHandoff && (
               <section aria-live="polite" className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
                 <p className="font-semibold">Source prepared — not yet deployed</p>
-                <p className="mt-1 text-muted-foreground text-xs">Worker name: {cloudflareHandoff.workerName}</p>
+                <p className="mt-1 text-muted-foreground text-xs">GitHub source committed. Cloudflare has not yet confirmed a deployment.</p>
                 {cloudflareHandoff.repositoryCreated && <p className="mt-1 text-xs">A private GitHub repository was created and linked automatically.</p>}
+                <div className="mt-3 space-y-1.5 rounded border bg-background/70 p-2 font-mono text-xs break-all">
+                  <p><span className="font-sans font-semibold">Worker name:</span> {cloudflareHandoff.workerName}</p>
+                  <p><span className="font-sans font-semibold">Branch:</span> {cloudflareHandoff.branch}</p>
+                  <p><span className="font-sans font-semibold">Build:</span> {cloudflareHandoff.buildCommand}</p>
+                  <p><span className="font-sans font-semibold">Deploy:</span> {cloudflareHandoff.deployCommand}</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" className="mt-2 w-full gap-2" onClick={() => void copyCloudflareSetup()}>
+                  <Copy className="size-3.5" /> Copy Cloudflare setup
+                </Button>
                 <div className="mt-3 grid gap-2 text-xs">
                   <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.repositoryUrl} target="_blank" rel="noopener noreferrer">View source on GitHub ↗</a>
                   <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.workflowUrl} target="_blank" rel="noopener noreferrer">Run deployment workflow ↗</a>
                   <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.secretsUrl} target="_blank" rel="noopener noreferrer">Set repository Cloudflare secrets ↗</a>
                   <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.dashboardUrl} target="_blank" rel="noopener noreferrer">Open Cloudflare Workers ↗</a>
+                  <a className="text-primary underline underline-offset-4" href={cloudflareHandoff.githubInstallationsUrl} target="_blank" rel="noopener noreferrer">Allow Cloudflare to access this private GitHub repository ↗</a>
                 </div>
-                <p className="mt-3 text-xs text-muted-foreground">Choose Workers Builds to connect GitHub for automatic updates, or add GitHub Actions secrets and run the prepared workflow manually. Verify the live URL in Cloudflare after deployment succeeds.</p>
+                <p className="mt-3 text-xs text-muted-foreground">Cloudflare → Workers &amp; Pages → Create application → GitHub → select the prepared repository. Match the Worker name exactly, paste the build and deploy commands above, and choose the shown branch. If you installed Cloudflare with selected-repository access, add this private repository in GitHub installations first. Verify the live URL in Cloudflare before connecting a custom domain. Manual GitHub Actions publishing is an alternative.</p>
               </section>
             )}
 

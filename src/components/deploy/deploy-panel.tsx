@@ -144,6 +144,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
   });
   const [token, setToken] = useState("");
   const [deploying, setDeploying] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [liveLog, setLiveLog] = useState<string[]>([]);
   const [history, setHistory] = useState<DeploymentEntry[]>([]);
   const [domain, setDomain] = useState("");
@@ -210,11 +211,12 @@ export function DeployPanel({ projectId }: { projectId: string }) {
     }
   }
 
-  async function deploy() {
+  async function deploy(target: Provider = provider) {
+    setProvider(target);
     setDeploying(true);
     setLiveLog([]);
     try {
-      if (provider === "cloudflare") {
+      if (target === "cloudflare") {
         // This action pushes real app source and a manual deployment workflow
         // to the linked GitHub repository. It is not a production deployment.
         setCloudflareHandoff(null);
@@ -237,7 +239,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
       const response = await fetch("/api/deploy/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, provider }),
+        body: JSON.stringify({ projectId, provider: target }),
       });
       if (!response.ok || !response.body) {
         const data = await response.json().catch(() => null);
@@ -260,7 +262,7 @@ export function DeployPanel({ projectId }: { projectId: string }) {
               setLiveLog((prev) => [...prev, event.line]);
             } else if (event.type === "complete") {
               if (event.status === "live") {
-                toast.success(`Deployed to ${provider}`);
+                toast.success("Your app is live!");
               } else if (event.status === "failed") {
                 toast.error("Deployment failed — see the logs");
               } else {
@@ -275,10 +277,21 @@ export function DeployPanel({ projectId }: { projectId: string }) {
       await load();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Deployment failed"
+        error instanceof Error ? error.message : "Unable to launch your app"
       );
     } finally {
       setDeploying(false);
+    }
+  }
+
+  async function launchApp() {
+    // A connected Vercel account can publish the full Next.js app directly.
+    // Cloudflare is an honest setup handoff until the owner finishes GitHub
+    // authorization and the first Workers Builds configuration.
+    if (connections.vercel) {
+      await deploy("vercel");
+    } else {
+      await deploy("cloudflare");
     }
   }
 
@@ -326,22 +339,53 @@ export function DeployPanel({ projectId }: { projectId: string }) {
       <SheetTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5">
           <Rocket className="size-4" />
-          <span>Deploy</span>
+          <span>Launch</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
         <SheetHeader className="border-b">
           <SheetTitle className="flex items-center gap-2">
             <Rocket className="size-4" />
-            One-click deployment
+            Launch your app
           </SheetTitle>
           <SheetDescription>
-            Deploy your generated app with Cloudflare Workers, Vercel, Netlify, or Railway.
+            No commands or hosting expertise needed to start. Technical options are available only when you want them.
           </SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-5 p-4">
+            {/* Nontechnical first: show one launch action, not a provider catalogue. */}
+            <section className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+              <div>
+                <p className="text-base font-semibold">Ready to share your app?</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {connections.vercel
+                    ? "Publish the verified app and receive a link to share with anyone."
+                    : "We will prepare your app and guide you through a one-time hosting connection. Your app is not public until the host confirms it is live."}
+                </p>
+              </div>
+              <Button type="button" className="w-full gap-2" disabled={deploying} onClick={() => void launchApp()}>
+                {deploying ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+                {deploying ? "Working on your launch…" : connections.vercel ? "Publish my app" : "Start my launch"}
+              </Button>
+              {history.find((entry) => entry.status === "live" && entry.url?.startsWith("https://")) && (
+                <a
+                  className="flex items-center gap-2 text-sm font-medium text-primary underline underline-offset-4"
+                  href={history.find((entry) => entry.status === "live" && entry.url?.startsWith("https://"))!.url!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Globe className="size-4" /> Open my published app <ExternalLink className="size-3.5" />
+                </a>
+              )}
+              <button type="button" className="text-xs text-muted-foreground underline underline-offset-4" onClick={() => setShowAdvanced((value) => !value)}>
+                {showAdvanced ? "Hide advanced hosting options" : "Advanced hosting options (optional)"}
+              </button>
+            </section>
+
+            {showAdvanced && (
+              <>
             {/* Provider picker */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {PROVIDERS.map((p) => (
@@ -427,6 +471,9 @@ export function DeployPanel({ projectId }: { projectId: string }) {
                 </>
               )}
             </Button>
+
+            </>
+            )}
 
             {provider === "cloudflare" && cloudflareHandoff && (
               <section aria-live="polite" className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">

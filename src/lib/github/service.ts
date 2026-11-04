@@ -34,6 +34,7 @@ export async function getConnection(): Promise<{
     .from("integration_connections")
     .select("access_token, account_name")
     .eq("provider", "github")
+    .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
     .maybeSingle();
   return data
     ? { token: data.access_token, accountName: data.account_name }

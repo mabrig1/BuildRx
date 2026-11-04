@@ -34,6 +34,15 @@ export interface PushResult {
   fileCount: number;
 }
 
+export interface CloudflareBuildCheck {
+  state: "not_connected" | "building" | "passed" | "failed" | "unknown";
+  commitSha: string | null;
+  commitUrl: string | null;
+  checksUrl: string | null;
+  checkCount: number;
+}
+
+
 export class GitHubApiError extends Error {
   constructor(
     message: string,
@@ -255,6 +264,72 @@ export class GitHubClient {
         return { path: entry.path, content };
       })
     );
+  }
+
+  /**
+   * Cloudflare Workers Builds reports status as GitHub check-runs.
+   * A passing check is NOT proof that the Worker URL responds correctly.
+   * When Cloudflare's Git integration isn't connected there may be no checks.
+   */
+  async getCloudflareBuildCheck(
+    fullName: string,
+    branch: string
+  ): Promise<CloudflareBuildCheck> {
+    const recent = await this.listCommits(fullName, branch, 1);
+    const commit = recent[0];
+    if (!commit) {
+      return {
+        state: "unknown", commitSha: null, commitUrl: null,
+        checksUrl: null, checkCount: 0,
+      };
+    }
+    const checks = await this.request<{
+      check_runs: Array<{
+        status: string;
+        conclusion: string | null;
+        html_url?: string;
+        details_url?: string;
+        name: string;
+        app?: { name?: string; slug?: string } | null;
+      }>;
+    }>("GET", `/repos/${fullName}/commits/${commit.sha}/check-runs?per_page=100`);
+
+    // Do not interpret arbitrary GitHub CI/Vercel success as a Cloudflare deployment.
+    const cf = (checks.check_runs ?? []).filter(
+      (run) => /cloudflare/i.test(
+        [run.app?.name, run.app?.slug, run.name].filter(Boolean).join(" ")
+      )
+    );
+    const state: CloudflareBuildCheck["state"] =
+      cf.length === 0 ? "not_connected"
+      : cf.some((run) => run.conclusion === "failure" || run.conclusion === "cancelled" || run.conclusion === "timed_out")
+        ? "failed"
+      : cf.some((run) => run.status !== "completed")
+        ? "building"
+      : cf.every((run) => run.conclusion === "success")
+        ? "passed"
+      : "unknown";
+    const details = cf.find((run) => run.details_url || run.html_url);
+    const candidate = details?.details_url ?? details?.html_url;
+    let checksUrl: string | null = null;
+    if (candidate) {
+      try {
+        const url = new URL(candidate);
+        if (url.protocol === "https:" &&
+            (url.hostname === "github.com" ||
+             url.hostname === "dash.cloudflare.com" ||
+             url.hostname === "www.cloudflare.com" ||
+             url.hostname === "cloudflare.com")) {
+          checksUrl = url.toString();
+        }
+      } catch {
+        // Never link to an untrusted check URL.
+      }
+    }
+    return {
+      state, commitSha: commit.sha, commitUrl: commit.url,
+      checksUrl, checkCount: cf.length,
+    };
   }
 
   async listCommits(

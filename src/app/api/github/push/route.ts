@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getFileSystem } from "@/lib/files/manager";
+import { fileWithEmbeddedCredential, isDeploymentSourcePath } from "@/lib/deploy/source";
 import { GitHubApiError, GitHubClient } from "@/lib/github/client";
 import {
   demoCommit,
@@ -35,7 +36,16 @@ export async function POST(request: Request) {
   }
   const { projectId, message } = parsed.data;
 
-  const files = await getFileSystem(projectId).list();
+  if (!session.demo) {
+    const supabase = await createClient();
+    const { data: ownedProject, error } = await supabase.from("projects")
+      .select("id").eq("id", projectId).eq("owner_id", session.userId!).maybeSingle();
+    if (error) return NextResponse.json({ error: "Unable to verify app ownership." }, { status: 503 });
+    if (!ownedProject) return NextResponse.json({ error: "App not found." }, { status: 404 });
+  }
+
+  const files = (await getFileSystem(projectId).list())
+    .filter((file) => isDeploymentSourcePath(file.path));
   if (files.length === 0) {
     return NextResponse.json(
       { error: "No files to push — run a build first." },
@@ -72,8 +82,9 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: project } = await supabase
     .from("projects")
-    .select("github_repo")
+.select("github_repo")
     .eq("id", projectId)
+    .eq("owner_id", session.userId!)
     .maybeSingle();
   if (!project?.github_repo) {
     return NextResponse.json(
@@ -87,6 +98,12 @@ export async function POST(request: Request) {
     const contents = await Promise.all(
       files.map(async ({ path }) => (await fs.read(path))!)
     );
+    const credentialFile = fileWithEmbeddedCredential(contents);
+    if (credentialFile) {
+      return NextResponse.json({
+        error: `Source file ${credentialFile} may contain a secret. Remove the value and use your hosting provider's encrypted settings instead.`,
+      }, { status: 409 });
+    }
     const client = new GitHubClient(connection.token);
     const repo = await client.getRepo(project.github_repo);
     const result = await client.pushFiles(

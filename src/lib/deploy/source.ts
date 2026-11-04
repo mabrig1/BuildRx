@@ -2,7 +2,11 @@
 export function isDeploymentSourcePath(path: string): boolean {
   if (path.startsWith("preview/")) return false;
   if (path === ".env.example") return true;
-  return !/(^|\/)\.env(?:\..*)?$/.test(path);
+  // Generated code is untrusted. Never upload provider credentials,
+  // local package auth config, VCS internals or machine-only files.
+  if (/(^|\/)(?:\.git|\.github|node_modules|\.next|\.open-next)(?:\/|$)/i.test(path)) return false;
+  if (/(^|\/)(?:\.dev\.vars(?:\..*)?|\.npmrc|\.pnp\.cjs|\.env(?:\..*)?)$/i.test(path)) return false;
+  return true;
 }
 
 const CREDENTIAL_PATTERNS = [

@@ -23,6 +23,7 @@ export async function getProviderToken(
     .from("integration_connections")
     .select("access_token")
     .eq("provider", provider)
+    .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
     .maybeSingle();
   return data?.access_token ?? null;
 }

@@ -69,7 +69,8 @@ export async function GET() {
   const { data } = await supabase
     .from("integration_connections")
     .select("provider")
-    .in("provider", ["vercel", "netlify", "railway"]);
+    .in("provider", ["vercel", "netlify", "railway"])
+    .eq("user_id", session.userId!);
   const connected = new Set((data ?? []).map((row) => row.provider));
   return NextResponse.json({
     connections: {
@@ -152,6 +153,7 @@ export async function DELETE(request: Request) {
   await supabase
     .from("integration_connections")
     .delete()
-    .eq("provider", parsed.data.provider);
+    .eq("provider", parsed.data.provider)
+    .eq("user_id", session.userId!);
   return NextResponse.json({ connected: false });
 }

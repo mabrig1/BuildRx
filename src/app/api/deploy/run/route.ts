@@ -31,32 +31,22 @@ const runSchema = z.object({
   provider: z.enum(["vercel", "netlify", "railway"]),
 });
 
-const DEMO_URLS: Record<DeployProviderName, (slug: string) => string> = {
-  vercel: (slug) => `https://${slug}.vercel.app`,
-  netlify: (slug) => `https://${slug}.netlify.app`,
-  railway: (slug) => `https://${slug}.up.railway.app`,
-};
-
 async function simulateDeploy(
   provider: DeployProviderName,
-  slug: string,
   log: (line: string) => void
 ): Promise<DeployOutcome> {
   const steps = [
-    `Authenticating with ${provider}…`,
-    "Uploading site files…",
-    "Build started",
-    "Build completed",
-    "Assigning URL…",
+    `Demonstrating the ${provider} publish flow…`,
+    "Demo projects cannot publish live apps. Sign in to save and launch a real project.",
   ];
   for (const step of steps) {
     log(step);
     await new Promise((r) => setTimeout(r, 350));
   }
   return {
-    status: "live",
-    url: DEMO_URLS[provider](slug),
-    providerId: `sim_${Date.now()}`,
+    status: "failed",
+    url: null,
+    providerId: null,
   };
 }
 
@@ -74,19 +64,42 @@ export async function POST(request: Request) {
   }
   const { projectId, provider } = parsed.data;
 
+  // Prevent expired, unauthorized, or unverified releases before reading
+  // project files, accessing provider credentials or spending deploy credits.
+  if (!session.demo) {
+    const supabase = await createClient();
+    const { data: ownProject, error: ownerError } = await supabase
+      .from("projects")
+      .select("name, status, github_repo")
+      .eq("id", projectId)
+      .eq("owner_id", session.userId!)
+      .maybeSingle();
+    if (ownerError) {
+      return NextResponse.json({ error: "Unable to verify app ownership." }, { status: 503 });
+    }
+    if (!ownProject) {
+      return NextResponse.json({ error: "App not found." }, { status: 404 });
+    }
+    if (ownProject.status !== "ready") {
+      return NextResponse.json({ error: "Your app needs to pass its checks before it can go live. Rebuild or repair it first." }, { status: 409 });
+    }
+  }
+
   // Gather the static preview plus the complete generated project. A
   // Vercel deployment must receive the Next.js source tree, not only
   // preview/index.html; the latter is a mock preview with no API or
   // persistence and was the main reason "deployed" apps were not real.
   const fs = getFileSystem(projectId);
   const preview = await fs.read("preview/index.html").catch(() => null);
-  if (!preview) {
+  // A verified Next.js app can be published directly even when its optional
+  // static preview has not been generated.
+  if (!preview && (provider !== "vercel" || session.demo)) {
     return NextResponse.json(
       { error: "Nothing to deploy — run a build first." },
       { status: 400 }
     );
   }
-  const siteFiles = [{ path: "index.html", content: preview.content }];
+  const siteFiles = preview ? [{ path: "index.html", content: preview.content }] : [];
   const entries = await fs.list();
   const projectFiles = (
     await Promise.all(
@@ -97,6 +110,16 @@ export async function POST(request: Request) {
   )
     .filter((file): file is NonNullable<typeof file> => Boolean(file))
     .map((file) => ({ path: file.path, content: file.content }));
+  if (!session.demo && (
+    !projectFiles.some((file) => file.path === "package.json") ||
+    !projectFiles.some((file) => file.path === "src/app/page.tsx") ||
+    !projectFiles.some((file) => file.path === "src/app/layout.tsx")
+  )) {
+    return NextResponse.json(
+      { error: "Your app source is incomplete. Run Repair and verify a real application before publishing." },
+      { status: 409 }
+    );
+  }
   const credentialFile = fileWithEmbeddedCredential(projectFiles);
   if (credentialFile) {
     return NextResponse.json(
@@ -116,6 +139,7 @@ export async function POST(request: Request) {
       .from("projects")
       .select("name, github_repo")
       .eq("id", projectId)
+      .eq("owner_id", session.userId!)
       .maybeSingle();
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -128,15 +152,14 @@ export async function POST(request: Request) {
     projectName = `demo-${projectId}`;
   }
 
-  const token = await getProviderToken(provider);
-  if (!session.demo && !token && provider !== "railway") {
+  const token = session.demo ? null : await getProviderToken(provider);
+  if (!session.demo && !token) {
     return NextResponse.json(
       { error: `Connect your ${provider} account first.` },
       { status: 400 }
     );
   }
 
-  const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "site";
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
@@ -183,9 +206,11 @@ export async function POST(request: Request) {
               ? "nextjs"
               : null,
         };
-        if (!token) {
-          outcome = await simulateDeploy(provider, slug, log);
-          log("(Simulated — connect a provider token for real deploys.)");
+        if (session.demo) {
+          outcome = await simulateDeploy(provider, log);
+          log("(Demo only — no real app was published.)");
+        } else if (!token) {
+          throw new DeployError("Connect your hosting account before publishing.");
         } else if (provider === "vercel") {
           outcome = await deployToVercel(token, input, log);
         } else if (provider === "netlify") {
@@ -196,7 +221,9 @@ export async function POST(request: Request) {
         log(
           outcome.status === "live"
             ? `Deployed: ${outcome.url}`
-            : "Deployment queued."
+            : outcome.status === "failed"
+              ? "Not published."
+              : "Deployment queued."
         );
       } catch (error) {
         const message =

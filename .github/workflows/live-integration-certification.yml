@@ -9,6 +9,9 @@ permissions:
 
 jobs:
   certify:
+    # Nightly certification is opt-in until dedicated integration secrets exist.
+    # Manual runs still execute preflight and report exactly what is missing.
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.LIVE_CERT_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     environment: live-certification
     timeout-minutes: 20

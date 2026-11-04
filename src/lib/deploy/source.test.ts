@@ -18,6 +18,13 @@ describe("isDeploymentSourcePath", () => {
     }
   );
 
+  it.each([".dev.vars", ".dev.vars.production", "apps/site/.dev.vars", ".npmrc", ".github/workflows/untrusted.yml", ".git/config", "node_modules/react/index.js", ".next/server/app.js"])(
+    "excludes deployment-unsafe file %s",
+    (path) => {
+      expect(isDeploymentSourcePath(path)).toBe(false);
+    }
+  );
+
   it("excludes the static preview from a full source deploy", () => {
     expect(isDeploymentSourcePath("preview/index.html")).toBe(false);
   });

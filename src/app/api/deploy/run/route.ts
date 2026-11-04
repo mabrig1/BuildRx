@@ -74,6 +74,27 @@ export async function POST(request: Request) {
   }
   const { projectId, provider } = parsed.data;
 
+  // Prevent expired, unauthorized, or unverified releases before reading
+  // project files, accessing provider credentials or spending deploy credits.
+  if (!session.demo) {
+    const supabase = await createClient();
+    const { data: ownProject, error: ownerError } = await supabase
+      .from("projects")
+      .select("name, status, github_repo")
+      .eq("id", projectId)
+      .eq("owner_id", session.userId!)
+      .maybeSingle();
+    if (ownerError) {
+      return NextResponse.json({ error: "Unable to verify app ownership." }, { status: 503 });
+    }
+    if (!ownProject) {
+      return NextResponse.json({ error: "App not found." }, { status: 404 });
+    }
+    if (ownProject.status !== "ready") {
+      return NextResponse.json({ error: "Your app needs to pass its checks before it can go live. Rebuild or repair it first." }, { status: 409 });
+    }
+  }
+
   // Gather the static preview plus the complete generated project. A
   // Vercel deployment must receive the Next.js source tree, not only
   // preview/index.html; the latter is a mock preview with no API or
@@ -97,6 +118,16 @@ export async function POST(request: Request) {
   )
     .filter((file): file is NonNullable<typeof file> => Boolean(file))
     .map((file) => ({ path: file.path, content: file.content }));
+  if (!session.demo && (
+    !projectFiles.some((file) => file.path === "package.json") ||
+    !projectFiles.some((file) => file.path === "src/app/page.tsx") ||
+    !projectFiles.some((file) => file.path === "src/app/layout.tsx")
+  )) {
+    return NextResponse.json(
+      { error: "Your app source is incomplete. Run Repair and verify a real application before publishing." },
+      { status: 409 }
+    );
+  }
   const credentialFile = fileWithEmbeddedCredential(projectFiles);
   if (credentialFile) {
     return NextResponse.json(
@@ -116,6 +147,7 @@ export async function POST(request: Request) {
       .from("projects")
       .select("name, github_repo")
       .eq("id", projectId)
+      .eq("owner_id", session.userId!)
       .maybeSingle();
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -129,7 +161,7 @@ export async function POST(request: Request) {
   }
 
   const token = await getProviderToken(provider);
-  if (!session.demo && !token && provider !== "railway") {
+  if (!session.demo && !token) {
     return NextResponse.json(
       { error: `Connect your ${provider} account first.` },
       { status: 400 }
@@ -183,9 +215,9 @@ export async function POST(request: Request) {
               ? "nextjs"
               : null,
         };
-        if (!token) {
+        if (session.demo) {
           outcome = await simulateDeploy(provider, slug, log);
-          log("(Simulated — connect a provider token for real deploys.)");
+          log("(Demo only — no real app was published.)");
         } else if (provider === "vercel") {
           outcome = await deployToVercel(token, input, log);
         } else if (provider === "netlify") {

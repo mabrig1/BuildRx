@@ -31,32 +31,22 @@ const runSchema = z.object({
   provider: z.enum(["vercel", "netlify", "railway"]),
 });
 
-const DEMO_URLS: Record<DeployProviderName, (slug: string) => string> = {
-  vercel: (slug) => `https://${slug}.vercel.app`,
-  netlify: (slug) => `https://${slug}.netlify.app`,
-  railway: (slug) => `https://${slug}.up.railway.app`,
-};
-
 async function simulateDeploy(
   provider: DeployProviderName,
-  slug: string,
   log: (line: string) => void
 ): Promise<DeployOutcome> {
   const steps = [
-    `Authenticating with ${provider}…`,
-    "Uploading site files…",
-    "Build started",
-    "Build completed",
-    "Assigning URL…",
+    `Demonstrating the ${provider} publish flow…`,
+    "Demo projects cannot publish live apps. Sign in to save and launch a real project.",
   ];
   for (const step of steps) {
     log(step);
     await new Promise((r) => setTimeout(r, 350));
   }
   return {
-    status: "live",
-    url: DEMO_URLS[provider](slug),
-    providerId: `sim_${Date.now()}`,
+    status: "failed",
+    url: null,
+    providerId: null,
   };
 }
 
@@ -168,7 +158,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "site";
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
@@ -216,7 +205,7 @@ export async function POST(request: Request) {
               : null,
         };
         if (session.demo) {
-          outcome = await simulateDeploy(provider, slug, log);
+          outcome = await simulateDeploy(provider, log);
           log("(Demo only — no real app was published.)");
         } else if (provider === "vercel") {
           outcome = await deployToVercel(token, input, log);

@@ -71,7 +71,7 @@ export async function projectPreviewResponse(projectId: string, allowDemoPlaceho
       // back to DENY and blocked the workspace's own preview iframe
       // (ERR_BLOCKED_BY_RESPONSE) even though it is same-origin.
       "Content-Security-Policy":
-        "default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'; frame-ancestors 'self'",
+        "default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'; frame-ancestors 'self'",
       // Owner-scoped content — never let shared caches store it.
       "Cache-Control": "private, no-store",
     },

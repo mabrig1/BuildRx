@@ -45,7 +45,7 @@ const originals: readonly TemplateGuide[] = BEGINNER_CODE_TEMPLATES.map(t => {
   const isTask = t.id === "beginner-task-planner";
   return {
     id: t.id, name: t.name, description: t.description,
-    category: isStock ? "Inventory" : isTask ? "Dashboards" : "Business apps",
+    category: (isStock ? "Inventory" : isTask ? "Dashboards" : "Business apps") as TemplateCategory,
     difficulty: "Beginner" as const,
     state: "source-reviewed" as const,
     origin: "BuildRx original" as const,
@@ -68,9 +68,9 @@ const originals: readonly TemplateGuide[] = BEGINNER_CODE_TEMPLATES.map(t => {
 
 const github: readonly TemplateGuide[] = GITHUB_APP_TEMPLATES.map(t => ({
   id: t.id, name: t.name, description: t.description,
-  category: t.id === "github-supabase-starter" ? "Business apps" :
+  category: (t.id === "github-supabase-starter" ? "Business apps" :
     t.id === "github-blog-starter" ? "Education" :
-    t.id === "github-context-counter" ? "Dashboards" : "E-commerce",
+    t.id === "github-context-counter" ? "Dashboards" : "E-commerce") as TemplateCategory,
   difficulty: t.difficulty,
   state: "source-reviewed" as const,
   origin: "Pinned GitHub" as const,

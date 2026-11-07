@@ -1,0 +1,24 @@
+{
+  // TEMPLATE ONLY: this file is not a deployable config until the founder
+  // provisions a paid Workers for Platforms plan, staging namespace, KV and DNS.
+  // It is intentionally NOT named wrangler.jsonc and is never read by CI.
+  "name": "buildrx-dispatcher-staging-example",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-07",
+  "workers_dev": false,
+  "vars": {
+    "APP_BASE_DOMAIN": "apps.example.com"
+  },
+  "dispatch_namespaces": [
+    {
+      "binding": "TENANT_WORKERS",
+      "namespace": "buildrx-staging"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "APP_ROUTES",
+      "id": "REPLACE_WITH_VERIFIED_PLATFORM_KV_ID"
+    }
+  ]
+}

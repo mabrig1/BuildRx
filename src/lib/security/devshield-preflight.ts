@@ -6,7 +6,7 @@
  *
  * This is a bounded static check, not an antivirus or a "safe to execute" verdict.
  */
-import "server-only";
+import { Buffer } from "node:buffer";
 
 export interface DevShieldSourceFile {
   path: string;

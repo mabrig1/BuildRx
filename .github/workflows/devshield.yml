@@ -1,0 +1,29 @@
+name: DevShield security review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Review changed source without executing it
+        # Immutable merged DevShield security preflight from PR #42.
+        uses: mabrig1/mabrig-devshield-ai@92a54b59170ff150387f63e1bfeb92a0151964f5
+        with:
+          fail-on: high
+          scan-scope: changed-lines
+          policy: balanced
+          comment: false
+          dependency-review: false
+          exclude-paths: '**/*.test.ts,**/*.test.tsx,test/**,docs/**'
+          openrouter-api-key: ''

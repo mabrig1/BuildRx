@@ -1,74 +1,67 @@
-# BuildRx App Template Library
+# BuildRx Beginner App Template Vault
 
-BuildRx provides two different starting points for vibe coders, both available from
-**New project**.
+BuildRx now has **three distinct starting points**, with clear labels so beginners know what is real source code versus an app idea.
 
-## 1. Choose an app idea — 24 editable briefs
+Open **App Templates** in the BuildRx sidebar or **Projects → Browse code templates** to search, filter and copy a project. The **New project** dialog also offers starter cloning.
 
-Use the search box or category picker to find a working specification for:
-online shops, booking, courses, CRM, research, SaaS, inventory/POS,
-restaurants, schools, church administration, event ticketing, rentals,
-invoicing, delivery services, academic printing, jobs, scholarships,
-NGO programs, clinic scheduling, hotel bookings, real estate, communities,
-creator studios and local business directories.
+## 1. Original, editable beginner apps (4)
 
-Each brief preloads real requirements: user roles, pages, workflow,
-database tables, validation, accessibility, privacy controls and
-testable acceptance criteria. The brief is **not** a deployed app.
-Choose one, adjust the specification, create the project and run the AI build.
+These are small, original MIT-licensed Next.js App Router projects with real code and a beginner README. They are built into BuildRx, require no GitHub requests, and import offline. There is **no external account or paid API** required to clone or try the example.
 
-## 2. Clone reviewed GitHub code — two pinned sources
+| Template | What already works | What needs development |
+| --- | --- | --- |
+| Business Website | Responsive service cards, contact-by-email link, CSS | Replace contact placeholders; add true bookings or payment if wanted |
+| Personal Portfolio | Responsive biography, project cards, email contact | Replace content; add real project links/media |
+| My Task Planner | Add, complete and delete tasks; local browser storage | Real authentication, cloud sync and backend database |
+| Small Shop Stock List | Add products; adjust counts and display low stock; browser storage | Database, role permissions, transaction safety and real POS integrations |
 
-BuildRx also offers **Clone to my project** for these official open-source
-Next.js examples:
+Browser storage is only a **local demo** on one device, not a production database. No sensitive personal information or financial accounts should use this data store. Cloned projects include `README.md`, `BUILD-RX-SOURCE.md`, and `LICENSE`.
 
-| BuildRx name | Upstream | License | Additional setup |
+Each template imports as a **private Draft**. Cloning does not execute npm scripts or initiate deployment.
+
+## 2. Approved, commit-pinned GitHub clones (4)
+
+All four sources originate from **Vercel's official MIT-licensed Next.js examples** at immutable commit
+`cc65c414d283e22e587828c94770d9b12522bbb4`. These were checked for App Router structure and have no install-time hooks in their example `package.json`.
+
+| Template | Repository subtree | Level | Dependency |
 | --- | --- | --- | --- |
-| Editorial Blog | [Vercel blog-starter](https://github.com/vercel/next.js/tree/cc65c414d283e22e587828c94770d9b12522bbb4/examples/blog-starter) | MIT | Content, images, dependency review |
-| Login & Database Starter | [Vercel with-supabase](https://github.com/vercel/next.js/tree/cc65c414d283e22e587828c94770d9b12522bbb4/examples/with-supabase) | MIT | User-owned Supabase credentials and callback configuration |
+| Editorial Blog | `examples/blog-starter` | Beginner | Content, images and dependency review |
+| Login & Database | `examples/with-supabase` | Intermediate | **Your own** Supabase credentials and configuration |
+| Simple Website | `examples/basic-css` | Beginner | No external service; learn CSS Modules |
+| Interactive Counter | `examples/with-context-api` | Beginner | No external service; shared React Context state |
 
-These examples contain **real third-party source code**, copied from the
-immutable Git commit above rather than generated from a text prompt.
-BuildRx preserves the upstream MIT LICENSE and creates
-`BUILD-RX-SOURCE.md` with the source URL and commit for attribution.
+Source: https://github.com/vercel/next.js/tree/cc65c414d283e22e587828c94770d9b12522bbb4/examples
 
-### Clone workflow
+**Security measures:** the importer accepts **catalog IDs only**; user-supplied repository URLs, branches, commits and file paths cannot control the source. It traverses an immutable commit and refuses truncated trees, excessive file sizes, malformed/binary files, secrets, install-time hooks and suspicious source via DevShield. Each clone includes the original upstream license and immutable GitHub link in `BUILD-RX-SOURCE.md`.
 
-1. Sign in to BuildRx with persistent storage enabled.
-2. Click **New project → Clone real open-source code from GitHub**.
-3. Choose a source and click **Clone to my project**.
-4. BuildRx saves approved UTF-8 code files into a new private **Draft**
-   project. Open the file editor, review dependencies and customize.
-5. Add missing assets and required application credentials through
-   secure provider settings. Test your app before enabling a live deployment.
+The text-only workspace omits binary images, fonts, lockfiles and GitHub Actions workflows. Some third-party examples therefore need assets restored and dependencies reviewed before they will build correctly. **An approved catalog entry is not a guarantee of malware-free or production-ready code.** No imported source is compiled or executed on the BuildRx web server.
 
-No personal GitHub token is needed to read these public examples.
+GitHub may rate-limit unauthenticated downloads; `GITHUB_TEMPLATE_READ_TOKEN` is an optional **server-only** read token for operators and is not needed by customers. Avoid exposing it to the browser.
 
-## Safeguards and limits
+## 3. Original app idea briefs (24)
 
-- The server accepts only catalog template IDs. Repository, commit, path and
-  license are pinned server-side; arbitrary user-supplied URLs cannot be
-  cloned through this endpoint.
-- Third-party source is never executed on the BuildRx web server.
-- `.env`, local credentials, GitHub Actions workflows, package-manager
-  lockfiles, generated build directories and binaries are not imported.
-  A scan blocks recognized embedded credentials and installation hooks.
-- Each text file is limited to 90 kB, the import to 140 editable source
-  files and 1.5 MB, and projects respect existing account creation limits.
-- Binary photographs, fonts and videos are not stored by the current
-  text-only virtual file editor; missing assets must be added separately.
-- Public GitHub API requests are subject to rate limits. An optional
-  **server-only** `GITHUB_TEMPLATE_READ_TOKEN` raises authorized read
-  capacity and must never be exposed to the browser.
-- A clone does not establish working authentication, payments, databases,
-  email or a deployed Worker. Imported projects begin as **Draft**, not Ready.
-- Upstream dependencies may be newer than the BuildRx Cloudflare OpenNext
-  deployment adapter; check runtime compatibility and security advisories.
+These are **editable written specifications**, not source code or deployed apps. Select school management, inventory, bookings, print hub, scholarships, CRM, ministry administration, creator studio and other use cases. BuildRx seeds the prompt into the new workspace where the AI build workflow must still generate and test the app.
 
-## Adding future GitHub code templates
+## Beginner journey
 
-Before adding another source, verify its repository origin, complete license,
-direct file list, source integrity, dependencies, external-service needs
-and application router structure. Pin a specific Git commit and test an
-import. Do not copy unlicensed or unknown third-party repositories into
-BuildRx or expose arbitrary URL cloning.
+1. Open **App Templates** and choose **Beginner**.
+2. Filter between **BuildRx originals** (no network required to prepare files) and **Pinned GitHub** (real upstream source).
+3. Choose a template and click **Clone to my project**.
+4. Sign in to save a **private Draft**. BuildRx checks source and saves the files with their origin/license details.
+5. Edit `app/page.tsx` (or `src/app/page.tsx`) and styling to make the project yours.
+6. Follow the README, review package dependencies and add any necessary service integrations.
+7. Use existing BuildRx build and security verification before publishing. A clone alone is never a live URL.
+8. When desired, export your own project as a ZIP using the existing project export workflow.
+
+## Guardrails and scope
+
+- Catalog selection is server-side allowlisted, with existing account project limits and owner-scoped persistence.
+- Before creating a project, BuildRx screens the entire editable source snapshot with DevShield.
+- A failed import removes its partial private draft; no permission or data grants are made by cloning.
+- Third-party dependency vulnerabilities are not fully covered by static pattern scanning; dependencies need separate review.
+- A source clone is not a payment, a deployed app or proof of a verified database.
+- Adding another external repo requires origin verification, a compatible license and preserved attribution, an **immutable commit**, checking every imported editable file, realistic user instructions and regression tests.
+- Do **not** enable arbitrary URL cloning, untrusted build hooks, uploaded binary files, or automatic deployment as a shortcut.
+
+All additions are reversible and require no new secrets, migrations, paid APIs, Cloudflare resources or production data updates.

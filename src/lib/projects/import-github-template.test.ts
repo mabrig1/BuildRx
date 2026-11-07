@@ -16,7 +16,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("curated GitHub app templates", () => {
   it("pins reviewed public MIT sources rather than accepting arbitrary URLs", () => {
-    expect(GITHUB_APP_TEMPLATES).toHaveLength(2);
+    expect(GITHUB_APP_TEMPLATES).toHaveLength(4);
     for (const template of GITHUB_APP_TEMPLATES) {
       expect(template.commit).toMatch(/^[a-f0-9]{40}$/);
       expect(template.repository).toBe("vercel/next.js");
@@ -24,6 +24,10 @@ describe("curated GitHub app templates", () => {
       expect(template.sourceUrl).toContain(template.commit);
     }
     expect(findGithubAppTemplate("not-approved")).toBeUndefined();
+    expect(GITHUB_APP_TEMPLATES.map(t => t.subdirectory)).toEqual(expect.arrayContaining([
+      "examples/basic-css", "examples/with-context-api",
+    ]));
+    expect(GITHUB_APP_TEMPLATES.every(t => t.difficulty && typeof t.requiresExternalService === "boolean")).toBe(true);
   });
 
   it("rejects hidden credentials, CI workflows and package manager lockfiles", () => {

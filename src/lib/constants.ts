@@ -6,6 +6,7 @@ import {
   GraduationCap,
   HeartPulse,
   LayoutDashboard,
+  LayoutTemplate,
   Mail,
   Settings,
   ShieldCheck,
@@ -120,6 +121,7 @@ export type NavItem = {
 export const dashboardNav: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Projects", href: "/projects", icon: FolderKanban },
+  { title: "App Templates", href: "/templates", icon: LayoutTemplate },
   { title: "AI Chat", href: "/chat", icon: Bot },
   { title: "Tech+ Course", href: "/course", icon: GraduationCap },
   { title: "Guide", href: "/guide", icon: BookOpen },

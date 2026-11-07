@@ -108,14 +108,15 @@ export function GuidedClonePanel({ template, onClose }: { template: TemplateGuid
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ templateId: template.id }),
       });
-      const result: { projectId?: unknown; error?: unknown; imported?: unknown; deployed?: unknown } =
+      const result: { projectId?: unknown; error?: unknown; imported?: unknown; deployed?: unknown; verified?: unknown } =
         await response.json().catch(() => ({}));
       if (response.status === 401) {
         toast.error("Sign in to save a private Draft. Your local checklist remains on this device.");
         return;
       }
       if (!response.ok || result.imported !== true || typeof result.projectId !== "string" ||
-          result.deployed !== false) {
+          result.deployed !== false || result.verified !== false ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result.projectId)) {
         throw new Error(typeof result.error === "string" ? result.error : "Import was not confirmed.");
       }
       setProgress(p => ({ ...p, projectId: result.projectId as string }));

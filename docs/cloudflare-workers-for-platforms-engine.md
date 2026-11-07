@@ -1,5 +1,20 @@
 # Cloudflare Workers for Platforms: isolated-artifact release boundary (November 7, 2026)
 
+## Relationship to companion PR #48
+
+PR #48 independently adds a staging-only HMAC uploader and a disabled-by-default
+standalone tenant dispatch Worker. This PR adds a **separate higher-assurance
+Ed25519 signed artifact/lease contract** for future promotion, plus WfP operator
+readiness and nonce-bound exact-host smoke checks. Both upload adapters are
+currently **unwired and disabled**. Before any actual release executor is
+connected, consolidate these into **one** controlled upload path; do not maintain
+two competing production uploaders. The smoke check targets PR #48's
+subdomain-based dispatch routing and same tenant/project worker hash.
+
+The smoke verifier cannot replace pre-live staging certification: PR #48's
+dispatcher intentionally routes only `live` records. A separate private staging
+probe/route is needed before promotion.
+
 ## Objective
 
 Give BuildRx customers a future **one-click Publish** flow without requiring GitHub or Cloudflare accounts. This PR is an executable, tested provider adapter and readiness/smoke-check contract, NOT a live release mechanism. User-facing publishing remains the existing verified provider flow and the guided Cloudflare handoff.

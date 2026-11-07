@@ -4,6 +4,7 @@
  * certification; auth, data writes and integration checks are separate.
  */
 import { randomBytes } from "node:crypto";
+import { isIP } from "node:net";
 import { managedWfpScriptName } from "./cloudflare-wfp-artifact";
 
 const HOSTNAME = /^(?=.{4,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
@@ -31,9 +32,12 @@ export async function probeWfpWorker(
   const failure: WfpSmokeResult = {
     passed: false, checks: { https: false, nonceEcho: false, artifactDigestEcho: false },
   };
+  const configuredHost = process.env.BUILDRX_WFP_DISPATCH_HOST?.trim() ?? "";
   if (!DIGEST.test(input.expectedArtifactDigest) ||
       !HOSTNAME.test(input.operatorDispatchHostname) ||
-      input.verifiedHostname !== input.operatorDispatchHostname) return failure;
+      isIP(input.operatorDispatchHostname) !== 0 ||
+      !configuredHost || configuredHost !== input.operatorDispatchHostname ||
+      input.verifiedHostname !== configuredHost) return failure;
 
   let scriptName: string;
   try { scriptName = managedWfpScriptName(input.projectId); }

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { scanDevShieldSource } from "@/lib/security/devshield-preflight";
 import { fileWithEmbeddedCredential, isDeploymentSourcePath } from "./source";
 
 export interface ManagedSourceFile { path: string; content: string }
@@ -27,6 +28,8 @@ export type ManagedBlocker =
   | "project_not_ready"
   | "source_invalid"
   | "source_credentials_detected"
+  | "security_scan_incomplete"
+  | "security_scan_failed"
   | "source_verification_missing"
   | "source_verification_stale"
   | "source_verification_failed"
@@ -98,7 +101,15 @@ export function evaluateManagedPreflight(input: {
   let sourceDigest: string | null = null;
   if (!validSource(source)) blockers.push("source_invalid");
   else if (fileWithEmbeddedCredential(source)) blockers.push("source_credentials_detected");
-  else sourceDigest = digestSource(source);
+  else {
+    // Managed preflight must incorporate the same fail-closed malware checks
+    // enforced before GitHub/Cloudflare handoff and direct deployment.
+    // No source is executed, transferred or returned to the caller.
+    const security = scanDevShieldSource(source);
+    if (!security.complete) blockers.push("security_scan_incomplete");
+    else if (security.status === "blocked") blockers.push("security_scan_failed");
+    else sourceDigest = digestSource(source);
+  }
 
   if (!input.verification) blockers.push("source_verification_missing");
   else if (!sourceDigest || input.verification.sourceDigest !== sourceDigest)

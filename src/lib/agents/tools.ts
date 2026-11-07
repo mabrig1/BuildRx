@@ -28,6 +28,8 @@
  * - Migrations are written as files into the generated project; they
  *   are never executed against BuildRx's own database.
  */
+import { projectPreviewResponse } from "@/lib/preview/response";
+import { withTimeout } from "@/lib/health/retry";
 import { isSafeFilePath } from "@/lib/agents/llm";
 import type { GeneratedFile, WorkflowContext } from "@/lib/agents/types";
 
@@ -182,35 +184,19 @@ export async function recentProjectLogs(
   }
 }
 
-/**
- * Fetch the published preview from the outside, the way a browser
- * would — the only honest server-side check that "the preview renders".
- * Returns null when no base URL is known (nothing to fetch against).
- */
-export async function verifyPreviewResponds(
-  projectId: string
-): Promise<{ ok: boolean; detail: string } | null> {
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  if (!base) return null;
-
+/** Verify the actual preview handler under the build owner's active request. */
+export async function verifyPreviewResponds(projectId: string) {
   try {
-    const response = await fetch(`${base.replace(/\/$/, "")}/api/preview/${projectId}`, {
-      signal: AbortSignal.timeout(TOOL_LIMITS.verifyFetchTimeoutMs),
-      headers: { Accept: "text/html" },
-    });
-    if (!response.ok) {
-      return { ok: false, detail: `preview returned HTTP ${response.status}` };
-    }
+    const response = await withTimeout(
+      () => projectPreviewResponse(projectId), TOOL_LIMITS.verifyFetchTimeoutMs, "Saved preview read"
+    );
+    if (!response.ok) return { ok: false, detail: `Saved preview returned HTTP ${response.status}` };
     const html = await response.text();
-    return html.includes("<html")
-      ? { ok: true, detail: "preview responds with HTML" }
-      : { ok: false, detail: "preview responded but not with an HTML document" };
+    if (!/<html(?:\s|>)/i.test(html) || !/<body(?:\s|>)/i.test(html)) {
+      return { ok: false, detail: "Saved preview is missing its HTML document or body" };
+    }
+    return { ok: true, detail: "Workspace preview handler returned the saved HTML document" };
   } catch (error) {
-    return {
-      ok: false,
-      detail: error instanceof Error ? error.message : "preview fetch failed",
-    };
+    return { ok: false, detail: error instanceof Error ? error.message : "Saved preview read failed" };
   }
 }

@@ -32,6 +32,7 @@ export interface FileTreeNode {
 
 export interface FileSystemManager {
   list(): Promise<FileEntry[]>;
+  readSnapshot(limit: number): Promise<Array<{ path: string; content: string }>>;
   read(path: string): Promise<FileContent | null>;
   write(file: {
     path: string;
@@ -139,15 +140,25 @@ class SupabaseFileSystem implements FileSystemManager {
     }));
   }
 
+  async readSnapshot(limit: number) {
+    const supabase = await this.client();
+    const { data, error } = await supabase.from("project_files")
+      .select("path, content").eq("project_id", this.projectId).limit(limit + 1);
+    if (error) throw new Error("Could not load the saved project files.");
+    if (data.length > limit) throw new Error("Saved project exceeds the repair file limit.");
+    return data;
+  }
+
   async read(path: string): Promise<FileContent | null> {
     assertSafePath(path);
     const supabase = await this.client();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("project_files")
       .select("path, content, language")
       .eq("project_id", this.projectId)
       .eq("path", path)
       .maybeSingle();
+    if (error) throw new Error("Could not read the saved project file.");
     return data ?? null;
   }
 
@@ -231,6 +242,12 @@ class DemoFileSystem implements FileSystemManager {
       size: file.content.length,
       updatedAt: file.updatedAt,
     }));
+  }
+
+  async readSnapshot(limit: number) {
+    const files = this.files();
+    if (files.size > limit) throw new Error("Saved project exceeds the repair file limit.");
+    return Array.from(files, ([path, file]) => ({ path, content: file.content }));
   }
 
   async read(path: string): Promise<FileContent | null> {

@@ -10,6 +10,7 @@ import { ArrowDown, Loader2, SendHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatMessageItem } from "@/components/chat/chat-message-item";
+import { isBuildBrief, isRepairCommand } from "@/lib/validations/build-prompt";
 import { PromptSuggestions } from "@/components/chat/prompt-suggestions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -115,6 +116,10 @@ export function ChatPanel({
     if (useChatStore.getState().isStreaming) return;
     setStickToBottom(true);
 
+    const previousBrief = isRepairCommand(prompt)
+      ? [...messages].reverse().find(message => message.projectId === projectId &&
+          message.role === "user" && isBuildBrief(message.content))?.content
+      : undefined;
     if (announceUser) {
       addMessage({
         id: `temp-user-${Date.now()}`,
@@ -161,7 +166,7 @@ export function ChatPanel({
       const response = await fetch("/api/agents/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, prompt }),
+        body: JSON.stringify({ projectId, prompt, previousBrief }),
         signal: watchdog.signal,
       });
 

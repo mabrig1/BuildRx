@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import ts from "typescript";
 
 import { BEGINNER_CODE_TEMPLATES, findBeginnerCodeTemplate } from "./beginner-catalog";
 import { createBeginnerCodeSource } from "./beginner-code-templates";
@@ -34,6 +35,27 @@ describe("original beginner code clone archive", () => {
       expect(files.get("BUILD-RX-SOURCE.md")).toContain("not an external GitHub clone");
       expect(files.get("README.md")).toContain("before publishing");
       expect(files.get("README.md")).not.toContain("sk-live-");
+    }
+  );
+
+  it.each(BEGINNER_CODE_TEMPLATES.map(template => [template.id] as const))(
+    "%s contains syntactically valid Next.js TSX pages", id => {
+      const source = createBeginnerCodeSource(id);
+      for (const file of source.files.filter(file => file.path.endsWith(".tsx"))) {
+        // Parse and transpile as source text only; never evaluate beginner code.
+        const compiled = ts.transpileModule(file.content, {
+          fileName: file.path,
+          reportDiagnostics: true,
+          compilerOptions: {
+            target: ts.ScriptTarget.ES2022,
+            module: ts.ModuleKind.ESNext,
+            jsx: ts.JsxEmit.ReactJSX,
+          },
+        });
+        expect(compiled.diagnostics?.filter(d => d.category === ts.DiagnosticCategory.Error))
+          .toEqual([]);
+        expect(compiled.outputText).toContain("export");
+      }
     }
   );
 

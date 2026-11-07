@@ -30,7 +30,7 @@ function mockDb(failFiles = false) {
     delete: vi.fn(() => removeProject),
   };
   const fileTable = {
-    insert: vi.fn(async () => ({ error: failFiles ? new Error("test storage failure") : null })),
+    insert: vi.fn(async (_rows: Array<{project_id: string; path: string; content: string}>) => ({ error: failFiles ? new Error("test storage failure") : null })),
   };
   const chatTable = { insert: vi.fn(async () => ({ error: null })) };
   const from = vi.fn((table: string) => {

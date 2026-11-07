@@ -194,6 +194,7 @@ export function GuidedClonePanel({ template, onClose }: { template: TemplateGuid
       </a> : <p className="mb-4 text-sm text-amber-700 dark:text-amber-300">
         No safe clone is offered: the source and licensing have not been approved.
       </p>}
+      <p className="mb-5 rounded-md border border-dashed p-3 text-xs text-muted-foreground"><strong>Source evidence:</strong> {template.sourceNote}</p>
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <h3 className="font-semibold">1. Plan your customization</h3>

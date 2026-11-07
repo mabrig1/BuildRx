@@ -79,8 +79,8 @@ function matchUuid(input: string) {
 export function managedWfpScriptName(ownerId: string, projectId: string): string {
   if (!matchUuid(ownerId) || !matchUuid(projectId)) throw new WfpAdapterError("invalid_artifact");
   return "brx-" + createHash("sha256")
-    .update("buildrx-wfp-tenant-project-v1\\0".replace("\\0", "\0") +
-      ownerId.toLowerCase() + "\\0".replace("\\0", "\0") + projectId.toLowerCase())
+    .update("buildrx-wfp-tenant-project-v1\0" +
+      ownerId.toLowerCase() + "\0" + projectId.toLowerCase())
     .digest("hex").slice(0, 36);
 }
 

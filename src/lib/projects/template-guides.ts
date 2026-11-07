@@ -22,6 +22,7 @@ export interface TemplateGuide {
   sourceNote: string;
   deployed: "Not verified" | "Not applicable";
   services: readonly string[];
+  assumptions: readonly string[];
   envKeys: readonly string[];
   setup: readonly string[];
   safeStart: readonly string[];
@@ -53,6 +54,7 @@ const originals: readonly TemplateGuide[] = BEGINNER_CODE_TEMPLATES.map(t => {
     sourceNote: "Original BuildRx MIT starter source reviewed in PR #50; not an independent upstream GitHub repository.",
     deployed: "Not verified" as const,
     services: ["None required for the demo"],
+    assumptions: ["Intended beginner/business use is a suggestion; no customer adoption or production uptime has been checked."],
     envKeys: [],
     setup: ["Clone the private draft.", "Open README.md and inspect app/page.tsx.",
       "Install dependencies only in a trusted local environment after review.",
@@ -80,6 +82,7 @@ const github: readonly TemplateGuide[] = GITHUB_APP_TEMPLATES.map(t => ({
   deployed: "Not verified" as const,
   services: t.requiresExternalService ? ["Supabase account and Auth/database setup"] :
     ["None required for initial source review"],
+  assumptions: ["Compatibility with this BuildRx preview and deployment toolchain is unproven until built and tested."],
   envKeys: t.id === "github-supabase-starter" ?
     ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"] : [],
   setup: ["Clone pinned source to a private Draft.", "Read README.md and BUILD-RX-SOURCE.md.",
@@ -100,6 +103,7 @@ const planned: readonly TemplateGuide[] = [
     difficulty: "Intermediate", state: "planned", origin: "Planned", sourceUrl: null,
     sourceNote: "Specification only. No reviewed, cloneable source is present in the allowlist.",
     deployed: "Not verified", services: ["Supabase Auth/database", "Optional email/SMS (not configured)"],
+    assumptions: ["Suggested architecture only; no source, live provider or booking contention test exists."],
     envKeys: ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
     setup: ["Review booking requirements and staff ownership.", "Design atomic conflict protection.",
       "Generate and review source separately; no code can be cloned from this card."],
@@ -114,6 +118,7 @@ const planned: readonly TemplateGuide[] = [
     difficulty: "Intermediate", state: "planned", origin: "Planned", sourceUrl: null,
     sourceNote: "Idea brief only; no source link has been verified.",
     deployed: "Not verified", services: ["Database/Auth (not configured)"],
+    assumptions: ["Course roles and service requirements are design hypotheses."],
     envKeys: ["NEXT_PUBLIC_SUPABASE_URL"],
     setup: ["Define roles and learner privacy.", "Review a licensed pinned-source candidate."],
     safeStart: UNIVERSAL_CHECKS,
@@ -127,6 +132,7 @@ const planned: readonly TemplateGuide[] = [
     difficulty: "Intermediate", state: "planned", origin: "Planned", sourceUrl: null,
     sourceNote: "Not an approved clone source or verified payment integration.",
     deployed: "Not verified", services: ["Database", "Payment provider (not configured)"],
+    assumptions: ["Checkout/provider architecture is hypothetical until implemented and audited."],
     envKeys: ["PAYMENT_PROVIDER_SECRET_KEY"],
     setup: ["Choose provider with webhook validation.", "Review licensing and dependency tree."],
     safeStart: UNIVERSAL_CHECKS,
@@ -140,6 +146,7 @@ const planned: readonly TemplateGuide[] = [
     difficulty: "Beginner", state: "planned", origin: "Planned", sourceUrl: null,
     sourceNote: "Planned template; screenshots and charts alone are not an audited repository.",
     deployed: "Not verified", services: ["None until real data is connected"],
+    assumptions: ["KPI sources and chart requirements are proposed; no live metric feed verified."],
     envKeys: [],
     setup: ["Specify KPI formulas.", "Review chart accessibility and real data permissions."],
     safeStart: UNIVERSAL_CHECKS,
@@ -153,6 +160,7 @@ const planned: readonly TemplateGuide[] = [
     difficulty: "Intermediate", state: "planned", origin: "Planned", sourceUrl: null,
     sourceNote: "No verified clone source; a prompt mockup is not a working AI integration.",
     deployed: "Not verified", services: ["Server-only AI provider (not configured)"],
+    assumptions: ["AI provider access, model performance and pricing are unknown."],
     envKeys: ["AI_PROVIDER_API_KEY"],
     setup: ["Design server-only key handling.", "Review request limits and misuse controls."],
     safeStart: UNIVERSAL_CHECKS,

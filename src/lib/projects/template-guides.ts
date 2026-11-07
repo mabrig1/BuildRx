@@ -43,6 +43,7 @@ const UNIVERSAL_CHECKS = [
 
 const originals: readonly TemplateGuide[] = BEGINNER_CODE_TEMPLATES.map(t => {
   const isStock = t.id === "beginner-stock-list";
+  const isTask = t.id === "beginner-task-planner";
   return {
     id: t.id, name: t.name, description: t.description,
     category: (isStock ? "Inventory" : "Business apps") as TemplateCategory,

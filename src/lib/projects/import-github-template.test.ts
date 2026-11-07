@@ -105,10 +105,11 @@ describe("curated GitHub app templates", () => {
       const parts = source.subdirectory.split("/");
       const shaRoot = "a".repeat(40), shaExample = "b".repeat(40), shaSubtree = "c".repeat(40);
       const name = parts[1];
+      const allowedFiles = files.map((file, index) => ({
+        ...file, sha: String(index + 1).repeat(40), size: Buffer.byteLength(file.content),
+      }));
       const payload = [
-        ...files.map((file, index) => ({
-          ...file, sha: String(index + 1).repeat(40), size: Buffer.byteLength(file.content),
-        })),
+        ...allowedFiles,
         { path: "app/other.png", sha: "f".repeat(40), size: 100 },
       ];
       const responses: Record<string, unknown> = {
@@ -128,7 +129,7 @@ describe("curated GitHub app templates", () => {
           content: Buffer.from("The MIT License (MIT)\\nCopyright Vercel.\\nPermission is hereby granted.").toString("base64"),
         },
       };
-      for (const file of payload.slice(0, -1)) {
+      for (const file of allowedFiles) {
         responses[`/repos/vercel/next.js/git/blobs/${file.sha}`] = {
           encoding: "base64", content: Buffer.from(file.content).toString("base64"),
         };

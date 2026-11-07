@@ -96,9 +96,16 @@ export async function POST(request: Request) {
 
   try {
     const fs = getFileSystem(projectId);
-    const contents = await Promise.all(
-      files.map(async ({ path }) => (await fs.read(path))!)
+    const readFiles = await Promise.all(
+      files.map(({ path }) => fs.read(path))
     );
+    if (readFiles.some(file => !file)) {
+      return NextResponse.json({
+        error: "Project source changed during review. Retry before pushing.",
+      }, { status: 409, headers: { "Cache-Control": "no-store" } });
+    }
+    const contents = readFiles.filter((file): file is NonNullable<typeof file> => file !== null)
+      .map(file => ({ path: file.path, content: file.content }));
     const credentialFile = fileWithEmbeddedCredential(contents);
     if (credentialFile) {
       return NextResponse.json({

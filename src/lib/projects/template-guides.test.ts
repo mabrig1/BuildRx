@@ -40,6 +40,7 @@ describe("evidence-scoped beginner template catalog", () => {
     for (const t of TEMPLATE_GUIDES) {
       expect(t.envKeys.every(k => /^[A-Z][A-Z0-9_]*$/.test(k))).toBe(true);
       expect(t.setup.length).toBeGreaterThan(0);
+      expect(t.assumptions.length).toBeGreaterThan(0);
       expect(t.safeStart.some(s => /no|never|private/i.test(s))).toBe(true);
       if (t.origin === "Pinned GitHub") expect(t.sourceUrl).toMatch(expected);
       if (t.state === "source-reviewed") expect(t.sourceUrl).toContain("https://github.com/");

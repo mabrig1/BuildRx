@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { runWorkflow } from "@/lib/agents/orchestrator";
 import { acquireBuildLease } from "@/lib/agents/build-lease";
-import type { AgentEvent, WorkflowContext } from "@/lib/agents/types";
+import { normalizePlan } from "@/lib/agents/planner";
+import type { AgentEvent, AppPlan, WorkflowContext } from "@/lib/agents/types";
 import { authorizeAiRequest } from "@/lib/ai/route-helpers";
 import { withTimeout } from "@/lib/health/retry";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -85,8 +86,27 @@ export async function POST(request: Request) {
         () => getFileSystem(projectId).readSnapshot(TOOL_LIMITS.maxFiles), 20_000, "Saved project lookup"
       );
       context.files = new Map(files.map(file => [file.path, file]));
+      // New builds leave their exact plan with the completion message. Older
+      // projects fall back to the workspace brief and their saved files.
+      let storedPrompt: string | undefined;
+      let storedPlan: Partial<AppPlan> | undefined;
+      if (persist && files.length) {
+        const db = await createClient();
+        const { data, error } = await withTimeout(
+          () => db.from("chat_messages").select("metadata").eq("project_id", projectId)
+            .eq("role", "assistant").contains("metadata", { kind: "build-result" })
+            .order("created_at", { ascending: false }).limit(1).maybeSingle(), 10_000, "Previous build lookup"
+        );
+        if (error) throw new Error("Could not load the previous build.");
+        const meta = data?.metadata;
+        if (meta && typeof meta === "object" && !Array.isArray(meta) && typeof meta.prompt === "string" &&
+            meta.plan && typeof meta.plan === "object" && !Array.isArray(meta.plan)) {
+          storedPrompt = meta.prompt;
+          storedPlan = meta.plan as Partial<AppPlan>;
+        }
+      }
       const savedBrief = context.files.get("docs/PRODUCT-BRIEF.md")?.content;
-      const brief = [parsed.data.previousBrief, savedBrief, context.files.get("README.md")?.content]
+      const brief = [storedPrompt, parsed.data.previousBrief, savedBrief, context.files.get("README.md")?.content]
         .map(value => value?.trim().slice(0, MAX_AI_PROMPT_CHARACTERS))
         .find((value): value is string => Boolean(value && isBuildBrief(value)));
       if (!brief) {
@@ -94,6 +114,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "No previous build brief was found. Describe the app you want to repair." }, { status: 422 });
       }
       context.prompt = brief;
+      if (storedPlan) context.plan = normalizePlan(storedPlan, brief);
       if (files.length) context.repairSnapshot = new Map(files.map(file => [file.path, file.content]));
     } catch {
       releaseBuildLease();

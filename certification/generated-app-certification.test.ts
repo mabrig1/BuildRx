@@ -260,6 +260,42 @@ async function runNpm(
   }
 }
 
+/** Start the built CRM fixture on loopback and read its real pages without service credentials. */
+async function smokeBuiltCrm(root: string) {
+  const script = `
+    const http = require("node:http");
+    const next = require("next");
+    (async () => {
+      const app = next({ dev: false, dir: process.cwd() });
+      const server = http.createServer(app.getRequestHandler());
+      try {
+        await app.prepare();
+        await new Promise((resolve, reject) => {
+          server.once("error", reject);
+          server.listen(0, "127.0.0.1", resolve);
+        });
+        for (const path of ["/", "/customers"]) {
+          const response = await fetch("http://127.0.0.1:" + server.address().port + path,
+            { redirect: "manual", signal: AbortSignal.timeout(10000) });
+          const html = await response.text();
+          if (response.status !== 200 || !html.includes("<h1") || !/customers/i.test(html)) {
+            throw Error(path + " did not render the CRM page (HTTP " + response.status + ")");
+          }
+          console.log(path + " returned HTTP 200");
+        }
+      } finally {
+        if (server.listening) await new Promise(resolve => server.close(resolve));
+        await app.close();
+      }
+    })().then(() => process.exit(0), error => { console.error(error); process.exit(1); });
+  `;
+  const { stdout } = await execFileAsync(process.execPath, ["-e", script], {
+    cwd: root, timeout: 45_000, env: { ...process.env, NODE_ENV: "production", NEXT_TELEMETRY_DISABLED: "1" },
+  });
+  expect(stdout).toContain("/ returned HTTP 200");
+  expect(stdout).toContain("/customers returned HTTP 200");
+}
+
 async function materializeGeneratedApp(
   context: WorkflowContext,
   slug: string
@@ -414,6 +450,7 @@ describe("Generated App Certification Matrix", () => {
       ).toMatch(
         /(?:Compiled successfully|Creating an optimized production build)/i
       );
+      if (slug === "crud-saas") await smokeBuiltCrm(root);
     }
   );
 });

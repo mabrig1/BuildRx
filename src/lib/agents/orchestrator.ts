@@ -143,6 +143,7 @@ export async function runWorkflow(
   const steps: AgentName[] = context.repairSnapshot
     ? ["planner", "security", "qa", "repair", "deployment"]
     : AGENT_ORDER;
+  if (context.repairSnapshot && context.plan) steps.shift();
   emit({ type: "workflow_start", agents: steps });
   await startBuildRun(context);
 

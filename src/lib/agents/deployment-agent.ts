@@ -194,6 +194,7 @@ export const deploymentAgent: Agent = {
       await supabase.from("chat_messages").insert({
         project_id: context.projectId,
         role: "assistant",
+        metadata: { kind: "build-result", prompt: context.prompt, plan: JSON.parse(JSON.stringify(plan)) },
         content: verified
           ? `🚀 **Build complete and verified** — **${plan?.appName ?? "your app"}**, ${context.files.size} files (${plan?.pages.length ?? 0} pages, ${plan?.dataModel.length ?? 0} tables). Blocking checks passed. Open the workspace preview to try the app.`
           : [

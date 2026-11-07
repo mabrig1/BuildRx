@@ -16,7 +16,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("curated GitHub app templates", () => {
   it("pins reviewed public MIT sources rather than accepting arbitrary URLs", () => {
-    expect(GITHUB_APP_TEMPLATES).toHaveLength(2);
+    expect(GITHUB_APP_TEMPLATES).toHaveLength(4);
     for (const template of GITHUB_APP_TEMPLATES) {
       expect(template.commit).toMatch(/^[a-f0-9]{40}$/);
       expect(template.repository).toBe("vercel/next.js");
@@ -24,6 +24,10 @@ describe("curated GitHub app templates", () => {
       expect(template.sourceUrl).toContain(template.commit);
     }
     expect(findGithubAppTemplate("not-approved")).toBeUndefined();
+    expect(GITHUB_APP_TEMPLATES.map(t => t.subdirectory)).toEqual(expect.arrayContaining([
+      "examples/basic-css", "examples/with-context-api",
+    ]));
+    expect(GITHUB_APP_TEMPLATES.every(t => t.difficulty && typeof t.requiresExternalService === "boolean")).toBe(true);
   });
 
   it("rejects hidden credentials, CI workflows and package manager lockfiles", () => {
@@ -95,4 +99,55 @@ describe("curated GitHub app templates", () => {
     expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("/git/blobs/99999"));
     expect(imported.skippedBinary).toBe(2);
   });
+  it.each(["github-basic-css", "github-context-counter"] as const)(
+    "imports %s from only the immutable verified subtree", async id => {
+      const source = findGithubAppTemplate(id)!;
+      const parts = source.subdirectory.split("/");
+      const shaRoot = "a".repeat(40), shaExample = "b".repeat(40), shaSubtree = "c".repeat(40);
+      const name = parts[1];
+      const allowedFiles = files.map((file, index) => ({
+        ...file, sha: String(index + 1).repeat(40), size: Buffer.byteLength(file.content),
+      }));
+      const payload = [
+        ...allowedFiles,
+        { path: "app/other.png", sha: "f".repeat(40), size: 100 },
+      ];
+      const responses: Record<string, unknown> = {
+        [`/repos/vercel/next.js/git/commits/${source.commit}`]: { tree: { sha: shaRoot } },
+        [`/repos/vercel/next.js/git/trees/${shaRoot}`]: {
+          tree: [{ path: "examples", type: "tree", sha: shaExample }], truncated: false,
+        },
+        [`/repos/vercel/next.js/git/trees/${shaExample}`]: {
+          tree: [{ path: name, type: "tree", sha: shaSubtree }], truncated: false,
+        },
+        [`/repos/vercel/next.js/git/trees/${shaSubtree}?recursive=1`]: {
+          tree: payload.map(file => ({ path: file.path, type: "blob", sha: file.sha, size: file.size })),
+          truncated: false,
+        },
+        [`/repos/vercel/next.js/contents/license.md?ref=${source.commit}`]: {
+          encoding: "base64",
+          content: Buffer.from("The MIT License (MIT)\\nCopyright Vercel.\\nPermission is hereby granted.").toString("base64"),
+        },
+      };
+      for (const file of allowedFiles) {
+        responses[`/repos/vercel/next.js/git/blobs/${file.sha}`] = {
+          encoding: "base64", content: Buffer.from(file.content).toString("base64"),
+        };
+      }
+      const mockFetch = vi.fn(async (url: string) => {
+        const u = new URL(url);
+        return u.pathname + u.search in responses
+          ? Response.json(responses[u.pathname + u.search])
+          : Response.json({ message: "Not found" }, { status: 404 });
+      });
+      vi.stubGlobal("fetch", mockFetch);
+      const imported = await importGithubTemplateSource(source);
+      expect(imported.securityPreflight.status).toBe("no-indicators-observed");
+      expect(imported.files.find(f => f.path === "BUILD-RX-SOURCE.md")?.content).toContain(source.commit);
+      expect(imported.files.find(f => f.path === "LICENSE")?.content).toContain("MIT");
+      expect(imported.files.some(f => f.path === "app/other.png")).toBe(false);
+      expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("/git/blobs/ffff"));
+    }
+  );
+
 });

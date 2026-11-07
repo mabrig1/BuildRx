@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/github/service";
 import { DevShieldPreflightError, devShieldPublicEvidence } from "@/lib/security/devshield-preflight";
 import { findGithubAppTemplate } from "@/lib/projects/github-app-templates";
+import { createBeginnerCodeSource, findBeginnerCodeTemplate } from "@/lib/projects/beginner-code-templates";
 import {
   GithubTemplateImportError,
   importGithubTemplateSource,
@@ -13,8 +14,9 @@ import { createClient } from "@/lib/supabase/server";
 export const maxDuration = 120;
 
 const schema = z.object({
-  templateId: z.enum(["github-blog-starter", "github-supabase-starter"]),
-});
+  templateId: z.enum(["github-blog-starter", "github-supabase-starter", "github-basic-css", "github-context-counter",
+    "beginner-business-website", "beginner-personal-portfolio", "beginner-task-planner", "beginner-stock-list"]),
+}).strict();
 
 /** POST — copy an allowlisted MIT example's editable files into a new draft.
  * This is a code import, NOT a verified app build or external deployment.
@@ -51,8 +53,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Select a supported GitHub template." }, { status: 400 });
   }
   const template = findGithubAppTemplate(body.data.templateId);
-  if (!template) {
-    return NextResponse.json({ error: "This GitHub template is not approved." }, { status: 400 });
+  const original = findBeginnerCodeTemplate(body.data.templateId);
+  if (!template && !original) {
+    return NextResponse.json({ error: "This source template is not approved." }, { status: 400 });
   }
 
   const { checkProjectLimit } = await import("@/lib/billing/limits");
@@ -64,14 +67,14 @@ export async function POST(request: Request) {
   try {
     // Inspect and download the public, pinned template BEFORE creating a
     // project; rate-limit or source failures never leave orphan drafts.
-    const source = await importGithubTemplateSource(template);
+    const source = template ? await importGithubTemplateSource(template) : createBeginnerCodeSource(original!.id);
     const supabase = await createClient();
     const { data: created, error: projectError } = await supabase
       .from("projects")
       .insert({
         owner_id: session.userId,
-        name: template.name.replace(" (GitHub)", ""),
-        description: `${template.description} — imported from an MIT-licensed example.`,
+        name: (template?.name ?? original!.name).replace(" (GitHub)", ""),
+        description: `${(template?.description ?? original!.description)} — copied from a curated, MIT-licensed code starter.`,
         status: "draft" as const,
       })
       .select("id")
@@ -100,7 +103,9 @@ export async function POST(request: Request) {
         user_id: session.userId,
         role: "user",
         content:
-          `I imported the MIT-licensed GitHub example ${template.sourceUrl} at commit ${template.commit}. ` +
+          (template
+            ? `I cloned the MIT-licensed GitHub example ${template.sourceUrl} at pinned commit ${template.commit}. `
+            : `I copied the original MIT-licensed BuildRx starter ${original!.name}. `) +
           "Inspect and customize the code, check dependencies and missing assets, implement any requested workflows, " +
           "and validate all required backend services before claiming the project is ready.",
       });
@@ -121,6 +126,7 @@ export async function POST(request: Request) {
       files: source.files.length,
       skippedBinary: source.skippedBinary,
       sourceUrl: source.sourceUrl,
+      sourceKind: template ? "github-pinned" : "buildrx-original",
       securityPreflight: devShieldPublicEvidence(source.securityPreflight),
       message: "Editable source imported. Review and build before publishing.",
     }, {

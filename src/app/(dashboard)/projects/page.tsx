@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ConnectSupabaseNotice } from "@/components/dashboard/connect-supabase-notice";
 import { PageHeader } from "@/components/layout/page-header";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
+import { Button } from "@/components/ui/button";
 import type { ProjectSummary } from "@/components/projects/project-card";
 import { ProjectsGrid } from "@/components/projects/projects-grid";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -51,6 +53,7 @@ export default async function ProjectsPage() {
         title="Projects"
         description="Create, manage, and deploy your AI-built apps."
       >
+        <Button variant="outline" asChild><Link href="/templates">Browse code templates</Link></Button>
         <CreateProjectDialog demoMode={!configured} />
       </PageHeader>
 

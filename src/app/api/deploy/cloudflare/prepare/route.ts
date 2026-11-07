@@ -52,13 +52,19 @@ export async function POST(request: Request) {
   try {
     const fs = getFileSystem(parsed.data.projectId);
     const entries = await fs.list();
+    const sourceEntries = entries.filter(entry =>
+      isDeploymentSourcePath(entry.path) && !entry.path.startsWith(".github/")
+    );
     const source = (await Promise.all(
-      entries
-        .filter(entry => isDeploymentSourcePath(entry.path) && !entry.path.startsWith(".github/"))
-        .map(entry => fs.read(entry.path))
+      sourceEntries.map(entry => fs.read(entry.path))
     ))
       .filter((file): file is NonNullable<typeof file> => file !== null)
       .map(({ path, content }) => ({ path, content }));
+    if (source.length !== sourceEntries.length) {
+      return NextResponse.json({
+        error: "Project source changed while being checked. Retry before preparing GitHub.",
+      }, { status: 409, headers: { "Cache-Control": "no-store" } });
+    }
     // Fail closed before contacting GitHub or creating a private repository.
     const securityPreflight = enforceDevShieldPreflight(source);
     const prepared = prepareCloudflareSource(source, project.name);

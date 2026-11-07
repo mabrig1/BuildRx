@@ -1,153 +1,233 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, ExternalLink, Loader2, Search, ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
+import { Check, ExternalLink, GitCompareArrows, Search, ShieldCheck, Sparkles } from "lucide-react";
 
+import { GuidedClonePanel } from "@/components/projects/guided-clone-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BEGINNER_CODE_TEMPLATES } from "@/lib/projects/beginner-catalog";
-import { GITHUB_APP_TEMPLATES } from "@/lib/projects/github-app-templates";
+import {
+  TEMPLATE_GUIDES, type TemplateCategory, type TemplateGuide,
+} from "@/lib/projects/template-guides";
 
-type Source = "All" | "BuildRx original" | "Pinned GitHub";
-type Level = "All" | "Beginner" | "Intermediate";
-
-const catalog = [
-  ...BEGINNER_CODE_TEMPLATES.map(template => ({
-    ...template,
-    origin: "BuildRx original" as const,
-    sourceUrl: null as string | null,
-    requiresExternalService: false,
-    setupNote: template.nextStep,
-  })),
-  ...GITHUB_APP_TEMPLATES.map(template => ({
-    ...template,
-    origin: "Pinned GitHub" as const,
-    sourceUrl: template.sourceUrl as string | null,
-    storage: undefined as string | undefined,
-  })),
-];
+const categories = [
+  "All categories", "Business apps", "Education", "E-commerce",
+  "Inventory", "Booking", "Dashboards", "AI tools",
+] as const;
+type CategoryFilter = "All categories" | TemplateCategory;
+type StateFilter = "All sources" | "Approved code" | "Planned";
+type DifficultyFilter = "All levels" | TemplateGuide["difficulty"];
 
 export function StarterVault() {
   const [query, setQuery] = useState("");
-  const [source, setSource] = useState<Source>("All");
-  const [level, setLevel] = useState<Level>("All");
-  const [busy, setBusy] = useState<string | null>(null);
+  const [category, setCategory] = useState<CategoryFilter>("All categories");
+  const [source, setSource] = useState<StateFilter>("All sources");
+  const [level, setLevel] = useState<DifficultyFilter>("All levels");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [compare, setCompare] = useState<string[]>([]);
 
-  const filtered = useMemo(() => catalog.filter(template => {
-    const matchesQuery = [
-      template.name, template.description, template.category, template.setupNote,
-    ].join(" ").toLowerCase().includes(query.trim().toLowerCase());
-    return matchesQuery && (source === "All" || template.origin === source) &&
-      (level === "All" || template.difficulty === level);
-  }), [query, source, level]);
+  const filtered = useMemo(() => TEMPLATE_GUIDES.filter(t => {
+    const text = [t.name, t.description, t.category, t.origin, t.nextAction, ...t.services]
+      .join(" ").toLowerCase();
+    return text.includes(query.trim().toLowerCase()) &&
+      (category === "All categories" || t.category === category) &&
+      (source === "All sources" ||
+        (source === "Approved code" && t.state === "source-reviewed") ||
+        (source === "Planned" && t.state === "planned")) &&
+      (level === "All levels" || level === t.difficulty);
+  }), [query, category, source, level]);
 
-  async function clone(templateId: string) {
-    if (busy) return;
-    setBusy(templateId);
-    try {
-      const response = await fetch("/api/projects/import-github-starter", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId }),
-      });
-      const body = await response.json().catch(() => ({}));
-      if (response.status === 401) {
-        toast.error("Sign in to save a private template clone.");
-        window.location.assign("/login?next=/templates");
-        return;
-      }
-      if (!response.ok || typeof body.projectId !== "string") {
-        throw new Error(typeof body.error === "string" ? body.error : "Could not copy this starter.");
-      }
-      toast.success("Starter cloned as a private draft. Customize and verify before publishing.");
-      window.location.assign("/projects/" + encodeURIComponent(body.projectId));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Clone failed.");
-    } finally {
-      setBusy(null);
-    }
+  const selectedGuide = TEMPLATE_GUIDES.find(t => t.id === selected);
+  const compared = compare.map(id => TEMPLATE_GUIDES.find(t => t.id === id))
+    .filter((t): t is TemplateGuide => Boolean(t));
+
+  function toggleCompare(id: string) {
+    setCompare(prev => prev.includes(id) ? prev.filter(v => v !== id) :
+      prev.length < 3 ? [...prev, id] : prev);
   }
 
   return <div className="space-y-6">
-    <div className="rounded-xl border bg-muted/30 p-4 sm:p-5">
-      <div className="flex items-center gap-2 text-sm font-semibold">
+    <section className="overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-blue-500/5 p-5 sm:p-8">
+      <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
         <ShieldCheck className="size-5 text-primary" aria-hidden="true" />
-        Safe-start cloning vault
+        BUILD RX · VERIFIED-SOURCE FIRST
+        <span className="rounded-full border bg-background px-2 py-1 text-muted-foreground">Fail closed</span>
       </div>
-      <p className="text-muted-foreground mt-2 max-w-3xl text-sm leading-6">
-        Pick a real code starter. BuildRx copies the code into your own private draft,
-        checks it for suspicious patterns and preserves license and origin information.
-        You do not need a GitHub token for these approved public examples.
+      <h2 className="mt-3 max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
+        Find your starting point. Build with evidence.
+      </h2>
+      <p className="text-muted-foreground mt-3 max-w-3xl text-sm leading-6">
+        Explore real, editable BuildRx code and commit-pinned official GitHub examples.
+        Compare what works in a local demo with what still needs a database, security review,
+        tests or deployment. Planned ideas cannot be cloned.
       </p>
-      <p className="text-muted-foreground mt-2 text-xs">
-        A security scan is not a guarantee of safety. No dependencies are installed, no code is
-        executed during cloning, and nothing is automatically deployed.
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border bg-background/80 p-4">
+          <strong className="text-2xl">{TEMPLATE_GUIDES.filter(t => t.state === "source-reviewed").length}</strong>
+          <p className="text-muted-foreground text-xs">Approved, source-reviewed clone IDs</p>
+        </div>
+        <div className="rounded-xl border bg-background/80 p-4">
+          <strong className="text-2xl">{TEMPLATE_GUIDES.filter(t => t.state === "planned").length}</strong>
+          <p className="text-muted-foreground text-xs">Future concepts, no source available</p>
+        </div>
+        <div className="rounded-xl border bg-background/80 p-4">
+          <strong className="text-2xl">0 claimed</strong>
+          <p className="text-muted-foreground text-xs">Verified live deployments from this catalog</p>
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Reviewed source is not proof of safe dependencies, app correctness, working integrations,
+        green CI or an accessible live URL. Nothing executes or deploys when imported.
       </p>
-    </div>
+    </section>
 
-    <div className="flex flex-col gap-3 sm:flex-row">
-      <div className="relative flex-1">
-        <Search className="text-muted-foreground pointer-events-none absolute left-3 top-2.5 size-4" aria-hidden="true" />
-        <Input aria-label="Search starter templates" placeholder="Search websites, tasks, stock, blogs, login..."
-          value={query} onChange={event => setQuery(event.target.value)} className="pl-9" />
+    {selectedGuide && <div id="guided-clone">
+      <GuidedClonePanel key={selectedGuide.id} template={selectedGuide} onClose={() => setSelected(null)} />
+    </div>}
+
+    <section aria-label="Template catalog filters" className="rounded-2xl border p-4 sm:p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Sparkles className="size-5 text-primary" aria-hidden="true" />
+        <h2 className="text-lg font-semibold">Explore templates</h2>
       </div>
-      <select aria-label="Filter template source" value={source}
-        onChange={event => setSource(event.target.value as Source)}
-        className="bg-background h-9 rounded-md border px-3 text-sm">
-        <option value="All">All sources</option>
-        <option value="BuildRx original">BuildRx originals</option>
-        <option value="Pinned GitHub">Pinned GitHub</option>
-      </select>
-      <select aria-label="Filter beginner level" value={level}
-        onChange={event => setLevel(event.target.value as Level)}
-        className="bg-background h-9 rounded-md border px-3 text-sm">
-        <option value="All">All levels</option>
-        <option value="Beginner">Beginner</option>
-        <option value="Intermediate">Intermediate</option>
-      </select>
-    </div>
-    <p className="text-muted-foreground text-xs" role="status">
-      Showing {filtered.length} of {catalog.length} real-code starter templates.
-    </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="relative block lg:col-span-1">
+          <span className="sr-only">Search templates</span>
+          <Search className="text-muted-foreground pointer-events-none absolute left-3 top-2.5 size-4" />
+          <Input value={query} onChange={e => setQuery(e.target.value)} className="pl-9"
+            placeholder="Search apps and services" />
+        </label>
+        <label>
+          <span className="sr-only">Filter template category</span>
+          <select value={category} onChange={e => setCategory(e.target.value as CategoryFilter)}
+            className="bg-background h-9 w-full rounded-md border px-3 text-sm">
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">Filter template availability</span>
+          <select value={source} onChange={e => setSource(e.target.value as StateFilter)}
+            className="bg-background h-9 w-full rounded-md border px-3 text-sm">
+            {(["All sources", "Approved code", "Planned"] as const).map(s => <option key={s}>{s}</option>)}
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">Filter difficulty</span>
+          <select value={level} onChange={e => setLevel(e.target.value as DifficultyFilter)}
+            className="bg-background h-9 w-full rounded-md border px-3 text-sm">
+            {(["All levels", "Beginner", "Intermediate"] as const).map(s => <option key={s}>{s}</option>)}
+          </select>
+        </label>
+      </div>
+      <p role="status" className="text-muted-foreground mt-3 text-xs">
+        Showing {filtered.length} of {TEMPLATE_GUIDES.length} entries. Select up to 3 to compare.
+      </p>
+    </section>
+
+    {compared.length > 0 && <section aria-label="Template comparison" className="space-y-3 rounded-2xl border p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 font-semibold">
+          <GitCompareArrows className="size-4" /> Compare ({compared.length}/3)
+        </h2>
+        <Button variant="ghost" size="sm" onClick={() => setCompare([])}>Clear</Button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[620px] border-collapse text-left text-sm">
+          <caption className="sr-only">Side-by-side source, services and next steps</caption>
+          <thead><tr className="border-b">
+            <th scope="col" className="p-2">Evidence</th>
+            {compared.map(t => <th key={t.id} scope="col" className="p-2">{t.name}</th>)}
+          </tr></thead>
+          <tbody>
+            {([
+              ["Category", (t: TemplateGuide) => t.category],
+              ["Difficulty", (t: TemplateGuide) => t.difficulty],
+              ["Source", (t: TemplateGuide) => t.origin + " · " + (t.state === "planned" ? "not approved" : "pinned/reviewed")],
+              ["Deployment", (t: TemplateGuide) => t.deployed],
+              ["Services", (t: TemplateGuide) => t.services.join("; ")],
+              ["Smallest next step", (t: TemplateGuide) => t.nextAction],
+            ] as Array<[string, (t: TemplateGuide) => string]>).map(([label, getter]) =>
+              <tr key={label} className="border-b align-top">
+                <th scope="row" className="p-2 font-medium">{label}</th>
+                {compared.map(t => <td key={t.id} className="min-w-[165px] p-2 text-muted-foreground">
+                  {getter(t)}
+                </td>)}
+              </tr>)}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-muted-foreground text-xs">
+        Source provenance is reviewed; environment readiness and deployment are not automatically checked.
+      </p>
+    </section>}
 
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {filtered.map(template => <article key={template.id}
-        className="flex h-full flex-col gap-3 rounded-xl border bg-background p-4">
-        <div className="flex flex-wrap gap-2 text-[11px]">
-          <span className="rounded bg-primary/10 px-2 py-1 text-primary">{template.category}</span>
-          <span className="rounded bg-muted px-2 py-1">{template.difficulty}</span>
-          <span className="rounded bg-muted px-2 py-1">{template.origin}</span>
+      {filtered.map(t => <article key={t.id} className="flex flex-col rounded-2xl border bg-background p-5 shadow-sm">
+        <div className="flex flex-wrap gap-2 text-[11px] font-medium">
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">{t.category}</span>
+          <span className="rounded-full bg-muted px-2.5 py-1">{t.difficulty}</span>
+          <span className={t.state === "source-reviewed"
+            ? "rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300"
+            : "rounded-full bg-amber-500/10 px-2.5 py-1 text-amber-700 dark:text-amber-300"}>
+            {t.state === "source-reviewed" ? "Source reviewed" : "Planned only"}
+          </span>
         </div>
-        <h2 className="text-base font-semibold">{template.name}</h2>
-        <p className="text-muted-foreground flex-1 text-sm leading-6">{template.description}</p>
-        <div className="rounded-lg bg-muted/30 p-3 text-xs leading-5">
-          <strong>First step:</strong> {template.setupNote}
-          {template.storage === "Browser only" && <p className="mt-2 text-amber-700 dark:text-amber-300">
-            Local demo data only; not for sensitive customer records.
-          </p>}
-          {template.requiresExternalService && <p className="mt-2 text-amber-700 dark:text-amber-300">
-            Requires a separately configured account or database.
-          </p>}
-        </div>
-        {template.sourceUrl && <a href={template.sourceUrl} target="_blank" rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-primary underline underline-offset-4">
-          View original pinned GitHub source <ExternalLink className="size-3" />
+        <h3 className="mt-4 text-lg font-semibold">{t.name}</h3>
+        <p className="text-muted-foreground mt-2 flex-1 text-sm leading-6">{t.description}</p>
+        <dl className="mt-4 space-y-2 rounded-lg bg-muted/40 p-3 text-xs">
+          <div><dt className="font-semibold">Repository</dt>
+            <dd className="text-muted-foreground">{t.sourceUrl ? t.origin : "None approved"}</dd></div>
+          <div><dt className="font-semibold">Deployment</dt>
+            <dd className="text-muted-foreground">{t.deployed}</dd></div>
+          <div><dt className="font-semibold">Requires</dt>
+            <dd className="text-muted-foreground">{t.services.join(", ")}</dd></div>
+          <div><dt className="font-semibold">Next action</dt>
+            <dd className="text-muted-foreground">{t.nextAction}</dd></div>
+        </dl>
+        {t.sourceUrl && <a href={t.sourceUrl} target="_blank" rel="noopener noreferrer"
+          className="mt-3 inline-flex items-center gap-1 text-xs text-primary underline underline-offset-4">
+          View source evidence <ExternalLink className="size-3" />
         </a>}
-        <Button type="button" onClick={() => void clone(template.id)} disabled={busy !== null}
-          aria-label={"Clone " + template.name + " to a private project"}>
-          {busy === template.id ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-          {busy === template.id ? "Copying source..." : "Clone to my project"}
-        </Button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button className="flex-1" onClick={() => {
+            setSelected(t.id);
+            window.requestAnimationFrame(() =>
+              document.getElementById("guided-clone")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          }}>
+            {t.state === "planned" ? "View plan" : "Guided clone"}
+          </Button>
+          <Button variant={compare.includes(t.id) ? "secondary" : "outline"} type="button"
+            disabled={!compare.includes(t.id) && compare.length >= 3}
+            aria-pressed={compare.includes(t.id)}
+            aria-label={(compare.includes(t.id) ? "Remove " : "Compare ") + t.name}
+            onClick={() => toggleCompare(t.id)}>
+            {compare.includes(t.id) ? <Check className="size-4" /> : <GitCompareArrows className="size-4" />}
+          </Button>
+        </div>
       </article>)}
     </div>
     {filtered.length === 0 && <p className="text-muted-foreground rounded-xl border p-6 text-sm">
-      No matching starters. Try a different search or filter.
+      No matching templates. Clear the search or choose another category.
     </p>}
-    <p className="text-muted-foreground text-sm leading-6">
-      Every clone opens as a Draft, not a published or certified app.
-      Review the included README and source attribution, test the main workflow,
-      and check dependencies before hosting it.
-    </p>
+    <section className="rounded-xl border p-4 text-sm">
+      <h2 className="font-semibold">Preview reported HTTP 404?</h2>
+      <p className="text-muted-foreground mt-2 leading-6">
+        The earlier BuildRx checker fetched an owner-protected preview using a separate
+        server-to-server request, which could return 404 without the signed-in user context.
+        A merged fix verifies the saved HTML through the owner-scoped handler instead
+        and adds a Repair path for saved builds. This is not proof that your deployed
+        instance has picked up the fix or that the generated application can run.
+      </p>
+      <a className="mt-2 inline-flex items-center gap-1 text-primary underline"
+        href="https://github.com/mabrig1/BuildRx/pull/51"
+        target="_blank" rel="noopener noreferrer">
+        Read merged preview fix PR #51 <ExternalLink className="size-3" />
+      </a>
+      <p className="text-muted-foreground mt-2">
+        In an existing project, open the code workspace and enter <strong>Repair</strong>
+        after the latest BuildRx version is available. Check the saved preview file,
+        RLS access and browser iframe behavior before declaring the app verified.
+      </p>
+    </section>
   </div>;
 }

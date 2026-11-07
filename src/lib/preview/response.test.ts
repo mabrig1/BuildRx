@@ -35,7 +35,10 @@ it("serves and verifies the saved private preview under its owner and denies an 
   const network = vi.fn().mockRejectedValue(new Error("Unexpected anonymous probe"));
   vi.stubGlobal("fetch", network);
   expect((await verifyPreviewResponds("private-project")).ok).toBe(true);
-  expect(await (await request()).text()).toContain("Owner preview");
+  const ownerResponse = await request();
+  expect(await ownerResponse.text()).toContain("Owner preview");
+  expect(ownerResponse.headers.get("Content-Security-Policy")).toContain("form-action 'none'");
+  expect(ownerResponse.headers.get("Content-Security-Policy")).toContain("base-uri 'none'");
 
   session.user = "anonymous";
   const denied = await request();

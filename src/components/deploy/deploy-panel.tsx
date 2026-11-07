@@ -156,6 +156,12 @@ export function DeployPanel({ projectId }: { projectId: string }) {
     checkCount: number;
   }>(null);
   const [checkingCloudflare, setCheckingCloudflare] = useState(false);
+  const [checkingManagedHosting, setCheckingManagedHosting] = useState(false);
+  const [managedHosting, setManagedHosting] = useState<null | {
+    available: boolean;
+    canPublish: boolean;
+    blockers: string[];
+  }>(null);
   const [checkingSecurity, setCheckingSecurity] = useState(false);
   const [securityPreflight, setSecurityPreflight] = useState<null | {
     status: "blocked" | "review" | "no-indicators-observed" | "incomplete";
@@ -336,6 +342,35 @@ export function DeployPanel({ projectId }: { projectId: string }) {
     }
   }
 
+  async function checkManagedHosting() {
+    setCheckingManagedHosting(true);
+    setManagedHosting(null);
+    try {
+      const response = await fetch(
+        `/api/deploy/managed/preflight?projectId=${encodeURIComponent(projectId)}`,
+        { cache: "no-store" }
+      );
+      if (response.status === 404) {
+        setManagedHosting({ available: false, canPublish: false, blockers: [] });
+        return;
+      }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Managed hosting check failed");
+      // The current server contract never claims managed publishing is ready.
+      setManagedHosting({
+        available: true,
+        canPublish: data.canPublish === true,
+        blockers: Array.isArray(data.blockers)
+          ? data.blockers.filter((item: unknown): item is string => typeof item === "string")
+          : [],
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Managed hosting check unavailable");
+    } finally {
+      setCheckingManagedHosting(false);
+    }
+  }
+
   async function launchApp() {
     // A connected Vercel account can publish the full Next.js app directly.
     // Cloudflare is an honest setup handoff until the owner finishes GitHub
@@ -456,6 +491,35 @@ export function DeployPanel({ projectId }: { projectId: string }) {
                       <p key={index} className="text-destructive">{error}</p>
                     ))}
                     <p className="text-muted-foreground">A passing static scan cannot guarantee code is safe or ready to publish.</p>
+                  </div>
+                )}
+              </div>
+              <div className="rounded-lg border p-3 text-xs space-y-2">
+                <p className="font-medium">Automatic Cloudflare hosting readiness</p>
+                <p className="text-muted-foreground">
+                  Managed one-click publishing is being built. The existing launch button
+                  prepares an app for manual Cloudflare setup until managed hosting is verified.
+                </p>
+                <Button type="button" variant="outline" size="sm"
+                  disabled={checkingManagedHosting || deploying}
+                  onClick={() => void checkManagedHosting()}>
+                  {checkingManagedHosting ? "Checking readiness…" : "Check automatic hosting"}
+                </Button>
+                {managedHosting && (
+                  <div role="status" className="space-y-1">
+                    <p>
+                      {managedHosting.available
+                        ? managedHosting.canPublish
+                          ? "Publishing prerequisites appear available; verify before using managed hosting."
+                          : "Managed one-click publishing is not available yet."
+                        : "Managed hosting is not activated by the operator."}
+                    </p>
+                    {managedHosting.blockers.length > 0 && (
+                      <p className="text-muted-foreground">
+                        Outstanding safeguards: {managedHosting.blockers.length}.
+                        Existing guided Cloudflare setup remains available.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

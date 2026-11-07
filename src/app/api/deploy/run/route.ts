@@ -102,15 +102,19 @@ export async function POST(request: Request) {
   }
   const siteFiles = preview ? [{ path: "index.html", content: preview.content }] : [];
   const entries = await fs.list();
+  const sourceEntries = entries.filter((entry) => isDeploymentSourcePath(entry.path));
   const projectFiles = (
     await Promise.all(
-      entries
-        .filter((entry) => isDeploymentSourcePath(entry.path))
-        .map((entry) => fs.read(entry.path))
+      sourceEntries.map((entry) => fs.read(entry.path))
     )
   )
     .filter((file): file is NonNullable<typeof file> => Boolean(file))
     .map((file) => ({ path: file.path, content: file.content }));
+  if (!session.demo && projectFiles.length !== sourceEntries.length) {
+    return NextResponse.json({
+      error: "Project source changed while being checked. Retry before publishing.",
+    }, { status: 409, headers: { "Cache-Control": "no-store" } });
+  }
   if (!session.demo && (
     !projectFiles.some((file) => file.path === "package.json") ||
     !(

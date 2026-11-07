@@ -23,6 +23,7 @@ import { getFileSystem } from "@/lib/files/manager";
 import { getSession } from "@/lib/github/service";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+import { enforceDevShieldPreflight, DevShieldPreflightError, devShieldPublicEvidence } from "@/lib/security/devshield-preflight";
 
 export const maxDuration = 300;
 
@@ -132,6 +133,22 @@ export async function POST(request: Request) {
       },
       { status: 400 }
     );
+  }
+
+  // Scan the actual saved project source BEFORE reading provider credentials,
+  // recording a deployment, or uploading code to a remote builder.
+  if (!session.demo) {
+    try {
+      enforceDevShieldPreflight(projectFiles);
+    } catch (error) {
+      if (error instanceof DevShieldPreflightError) {
+        return NextResponse.json({
+          error: error.message,
+          securityPreflight: devShieldPublicEvidence(error.report),
+        }, { status: 409, headers: { "Cache-Control": "no-store" } });
+      }
+      throw error;
+    }
   }
 
   // Project metadata.

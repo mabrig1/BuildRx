@@ -37,6 +37,7 @@ it("serves and verifies the saved private preview under its owner and denies an 
   expect((await verifyPreviewResponds("private-project")).ok).toBe(true);
   const ownerResponse = await request();
   expect(await ownerResponse.text()).toContain("Owner preview");
+  expect(ownerResponse.headers.get("Content-Security-Policy")).toContain("sandbox allow-scripts");
   expect(ownerResponse.headers.get("Content-Security-Policy")).toContain("form-action 'none'");
   expect(ownerResponse.headers.get("Content-Security-Policy")).toContain("base-uri 'none'");
 

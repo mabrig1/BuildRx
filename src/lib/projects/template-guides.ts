@@ -84,7 +84,7 @@ const github: readonly TemplateGuide[] = GITHUB_APP_TEMPLATES.map(t => ({
     ["None required for initial source review"],
   assumptions: ["Compatibility with this BuildRx preview and deployment toolchain is unproven until built and tested."],
   envKeys: t.id === "github-supabase-starter" ?
-    ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"] : [],
+    ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] : [],
   setup: ["Clone pinned source to a private Draft.", "Read README.md and BUILD-RX-SOURCE.md.",
     "Check skipped binary assets, package versions and dependency advisories.",
     t.setupNote, "Run locally, test behavior and review access controls before hosting."],
@@ -104,7 +104,7 @@ const planned: readonly TemplateGuide[] = [
     sourceNote: "Specification only. No reviewed, cloneable source is present in the allowlist.",
     deployed: "Not verified", services: ["Supabase Auth/database", "Optional email/SMS (not configured)"],
     assumptions: ["Suggested architecture only; no source, live provider or booking contention test exists."],
-    envKeys: ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+    envKeys: ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"],
     setup: ["Review booking requirements and staff ownership.", "Design atomic conflict protection.",
       "Generate and review source separately; no code can be cloned from this card."],
     safeStart: UNIVERSAL_CHECKS,

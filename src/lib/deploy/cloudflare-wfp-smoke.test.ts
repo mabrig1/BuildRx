@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { managedWfpScriptName } from "./cloudflare-wfp-artifact";
 import { probeWfpWorker } from "./cloudflare-wfp-smoke";
 
@@ -9,6 +9,9 @@ const input = {
   operatorDispatchHostname: "apps.buildrx.example",
   verifiedHostname: "apps.buildrx.example",
 };
+
+beforeEach(() => vi.stubEnv("BUILDRX_WFP_DISPATCH_HOST", "apps.buildrx.example"));
+afterEach(() => vi.unstubAllEnvs());
 
 describe("WfP hosted smoke test", () => {
   it("refuses unverified hostnames and malformed names without network access", async () => {
@@ -24,6 +27,14 @@ describe("WfP hosted smoke test", () => {
       expect((await probeWfpWorker({ ...input, ...overrides }, http as typeof fetch)).passed).toBe(false);
     }
     expect(http).not.toHaveBeenCalled();
+  });
+
+  it("never probes the network if the exact operator hostname is unconfigured", async () => {
+    const mock = vi.fn();
+    vi.stubEnv("BUILDRX_WFP_DISPATCH_HOST", "");
+    const result = await probeWfpWorker(input, mock as typeof fetch);
+    expect(result.passed).toBe(false);
+    expect(mock).not.toHaveBeenCalled();
   });
 
   it("requires nonce echo and artifact hash echo before a limited smoke pass", async () => {

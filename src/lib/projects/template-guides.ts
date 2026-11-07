@@ -43,10 +43,9 @@ const UNIVERSAL_CHECKS = [
 
 const originals: readonly TemplateGuide[] = BEGINNER_CODE_TEMPLATES.map(t => {
   const isStock = t.id === "beginner-stock-list";
-  const isTask = t.id === "beginner-task-planner";
   return {
     id: t.id, name: t.name, description: t.description,
-    category: (isStock ? "Inventory" : isTask ? "Dashboards" : "Business apps") as TemplateCategory,
+    category: (isStock ? "Inventory" : "Business apps") as TemplateCategory,
     difficulty: "Beginner" as const,
     state: "source-reviewed" as const,
     origin: "BuildRx original" as const,
@@ -70,9 +69,8 @@ const originals: readonly TemplateGuide[] = BEGINNER_CODE_TEMPLATES.map(t => {
 
 const github: readonly TemplateGuide[] = GITHUB_APP_TEMPLATES.map(t => ({
   id: t.id, name: t.name, description: t.description,
-  category: (t.id === "github-supabase-starter" ? "Business apps" :
-    t.id === "github-blog-starter" ? "Education" :
-    t.id === "github-context-counter" ? "Dashboards" : "E-commerce") as TemplateCategory,
+  category: (t.id === "github-blog-starter" || t.id === "github-context-counter"
+    ? "Education" : "Business apps") as TemplateCategory,
   difficulty: t.difficulty,
   state: "source-reviewed" as const,
   origin: "Pinned GitHub" as const,
@@ -82,7 +80,8 @@ const github: readonly TemplateGuide[] = GITHUB_APP_TEMPLATES.map(t => ({
   deployed: "Not verified" as const,
   services: t.requiresExternalService ? ["Supabase account and Auth/database setup"] :
     ["None required for initial source review"],
-  assumptions: ["Compatibility with this BuildRx preview and deployment toolchain is unproven until built and tested."],
+  assumptions: ["Compatibility with this BuildRx preview and deployment toolchain is unproven until built and tested.",
+    "The category indicates a possible learning/use case, not a completed production workflow."],
   envKeys: t.id === "github-supabase-starter" ?
     ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] : [],
   setup: ["Clone pinned source to a private Draft.", "Read README.md and BUILD-RX-SOURCE.md.",

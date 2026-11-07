@@ -105,7 +105,8 @@ export function validateWfpArtifact(input: WfpUploadInput): {
 } {
   const { attestation: a, verifiedLease: lease, compiledModule: module,
     accountId, apiToken, signature, publicKeyPem } = input;
-  if (!input.executionEnabled) throw new WfpAdapterError("disabled");
+  if (process.env.BUILDRX_WFP_ARTIFACT_UPLOAD_ENABLED !== "true" ||
+      !input.executionEnabled) throw new WfpAdapterError("disabled");
   if (!a || !lease || !matchUuid(a.ownerId) || !matchUuid(a.projectId) ||
       !matchUuid(a.quotaLeaseId) || !matchUuid(a.idempotencyKey) ||
       a.protocol !== ENGINE_VERSION || !SHA256.test(a.sourceDigest) ||
@@ -115,7 +116,10 @@ export function validateWfpArtifact(input: WfpUploadInput): {
   // The deployer namespace must originate from operator settings and be
   // independently checked against a reserved tenant job before this call.
   if (!CF_ACCOUNT.test(accountId) || typeof apiToken !== "string" ||
-      apiToken.length < 15 || typeof publicKeyPem !== "string") {
+      apiToken.length < 15 || typeof publicKeyPem !== "string" ||
+      !same(process.env.BUILDRX_MANAGED_WFP_ACCOUNT_ID ?? "", accountId) ||
+      !same(process.env.BUILDRX_MANAGED_WFP_NAMESPACE ?? "", a.namespace) ||
+      !same(process.env.BUILDRX_MANAGED_WFP_API_TOKEN ?? "", apiToken)) {
     throw new WfpAdapterError("invalid_configuration");
   }
   if (typeof module !== "string" || !module.trim()) {

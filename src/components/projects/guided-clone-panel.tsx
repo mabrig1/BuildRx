@@ -205,6 +205,10 @@ export function GuidedClonePanel({ template, onClose }: { template: TemplateGuid
               onChange={e => change("audience", e.target.value)} placeholder="e.g. local businesses" />
           </label>
           <div>
+            <h4 className="text-sm font-medium">Assumptions — not verified</h4>
+            <p className="text-muted-foreground mt-1 text-sm">{template.assumptions.join(" · ")}</p>
+          </div>
+          <div>
             <h4 className="text-sm font-medium">Editable features</h4>
             <p className="text-muted-foreground mt-1 text-sm">{template.editable.join(" · ")}</p>
           </div>

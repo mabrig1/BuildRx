@@ -61,14 +61,13 @@ export function signStagingArtifact(
   signingKey: string
 ): StagingWorkerArtifact {
   if (signingKey.length < 32) throw new Error("Weak builder attestation key.");
-  const { module: _module, ...payload } = data;
   // Verifying the module's SHA prevents signing a mismatched payload.
   if (moduleDigest(data.module) !== data.moduleSha256) {
     throw new Error("Module digest mismatch.");
   }
   return {
     ...data,
-    signature: createHmac("sha256", signingKey).update(attestationPayload(payload)).digest("hex")
+    signature: createHmac("sha256", signingKey).update(attestationPayload(data)).digest("hex")
   };
 }
 
@@ -104,10 +103,9 @@ export function verifyStagingArtifact(
       moduleDigest(artifact.module) !== artifact.moduleSha256) {
     throw new Error("Artifact exceeds limits or its content has changed.");
   }
-  const { module: _module, signature, ...payload } = artifact;
   const expectedMac = createHmac("sha256", signingKey)
-    .update(attestationPayload(payload)).digest();
-  const receivedMac = Buffer.from(signature, "hex");
+    .update(attestationPayload(artifact)).digest();
+  const receivedMac = Buffer.from(artifact.signature, "hex");
   if (receivedMac.byteLength !== expectedMac.byteLength ||
       !timingSafeEqual(receivedMac, expectedMac)) {
     throw new Error("Invalid artifact signature.");

@@ -234,6 +234,9 @@ export function GuidedClonePanel({ template, onClose }: { template: TemplateGuid
               {template.setup.map(s => <li key={s}>{s}</li>)}
             </ol>
           </div>
+          <div><h4 className="text-sm font-medium">Safe-start checklist — guidance, not test results</h4>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{template.safeStart.map(item => <li key={item}>{item}</li>)}</ul>
+          </div>
           <p className="rounded-md bg-muted/50 p-3 text-sm"><strong>Smallest next action:</strong> {template.nextAction}</p>
         </div>
         <div className="space-y-4">

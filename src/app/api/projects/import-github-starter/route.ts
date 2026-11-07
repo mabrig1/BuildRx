@@ -16,7 +16,7 @@ export const maxDuration = 120;
 const schema = z.object({
   templateId: z.enum(["github-blog-starter", "github-supabase-starter", "github-basic-css", "github-context-counter",
     "beginner-business-website", "beginner-personal-portfolio", "beginner-task-planner", "beginner-stock-list"]),
-});
+}).strict();
 
 /** POST — copy an allowlisted MIT example's editable files into a new draft.
  * This is a code import, NOT a verified app build or external deployment.

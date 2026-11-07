@@ -506,7 +506,7 @@ export function fallbackPlan(prompt: string): AppPlan {
  * slice). Fill what's missing from the deterministic plan and enforce
  * the size limits the prompt asks for.
  */
-function normalizePlan(plan: Partial<AppPlan> | null, prompt: string): AppPlan {
+export function normalizePlan(plan: Partial<AppPlan> | null, prompt: string): AppPlan {
   const base = fallbackPlan(prompt);
   const list = <T>(
     value: unknown,

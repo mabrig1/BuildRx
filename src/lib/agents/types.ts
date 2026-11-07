@@ -113,6 +113,8 @@ export interface WorkflowContext {
   founderOpsSource?: "agent" | "deterministic";
   /** Accumulated generated files, keyed by path (later agents may revise). */
   files: Map<string, GeneratedFile>;
+  /** Contents loaded before a repair, so only changed files are saved. */
+  repairSnapshot?: Map<string, string>;
   previewUrl?: string;
   /** Final blocking verification result set by the deployment agent. */
   verificationPassed?: boolean;

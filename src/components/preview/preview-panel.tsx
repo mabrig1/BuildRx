@@ -257,6 +257,9 @@ export function PreviewPanel({
         />
       ) : (
         <>
+          <p className="bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200" role="note">
+            Instant shows isolated saved HTML, not a verified live app. Database writes, Auth, payments and notifications must be tested separately.
+          </p>
           <div className="bg-muted/40 flex min-h-0 flex-1 items-stretch justify-center overflow-auto p-4">
             <div
               className="bg-background flex flex-col overflow-hidden rounded-lg border shadow-sm transition-[width] duration-200"
@@ -267,7 +270,7 @@ export function PreviewPanel({
                   ref={previewFrameRef}
                   key={reloadKey}
                   src={previewUrl}
-                  title="Live preview"
+                  title="Isolated saved HTML prototype"
                   className="size-full flex-1"
                   sandbox="allow-scripts"
                 />

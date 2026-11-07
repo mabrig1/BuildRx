@@ -183,6 +183,15 @@ export function CreateProjectDialog({
                   Demo mode: drafts stay in this browser session. Generated files are temporary on the server; connect a database before creating real customer projects.
                 </p>
               )}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <div>
+                  <p className="text-sm font-semibold">New to app development?</p>
+                  <p className="text-muted-foreground text-xs">Copy real editable code from the Clone Vault instead of starting from scratch.</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" asChild>
+                  <Link href="/templates" onClick={() => setOpen(false)}>Browse 8 code starters</Link>
+                </Button>
+              </div>
               <section aria-label="Starter app ideas" className="space-y-2">
                 <div className="flex items-center gap-2">
                   <LayoutTemplate className="size-4 text-primary" aria-hidden="true" />

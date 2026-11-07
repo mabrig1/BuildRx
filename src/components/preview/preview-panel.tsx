@@ -76,6 +76,7 @@ export function PreviewPanel({
   const [showConsole, setShowConsole] = useState(false);
   const [entries, setEntries] = useState<ConsoleEntry[]>([]);
   const shellRef = useRef<HTMLDivElement>(null);
+  const previewFrameRef = useRef<HTMLIFrameElement>(null);
 
   // Error console feed: the served preview forwards runtime errors via
   // postMessage (injected by /api/preview).
@@ -84,7 +85,7 @@ export function PreviewPanel({
       const payload = event.data?.__previewEvent as
         | { level: "error" | "warn"; text: string }
         | undefined;
-      if (payload) {
+      if (payload && event.source === previewFrameRef.current?.contentWindow) {
         setEntries((prev) => [
           ...prev.slice(-199),
           { level: payload.level, text: payload.text, at: Date.now() },
@@ -263,11 +264,12 @@ export function PreviewPanel({
             >
               {previewUrl ? (
                 <iframe
+                  ref={previewFrameRef}
                   key={reloadKey}
                   src={previewUrl}
                   title="Live preview"
                   className="size-full flex-1"
-                  sandbox="allow-scripts allow-same-origin allow-forms"
+                  sandbox="allow-scripts"
                 />
               ) : (
                 <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm">

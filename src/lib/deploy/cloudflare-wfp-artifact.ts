@@ -11,7 +11,7 @@ import {
   createHash, createPublicKey, timingSafeEqual, verify as verifySignature,
 } from "node:crypto";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
 const CF_ACCOUNT = /^[a-f0-9]{32}$/i;
 const NAMESPACE = /^[a-z][a-z0-9-]{0,62}$/;

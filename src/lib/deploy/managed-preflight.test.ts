@@ -58,6 +58,23 @@ describe("managed publish preflight", () => {
       expect(check({ files }).blockers).toContain("source_invalid");
     }
   });
+  it("withholds digest and blocks when DevShield reports suspicious or unscannable source", () => {
+    const malicious = check({ files: [
+      ...source,
+      { path: "tool.ps1", content: "powershell.exe -EncodedCommand Zg==" },
+    ] });
+    expect(malicious.sourceDigest).toBeNull();
+    expect(malicious.blockers).toContain("security_scan_failed");
+    expect(malicious.canPublish).toBe(false);
+
+    const incomplete = check({ files: [
+      ...source,
+      { path: "payload.exe", content: "untrusted executable" },
+    ] });
+    expect(incomplete.sourceDigest).toBeNull();
+    expect(incomplete.blockers).toContain("security_scan_incomplete");
+    expect(incomplete.canPublish).toBe(false);
+  });
   it("only checks presence of explicitly named server settings", () => {
     expect(operatorConfigurationPresent({})).toBe(false);
     expect(operatorConfigurationPresent({

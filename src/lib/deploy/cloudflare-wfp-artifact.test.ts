@@ -49,13 +49,13 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("BuildRx Workers for Platforms artifact contract", () => {
   it("derives a fixed script name independent of tenant supplied display names", () => {
-    expect(managedWfpScriptName(projectId)).toBe("brx-" + projectId.replace(/-/g, ""));
-    expect(() => managedWfpScriptName("../operator")).toThrow(/invalid_artifact/);
+    expect(managedWfpScriptName(ownerId, projectId)).toMatch(/^brx-[a-f0-9]{36}$/);
+    expect(() => managedWfpScriptName(ownerId, "../operator")).toThrow(/invalid_artifact/);
   });
 
   it("accepts a signed artifact bound to an attested lease", () => {
     expect(validateWfpArtifact(valid())).toMatchObject({
-      scriptName: managedWfpScriptName(projectId),
+      scriptName: managedWfpScriptName(ownerId, projectId),
       namespace: "buildrx-staging",
       byteSize: Buffer.byteLength(worker),
     });
@@ -105,7 +105,7 @@ describe("BuildRx Workers for Platforms artifact contract", () => {
       expect(url).toBe(
         "https://api.cloudflare.com/client/v4/accounts/" +
         "f".repeat(32) + "/workers/dispatch/namespaces/buildrx-staging/scripts/" +
-        managedWfpScriptName(projectId)
+        managedWfpScriptName(ownerId, projectId)
       );
       expect(options.method).toBe("PUT");
       expect(options.redirect).toBe("manual");
@@ -118,7 +118,7 @@ describe("BuildRx Workers for Platforms artifact contract", () => {
       const file = form.get("worker.mjs") as File;
       expect(file.name).toBe("worker.mjs");
       expect(await file.text()).toBe(worker);
-      return Response.json({ success: true, result: { id: managedWfpScriptName(projectId) } });
+      return Response.json({ success: true, result: { id: managedWfpScriptName(ownerId, projectId) } });
     });
     const result = await uploadAttestedWfpArtifact(valid(), http as typeof fetch);
     expect(result.uploaded).toBe(true);

@@ -44,6 +44,18 @@ describe("curated GitHub app templates", () => {
     expect(() => validateImportedGithubFiles([dangerous, ...files.slice(1)])).toThrow(/installation hooks/);
   });
 
+  it("blocks a valid-looking GitHub starter with hidden malware before it can be saved", () => {
+    const malicious = [
+      files[0],
+      { path: "src/app/page.tsx", content: "export default function Page(){ return null; }\n" +
+        " ".repeat(160) + "powershell.exe -EncodedCommand abc" },
+      files[2],
+    ];
+    expect(() => validateImportedGithubFiles(malicious)).toThrow(/suspicious code/i);
+    const clean = validateImportedGithubFiles(files);
+    expect(clean.status).toBe("no-indicators-observed");
+  });
+
   it("copies immutable source with original license but never imports environment secrets", async () => {
     const source = GITHUB_APP_TEMPLATES[0];
     const fileNames = files.map((f, i) => ({ ...f, sha: String(i + 1).repeat(40), size: Buffer.byteLength(f.content) }));

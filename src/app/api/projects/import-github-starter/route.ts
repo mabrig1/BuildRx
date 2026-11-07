@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getSession } from "@/lib/github/service";
+import { DevShieldPreflightError, devShieldPublicEvidence } from "@/lib/security/devshield-preflight";
 import { findGithubAppTemplate } from "@/lib/projects/github-app-templates";
 import {
   GithubTemplateImportError,
@@ -120,12 +121,19 @@ export async function POST(request: Request) {
       files: source.files.length,
       skippedBinary: source.skippedBinary,
       sourceUrl: source.sourceUrl,
+      securityPreflight: devShieldPublicEvidence(source.securityPreflight),
       message: "Editable source imported. Review and build before publishing.",
     }, {
       status: 201,
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
+    if (error instanceof DevShieldPreflightError) {
+      return NextResponse.json({
+        error: error.message,
+        securityPreflight: devShieldPublicEvidence(error.report),
+      }, { status: 422, headers: { "Cache-Control": "no-store" } });
+    }
     if (error instanceof GithubTemplateImportError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }

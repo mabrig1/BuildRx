@@ -8,6 +8,7 @@ import { getFileSystem } from "@/lib/files/manager";
 import { GitHubApiError, GitHubClient } from "@/lib/github/client";
 import { getConnection, getSession } from "@/lib/github/service";
 import { createClient } from "@/lib/supabase/server";
+import { enforceDevShieldPreflight, DevShieldPreflightError, devShieldPublicEvidence } from "@/lib/security/devshield-preflight";
 
 export const maxDuration = 120;
 
@@ -48,22 +49,29 @@ export async function POST(request: Request) {
   if (project.github_repo && !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(project.github_repo)) {
     return NextResponse.json({ error: "The linked GitHub repository name is invalid. Review the GitHub connection." }, { status: 400 });
   }
-  const connection = await getConnection();
-  if (!connection) {
-    return NextResponse.json({ error: "Connect GitHub in the workspace first." }, { status: 400 });
-  }
-
   try {
     const fs = getFileSystem(parsed.data.projectId);
     const entries = await fs.list();
+    const sourceEntries = entries.filter(entry =>
+      isDeploymentSourcePath(entry.path) && !entry.path.startsWith(".github/")
+    );
     const source = (await Promise.all(
-      entries
-        .filter(entry => isDeploymentSourcePath(entry.path) && !entry.path.startsWith(".github/"))
-        .map(entry => fs.read(entry.path))
+      sourceEntries.map(entry => fs.read(entry.path))
     ))
       .filter((file): file is NonNullable<typeof file> => file !== null)
       .map(({ path, content }) => ({ path, content }));
+    if (source.length !== sourceEntries.length) {
+      return NextResponse.json({
+        error: "Project source changed while being checked. Retry before preparing GitHub.",
+      }, { status: 409, headers: { "Cache-Control": "no-store" } });
+    }
+    // Fail closed before contacting GitHub or creating a private repository.
+    const securityPreflight = enforceDevShieldPreflight(source);
     const prepared = prepareCloudflareSource(source, project.name);
+    const connection = await getConnection();
+    if (!connection) {
+      return NextResponse.json({ error: "Connect GitHub in the workspace first." }, { status: 400 });
+    }
     const client = new GitHubClient(connection.token);
     // An explicit Prepare click may create a PRIVATE repository if this
     // project has never been linked. Avoid making project source public.
@@ -93,6 +101,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       prepared: true,
       deployed: false,
+      securityPreflight: devShieldPublicEvidence(securityPreflight),
       repositoryCreated,
       workerName: prepared.workerName,
       // Workers Builds must follow the exact branch and worker name pushed
@@ -116,6 +125,12 @@ export async function POST(request: Request) {
       ],
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (error instanceof DevShieldPreflightError) {
+      return NextResponse.json({
+        error: error.message,
+        securityPreflight: devShieldPublicEvidence(error.report),
+      }, { status: 409, headers: { "Cache-Control": "no-store" } });
+    }
     const message = error instanceof Error ? error.message : "Unable to prepare Cloudflare deployment.";
     return NextResponse.json({ error: message }, {
       status: error instanceof DeployError ? 400 : error instanceof GitHubApiError ? 502 : 500,

@@ -11,6 +11,7 @@ import {
   getSession,
 } from "@/lib/github/service";
 import { createClient } from "@/lib/supabase/server";
+import { enforceDevShieldPreflight, DevShieldPreflightError, devShieldPublicEvidence } from "@/lib/security/devshield-preflight";
 
 export const maxDuration = 120;
 
@@ -95,15 +96,24 @@ export async function POST(request: Request) {
 
   try {
     const fs = getFileSystem(projectId);
-    const contents = await Promise.all(
-      files.map(async ({ path }) => (await fs.read(path))!)
+    const readFiles = await Promise.all(
+      files.map(({ path }) => fs.read(path))
     );
+    if (readFiles.some(file => !file)) {
+      return NextResponse.json({
+        error: "Project source changed during review. Retry before pushing.",
+      }, { status: 409, headers: { "Cache-Control": "no-store" } });
+    }
+    const contents = readFiles.filter((file): file is NonNullable<typeof file> => file !== null)
+      .map(file => ({ path: file.path, content: file.content }));
     const credentialFile = fileWithEmbeddedCredential(contents);
     if (credentialFile) {
       return NextResponse.json({
         error: `Source file ${credentialFile} may contain a secret. Remove the value and use your hosting provider's encrypted settings instead.`,
       }, { status: 409 });
     }
+    // GitHub pushes can trigger linked CI/CD; scan before mutating the remote.
+    const securityPreflight = enforceDevShieldPreflight(contents);
     const client = new GitHubClient(connection.token);
     const repo = await client.getRepo(project.github_repo);
     const result = await client.pushFiles(
@@ -112,8 +122,16 @@ export async function POST(request: Request) {
       message,
       repo.defaultBranch
     );
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result, securityPreflight: devShieldPublicEvidence(securityPreflight),
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (error instanceof DevShieldPreflightError) {
+      return NextResponse.json({
+        error: error.message,
+        securityPreflight: devShieldPublicEvidence(error.report),
+      }, { status: 409, headers: { "Cache-Control": "no-store" } });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Push failed" },
       { status: error instanceof GitHubApiError ? 502 : 500 }

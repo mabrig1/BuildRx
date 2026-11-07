@@ -156,6 +156,14 @@ export function DeployPanel({ projectId }: { projectId: string }) {
     checkCount: number;
   }>(null);
   const [checkingCloudflare, setCheckingCloudflare] = useState(false);
+  const [checkingSecurity, setCheckingSecurity] = useState(false);
+  const [securityPreflight, setSecurityPreflight] = useState<null | {
+    status: "blocked" | "review" | "no-indicators-observed" | "incomplete";
+    complete: boolean;
+    checkedFiles: number;
+    findings: Array<{ id: string; path: string; line: number; message: string }>;
+    errors: string[];
+  }>(null);
   const [cloudflareHandoff, setCloudflareHandoff] = useState<null | {
     repositoryUrl: string;
     workflowUrl: string;
@@ -310,6 +318,24 @@ export function DeployPanel({ projectId }: { projectId: string }) {
     }
   }
 
+  async function checkSecurity() {
+    setCheckingSecurity(true);
+    setSecurityPreflight(null);
+    try {
+      const response = await fetch(
+        `/api/projects/security-preflight?projectId=${encodeURIComponent(projectId)}`,
+        { cache: "no-store" }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error ?? "Security scan unavailable");
+      setSecurityPreflight(data.securityPreflight);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Security check could not complete");
+    } finally {
+      setCheckingSecurity(false);
+    }
+  }
+
   async function launchApp() {
     // A connected Vercel account can publish the full Next.js app directly.
     // Cloudflare is an honest setup handoff until the owner finishes GitHub
@@ -405,6 +431,34 @@ export function DeployPanel({ projectId }: { projectId: string }) {
                   <Globe className="size-4" /> Open my published app <ExternalLink className="size-3.5" />
                 </a>
               )}
+              <div className="rounded-lg border p-3 text-xs space-y-2" aria-live="polite">
+                <div className="font-medium">DevShield AI — scan before launch</div>
+                <p className="text-muted-foreground">Checks suspicious code without executing it. Every real launch is checked again automatically.</p>
+                <Button type="button" size="sm" variant="outline" disabled={checkingSecurity || deploying}
+                  onClick={() => void checkSecurity()}>
+                  {checkingSecurity ? "Checking source…" : "Check my app security"}
+                </Button>
+                {securityPreflight && (
+                  <div className="space-y-1">
+                    <p className="font-medium">
+                      {securityPreflight.status === "no-indicators-observed"
+                        ? `No matching indicators in ${securityPreflight.checkedFiles} inspected files.`
+                        : securityPreflight.status === "incomplete"
+                          ? "Security scan incomplete — launch will be blocked."
+                          : "Suspicious code detected — launch will be blocked."}
+                    </p>
+                    {securityPreflight.findings.slice(0, 5).map((finding, index) => (
+                      <p key={`${finding.id}-${index}`} className="text-destructive">
+                        {finding.id} in {finding.path}:{finding.line}. {finding.message}
+                      </p>
+                    ))}
+                    {securityPreflight.errors.map((error, index) => (
+                      <p key={index} className="text-destructive">{error}</p>
+                    ))}
+                    <p className="text-muted-foreground">A passing static scan cannot guarantee code is safe or ready to publish.</p>
+                  </div>
+                )}
+              </div>
               <button type="button" disabled={checkingCloudflare} className="text-xs font-medium text-primary underline underline-offset-4 disabled:opacity-50" onClick={() => void checkCloudflareBuild()}>
                 {checkingCloudflare ? "Checking Cloudflare…" : "Check my Cloudflare launch"}
               </button>

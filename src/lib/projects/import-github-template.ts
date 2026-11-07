@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 
 import { fileWithEmbeddedCredential, isDeploymentSourcePath } from "@/lib/deploy/source";
 import { isSafeFilePath } from "@/lib/agents/llm";
+import { enforceDevShieldPreflight, type DevShieldPreflightReport } from "@/lib/security/devshield-preflight";
 import type { GithubAppTemplate } from "@/lib/projects/github-app-templates";
 
 /**
@@ -27,6 +28,7 @@ export type GithubImportedProject = {
   files: GithubImportedFile[];
   skippedBinary: number;
   sourceUrl: string;
+  securityPreflight: DevShieldPreflightReport;
 };
 
 export class GithubTemplateImportError extends Error {
@@ -136,6 +138,9 @@ export function validateImportedGithubFiles(files: GithubImportedFile[]) {
       `Potential credential found in ${leaked}. This template is not safe to import.`
     );
   }
+  // Perform DevShield's in-memory checks before creating any project records.
+  // A GitHub template's pinned commit is not a substitute for malware screening.
+  return enforceDevShieldPreflight(files);
 }
 
 export async function importGithubTemplateSource(
@@ -224,6 +229,6 @@ export async function importGithubTemplateSource(
       "",
     ].join("\n"),
   });
-  validateImportedGithubFiles(files);
-  return { files, skippedBinary, sourceUrl: template.sourceUrl };
+  const securityPreflight = validateImportedGithubFiles(files);
+  return { files, skippedBinary, sourceUrl: template.sourceUrl, securityPreflight };
 }

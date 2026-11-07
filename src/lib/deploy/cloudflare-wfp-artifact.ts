@@ -75,10 +75,13 @@ function matchUuid(input: string) {
   return typeof input === "string" && UUID.test(input);
 }
 
-/** Stable isolated script target for one project; no user-editable slugs. */
-export function managedWfpScriptName(projectId: string): string {
-  if (!matchUuid(projectId)) throw new WfpAdapterError("invalid_artifact");
-  return "brx-" + projectId.replace(/-/g, "").toLowerCase();
+/** Stable tenant/project target, aligned with the staging dispatcher in PR #48. */
+export function managedWfpScriptName(ownerId: string, projectId: string): string {
+  if (!matchUuid(ownerId) || !matchUuid(projectId)) throw new WfpAdapterError("invalid_artifact");
+  return "brx-" + createHash("sha256")
+    .update("buildrx-wfp-tenant-project-v1\\0".replace("\\0", "\0") +
+      ownerId.toLowerCase() + "\\0".replace("\\0", "\0") + projectId.toLowerCase())
+    .digest("hex").slice(0, 36);
 }
 
 function serializeClaim(claim: ArtifactAttestation): Buffer {
@@ -154,7 +157,7 @@ export function validateWfpArtifact(input: WfpUploadInput): {
     throw new WfpAdapterError("invalid_proof");
   }
   return {
-    scriptName: managedWfpScriptName(a.projectId),
+    scriptName: managedWfpScriptName(a.ownerId, a.projectId),
     namespace: a.namespace,
     digest,
     byteSize: bytes,

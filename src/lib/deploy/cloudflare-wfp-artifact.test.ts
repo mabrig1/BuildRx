@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import {
   managedWfpScriptName, serializeArtifactAttestation, uploadAttestedWfpArtifact,
   validateWfpArtifact, type ArtifactAttestation, type WfpUploadInput,
@@ -39,6 +39,14 @@ function valid(overrides: Partial<WfpUploadInput> = {}): WfpUploadInput {
   };
 }
 
+beforeEach(() => {
+  vi.stubEnv("BUILDRX_WFP_ARTIFACT_UPLOAD_ENABLED", "true");
+  vi.stubEnv("BUILDRX_MANAGED_WFP_ACCOUNT_ID", "f".repeat(32));
+  vi.stubEnv("BUILDRX_MANAGED_WFP_NAMESPACE", "buildrx-staging");
+  vi.stubEnv("BUILDRX_MANAGED_WFP_API_TOKEN", "SECRET-PRIVATE-OPERATOR-TOKEN");
+});
+afterEach(() => vi.unstubAllEnvs());
+
 describe("BuildRx Workers for Platforms artifact contract", () => {
   it("derives a fixed script name independent of tenant supplied display names", () => {
     expect(managedWfpScriptName(projectId)).toBe("brx-" + projectId.replace(/-/g, ""));
@@ -51,6 +59,18 @@ describe("BuildRx Workers for Platforms artifact contract", () => {
       namespace: "buildrx-staging",
       byteSize: Buffer.byteLength(worker),
     });
+  });
+
+  it("refuses uploads when the server-only feature flag is off or namespace is changed", async () => {
+    const http = vi.fn();
+    vi.stubEnv("BUILDRX_WFP_ARTIFACT_UPLOAD_ENABLED", "false");
+    await expect(uploadAttestedWfpArtifact(valid(), http as typeof fetch))
+      .rejects.toThrow(/disabled/);
+    vi.stubEnv("BUILDRX_WFP_ARTIFACT_UPLOAD_ENABLED", "true");
+    vi.stubEnv("BUILDRX_MANAGED_WFP_NAMESPACE", "operator-other-namespace");
+    await expect(uploadAttestedWfpArtifact(valid(), http as typeof fetch))
+      .rejects.toThrow(/invalid_configuration/);
+    expect(http).not.toHaveBeenCalled();
   });
 
   it("never uploads without an explicit private executor switch", async () => {

@@ -149,7 +149,9 @@ describe("BuildRx Workers for Platforms artifact contract", () => {
   it("won't allow edits to signed release claim fields", () => {
     const input = valid();
     input.attestation = { ...input.attestation, namespace: "buildrx-production" };
-    expect(() => validateWfpArtifact(input)).toThrow(/invalid_lease/);
+    // Operator namespace allowlisting is deliberately checked BEFORE
+    // durable-lease reconciliation: this must fail as invalid_configuration.
+    expect(() => validateWfpArtifact(input)).toThrow(/invalid_configuration/);
     const forged = valid();
     forged.attestation = { ...forged.attestation, sourceDigest: "1".repeat(64) };
     forged.verifiedLease = { ...forged.verifiedLease, sourceDigest: "1".repeat(64) };

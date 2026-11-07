@@ -11,8 +11,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 /**
  * The completion checklist: every claim we can honestly verify from the
  * server before calling an app "done". Static claims come from the final
- * check-suite state; the preview claim is a real HTTP fetch of the
- * published preview. (A real `npm run build` of the generated app runs
+ * check-suite state; the preview claim is a read of the saved HTML through the same owner-scoped
+ * response used by the workspace. (A real `npm run build` of the generated app runs
  * client-side in the WebContainer preview — a serverless function can't
  * execute it, so the static suite is the server-side stand-in.)
  */
@@ -100,17 +100,11 @@ async function buildVerification(
     detail: `${pages.length}/${plan.pages.length} pages`,
   });
 
-  // Real fetch of the published preview, from the outside.
   const preview = await verifyPreviewResponds(context.projectId);
   items.push({
-    label: "Preview renders",
-    status: preview === null ? "warn" : preview.ok ? "pass" : context.persist ? "fail" : "warn",
-    detail:
-      preview === null
-        ? "no public URL configured to verify against"
-        : !preview.ok && !context.persist
-          ? `${preview.detail} (demo mode stores files in memory — expected across instances)`
-          : preview.detail,
+    label: "Saved workspace preview",
+    status: preview.ok ? "pass" : "fail",
+    detail: preview.detail,
   });
 
   items.push({
@@ -141,14 +135,15 @@ export const deploymentAgent: Agent = {
 
     const previewUrl = `/api/preview/${context.projectId}`;
 
+    const changed = [...context.files.values()].filter(
+      file => context.repairSnapshot?.get(file.path) !== file.content
+    );
     emit({
       type: "agent_log",
       agent: "deployment",
-      message: `Saving ${context.files.size} files…`,
+      message: `Saving ${changed.length} changed files…`,
     });
-    await getFileSystem(context.projectId).writeMany([
-      ...context.files.values(),
-    ]);
+    await getFileSystem(context.projectId).writeMany(changed);
 
     // Verification runs BEFORE the project is marked ready: "ready" has
     // to mean verified, not merely generated. Files are already saved at
@@ -199,8 +194,9 @@ export const deploymentAgent: Agent = {
       await supabase.from("chat_messages").insert({
         project_id: context.projectId,
         role: "assistant",
+        metadata: { kind: "build-result", prompt: context.prompt, plan: JSON.parse(JSON.stringify(plan)) },
         content: verified
-          ? `🚀 **Build complete and verified** — **${plan?.appName ?? "your app"}**, ${context.files.size} files (${plan?.pages.length ?? 0} pages, ${plan?.dataModel.length ?? 0} tables). Every check passed and the preview is live.`
+          ? `🚀 **Build complete and verified** — **${plan?.appName ?? "your app"}**, ${context.files.size} files (${plan?.pages.length ?? 0} pages, ${plan?.dataModel.length ?? 0} tables). Blocking checks passed. Open the workspace preview to try the app.`
           : [
               `⚠️ **Build finished but did not pass verification** — **${plan?.appName ?? "your app"}**, ${context.files.size} files saved.`,
               "",
@@ -208,7 +204,7 @@ export const deploymentAgent: Agent = {
               ...failures.map((item) => `- ${item.label}${item.detail ? ` — ${item.detail}` : ""}`),
               "",
               "**What BuildRx did** — it generated the app, ran its checks, and applied every repair it could before stopping at the configured limit.",
-              "**What you can do** — send another message to retry the build, or open the Code tab to inspect the files that were saved.",
+              "**What you can do** — type **Repair** to check and repair the saved project, or open the Code tab to inspect the files that were saved.",
             ].join("\n"),
       });
     } else {

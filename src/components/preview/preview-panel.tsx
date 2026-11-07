@@ -76,6 +76,7 @@ export function PreviewPanel({
   const [showConsole, setShowConsole] = useState(false);
   const [entries, setEntries] = useState<ConsoleEntry[]>([]);
   const shellRef = useRef<HTMLDivElement>(null);
+  const previewFrameRef = useRef<HTMLIFrameElement>(null);
 
   // Error console feed: the served preview forwards runtime errors via
   // postMessage (injected by /api/preview).
@@ -84,7 +85,7 @@ export function PreviewPanel({
       const payload = event.data?.__previewEvent as
         | { level: "error" | "warn"; text: string }
         | undefined;
-      if (payload) {
+      if (payload && event.source === previewFrameRef.current?.contentWindow) {
         setEntries((prev) => [
           ...prev.slice(-199),
           { level: payload.level, text: payload.text, at: Date.now() },
@@ -256,6 +257,9 @@ export function PreviewPanel({
         />
       ) : (
         <>
+          <p className="bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200" role="note">
+            Instant shows isolated saved HTML, not a verified live app. Database writes, Auth, payments and notifications must be tested separately.
+          </p>
           <div className="bg-muted/40 flex min-h-0 flex-1 items-stretch justify-center overflow-auto p-4">
             <div
               className="bg-background flex flex-col overflow-hidden rounded-lg border shadow-sm transition-[width] duration-200"
@@ -263,11 +267,12 @@ export function PreviewPanel({
             >
               {previewUrl ? (
                 <iframe
+                  ref={previewFrameRef}
                   key={reloadKey}
                   src={previewUrl}
-                  title="Live preview"
+                  title="Isolated saved HTML prototype"
                   className="size-full flex-1"
-                  sandbox="allow-scripts allow-same-origin allow-forms"
+                  sandbox="allow-scripts"
                 />
               ) : (
                 <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm">

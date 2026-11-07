@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { isBuildBrief, isRepairCommand } from "@/lib/validations/build-prompt";
 import { useChatStore } from "@/stores/chat-store";
 import type { AgentEvent, AgentName } from "@/lib/agents/types";
 import { AgentEventStream } from "@/lib/agents/event-stream";
@@ -99,6 +100,7 @@ export function AgentRunPanel({
   const [running, setRunning] = useState(false);
   const workspaceBusy = useChatStore((state) => state.isStreaming);
   const setWorkspaceBusy = useChatStore((state) => state.setStreaming);
+  const [activeAgents, setActiveAgents] = useState(AGENT_ORDER);
   const [steps, setSteps] = useState(initialSteps);
   const [files, setFiles] = useState<string[]>([]);
   const [finished, setFinished] = useState(false);
@@ -109,6 +111,9 @@ export function AgentRunPanel({
 
   function applyEvent(event: AgentEvent) {
     switch (event.type) {
+      case "workflow_start":
+        setActiveAgents(event.agents);
+        break;
       case "agent_start":
         setSteps((prev) => ({
           ...prev,
@@ -204,7 +209,7 @@ export function AgentRunPanel({
       toast.warning("A workspace request is already running.");
       return;
     }
-    if (prompt.trim().length < 10) {
+    if (!isBuildBrief(prompt) && !isRepairCommand(prompt)) {
       toast.error("Describe your app in at least 10 characters.");
       return;
     }
@@ -219,7 +224,7 @@ export function AgentRunPanel({
       const response = await fetch("/api/agents/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, prompt: prompt.trim() }),
+        body: JSON.stringify({ projectId, prompt: prompt.trim(), previousBrief: isRepairCommand(prompt) && defaultPrompt && isBuildBrief(defaultPrompt) ? defaultPrompt : undefined }),
       });
       if (!response.ok || !response.body) {
         const data = await response.json().catch(() => null);
@@ -301,7 +306,7 @@ export function AgentRunPanel({
 
             {/* Pipeline */}
             <ol className="grid gap-1.5">
-              {AGENT_ORDER.map((name, index) => {
+              {activeAgents.map((name, index) => {
                 const step = steps[name];
                 const Icon = AGENT_ICONS[name];
                 return (
@@ -353,7 +358,7 @@ export function AgentRunPanel({
                             {AGENT_LABELS[name]}
                           </p>
                           <span className="text-muted-foreground text-xs">
-                            {index + 1}/{AGENT_ORDER.length}
+                            {index + 1}/{activeAgents.length}
                           </span>
                         </div>
                         <p className="text-muted-foreground truncate text-xs">

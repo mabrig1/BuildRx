@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ExternalLink, GitCompareArrows, Search, ShieldCheck, Sparkles } from "lucide-react";
 
 import { GuidedClonePanel } from "@/components/projects/guided-clone-panel";
@@ -25,6 +25,22 @@ export function StarterVault() {
   const [level, setLevel] = useState<DifficultyFilter>("All levels");
   const [selected, setSelected] = useState<string | null>(null);
   const [compare, setCompare] = useState<string[]>([]);
+
+  // Remember only an approved catalog ID, never a source URL or credential.
+  useEffect(() => {
+    try {
+      const id = window.localStorage.getItem("buildrx:guided-clone:active");
+      if (id && TEMPLATE_GUIDES.some(t => t.id === id)) setSelected(id);
+    } catch { /* Storage may be disabled; browsing still works. */ }
+  }, []);
+
+  function selectGuide(id: string | null) {
+    setSelected(id);
+    try {
+      if (id) window.localStorage.setItem("buildrx:guided-clone:active", id);
+      else window.localStorage.removeItem("buildrx:guided-clone:active");
+    } catch { /* Local persistence is optional. */ }
+  }
 
   const filtered = useMemo(() => TEMPLATE_GUIDES.filter(t => {
     const text = [t.name, t.description, t.category, t.origin, t.nextAction, ...t.services]
@@ -82,7 +98,7 @@ export function StarterVault() {
     </section>
 
     {selectedGuide && <div id="guided-clone">
-      <GuidedClonePanel key={selectedGuide.id} template={selectedGuide} onClose={() => setSelected(null)} />
+      <GuidedClonePanel key={selectedGuide.id} template={selectedGuide} onClose={() => selectGuide(null)} />
     </div>}
 
     <section aria-label="Template catalog filters" className="rounded-2xl border p-4 sm:p-5">
@@ -193,7 +209,7 @@ export function StarterVault() {
         </a>}
         <div className="mt-4 flex flex-wrap gap-2">
           <Button className="flex-1" onClick={() => {
-            setSelected(t.id);
+            selectGuide(t.id);
             window.requestAnimationFrame(() =>
               document.getElementById("guided-clone")?.scrollIntoView({ behavior: "smooth", block: "start" }));
           }}>

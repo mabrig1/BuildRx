@@ -246,24 +246,43 @@ export class GitHubClient {
       truncated: boolean;
     }>("GET", `/repos/${fullName}/git/trees/${commit.tree.sha}?recursive=1`);
 
-    const blobs = tree.tree.filter(
-      (entry) =>
-        entry.type === "blob" && (entry.size ?? 0) <= maxFileBytes
-    );
-
-    return Promise.all(
-      blobs.map(async (entry) => {
-        const blob = await this.request<{
-          content: string;
-          encoding: string;
-        }>("GET", `/repos/${fullName}/git/blobs/${entry.sha}`);
-        const content =
-          blob.encoding === "base64"
-            ? Buffer.from(blob.content, "base64").toString("utf8")
-            : blob.content;
+    // GitHub's recursive tree API can be truncated; never silently import a
+    // partial repository and present it as a reviewed full source snapshot.
+    if (tree.truncated || !Array.isArray(tree.tree)) {
+      throw new GitHubApiError("GitHub returned an incomplete repository tree.", 422);
+    }
+    if (tree.tree.length > 2000) {
+      throw new GitHubApiError("Repository has too many paths for a bounded source import.", 422);
+    }
+    // BuildRx is a source-code editor, not a binary/archive importer.
+    const textFile = /\.(?:ts|tsx|js|jsx|mjs|cjs|json|css|scss|html|md|mdx|txt|svg|yml|yaml|toml|graphql|gql|py|go|ps1|sh|csproj|vbproj|fsproj|targets|props|suo|bat|cmd)$/i;
+    const blobs = tree.tree.filter(entry => entry.type === "blob" && textFile.test(entry.path));
+    if (blobs.length === 0 || blobs.length > 500 || blobs.some(entry =>
+      !/^[a-f0-9]{40}$/.test(entry.sha) || !Number.isSafeInteger(entry.size) ||
+      (entry.size ?? 0) > maxFileBytes || (entry.size ?? 0) < 0
+    )) {
+      throw new GitHubApiError("GitHub source exceeds safe file limits or lacks verified metadata.", 422);
+    }
+    const files: Array<{path: string; content: string}> = [];
+    for (let i = 0; i < blobs.length; i += 8) {
+      const batch = await Promise.all(blobs.slice(i, i + 8).map(async entry => {
+        const blob = await this.request<{content: string; encoding: string}>(
+          "GET", `/repos/${fullName}/git/blobs/${entry.sha}`
+        );
+        if (blob.encoding !== "base64") {
+          throw new GitHubApiError("Unsupported GitHub source encoding.", 422);
+        }
+        const bytes = Buffer.from(blob.content.replace(/\s/g, ""), "base64");
+        const content = bytes.toString("utf8");
+        if (bytes.length !== entry.size || bytes.includes(0) ||
+            Buffer.from(content, "utf8").compare(bytes) !== 0) {
+          throw new GitHubApiError("GitHub returned binary or inconsistent source content.", 422);
+        }
         return { path: entry.path, content };
-      })
-    );
+      }));
+      files.push(...batch);
+    }
+    return files;
   }
 
   /**

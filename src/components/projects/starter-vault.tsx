@@ -145,6 +145,7 @@ export function StarterVault() {
               ["Source", (t: TemplateGuide) => t.origin + " · " + (t.state === "planned" ? "not approved" : "pinned/reviewed")],
               ["Deployment", (t: TemplateGuide) => t.deployed],
               ["Services", (t: TemplateGuide) => t.services.join("; ")],
+              ["Assumptions", (t: TemplateGuide) => t.assumptions.join("; ")],
               ["Smallest next step", (t: TemplateGuide) => t.nextAction],
             ] as Array<[string, (t: TemplateGuide) => string]>).map(([label, getter]) =>
               <tr key={label} className="border-b align-top">
@@ -181,6 +182,8 @@ export function StarterVault() {
             <dd className="text-muted-foreground">{t.deployed}</dd></div>
           <div><dt className="font-semibold">Requires</dt>
             <dd className="text-muted-foreground">{t.services.join(", ")}</dd></div>
+          <div><dt className="font-semibold">Assumption (not checked)</dt>
+            <dd className="text-muted-foreground">{t.assumptions.join("; ")}</dd></div>
           <div><dt className="font-semibold">Next action</dt>
             <dd className="text-muted-foreground">{t.nextAction}</dd></div>
         </dl>

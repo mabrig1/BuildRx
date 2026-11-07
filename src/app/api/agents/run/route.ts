@@ -8,6 +8,9 @@ import { authorizeAiRequest } from "@/lib/ai/route-helpers";
 import { withTimeout } from "@/lib/health/retry";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+import { getFileSystem } from "@/lib/files/manager";
+import { TOOL_LIMITS } from "@/lib/agents/tools";
+import { isBuildBrief, isRepairCommand } from "@/lib/validations/build-prompt";
 import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
 
 export const maxDuration = 300;
@@ -16,8 +19,10 @@ const runSchema = z.object({
   projectId: z.string().min(1).max(100),
   prompt: z
     .string()
-    .min(10, "Describe your app in at least 10 characters")
-    .max(MAX_AI_PROMPT_CHARACTERS),
+    .trim()
+    .max(MAX_AI_PROMPT_CHARACTERS)
+    .refine(value => isBuildBrief(value) || isRepairCommand(value), "Describe your app in at least 10 characters"),
+  previousBrief: z.string().trim().max(MAX_AI_PROMPT_CHARACTERS).optional(),
 });
 
 /**
@@ -73,6 +78,28 @@ export async function POST(request: Request) {
     persist,
     files: new Map(),
   };
+
+  if (isRepairCommand(prompt)) {
+    try {
+      const files = await withTimeout(
+        () => getFileSystem(projectId).readSnapshot(TOOL_LIMITS.maxFiles), 20_000, "Saved project lookup"
+      );
+      context.files = new Map(files.map(file => [file.path, file]));
+      const savedBrief = context.files.get("docs/PRODUCT-BRIEF.md")?.content;
+      const brief = [parsed.data.previousBrief, savedBrief, context.files.get("README.md")?.content]
+        .map(value => value?.trim().slice(0, MAX_AI_PROMPT_CHARACTERS))
+        .find((value): value is string => Boolean(value && isBuildBrief(value)));
+      if (!brief) {
+        releaseBuildLease();
+        return NextResponse.json({ error: "No previous build brief was found. Describe the app you want to repair." }, { status: 422 });
+      }
+      context.prompt = brief;
+      if (files.length) context.repairSnapshot = new Map(files.map(file => [file.path, file.content]));
+    } catch {
+      releaseBuildLease();
+      return NextResponse.json({ error: "Could not load the complete saved project for repair. Your files were left in place." }, { status: 503 });
+    }
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({

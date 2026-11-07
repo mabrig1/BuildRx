@@ -312,6 +312,12 @@ describe("Generated App Certification Matrix", () => {
 
       await runWorkflow(context, (event) => events.push(event));
 
+      expect(context.verificationPassed, `${label}: workspace verification failed`).toBe(true);
+      expect(events).toContainEqual(expect.objectContaining({
+        type: "verification",
+        items: expect.arrayContaining([expect.objectContaining({ label: "Saved workspace preview", status: "pass" })]),
+      }));
+
       expect(
         context.plan,
         `${label}: the pipeline must produce an application plan`

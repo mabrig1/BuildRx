@@ -140,7 +140,10 @@ export async function runWorkflow(
   context.requestId =
     context.requestId ??
     `run_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  emit({ type: "workflow_start", agents: AGENT_ORDER });
+  const steps: AgentName[] = context.repairSnapshot
+    ? ["planner", "security", "qa", "repair", "deployment"]
+    : AGENT_ORDER;
+  emit({ type: "workflow_start", agents: steps });
   await startBuildRun(context);
 
   // Say up front what this build can actually do. Finding out after five
@@ -167,8 +170,8 @@ export async function runWorkflow(
   }
 
   try {
-    for (const [index, name] of AGENT_ORDER.entries()) {
-      context.stepDeadlineAt = stepDeadline(context, AGENT_ORDER.slice(index));
+    for (const [index, name] of steps.entries()) {
+      context.stepDeadlineAt = stepDeadline(context, steps.slice(index));
       await markBuildStep(context, name);
 
       // The planner is what every later step reads; if it produced

@@ -1,4 +1,5 @@
 import type { BillingProvider } from "@/lib/billing/providers";
+import { getAccountQuotaOverrides } from "@/lib/billing/quota-overrides";
 import { planById, plans } from "@/lib/constants";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
@@ -173,7 +174,7 @@ export async function getBillingSummary(
   }
 
   const supabase = await createClient();
-  const [subscription, projectCount, aiUsage, invoices] = await Promise.all([
+  const [subscription, projectCount, aiUsage, invoices, quotaOverrides] = await Promise.all([
     supabase
       .from("subscriptions")
       .select(
@@ -201,6 +202,7 @@ export async function getBillingSummary(
       )
       .order("created_at", { ascending: false })
       .limit(24),
+    getAccountQuotaOverrides(userId),
   ]);
 
   const active =
@@ -217,9 +219,9 @@ export async function getBillingSummary(
     cancelAtPeriodEnd: subscription.data?.cancel_at_period_end ?? false,
     usage: {
       projects: projectCount.count ?? 0,
-      projectLimit: limits.projects,
+      projectLimit: quotaOverrides.unlimitedProjects ? Infinity : limits.projects,
       aiRequestsThisMonth: aiUsage.count ?? 0,
-      aiRequestLimit: limits.aiRequestsPerMonth,
+      aiRequestLimit: quotaOverrides.unlimitedAiRequests ? Infinity : limits.aiRequestsPerMonth,
     },
     invoices: (invoices.data ?? []).map((row) => ({
       id: row.id,

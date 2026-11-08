@@ -21,6 +21,7 @@ export interface LaunchPreferences {
   host: LaunchHost;
   dataNeed: DataNeed;
   databaseConfigured: boolean;
+  sourceConfirmed: boolean;
   liveUrl: string;
   liveTestsConfirmed: boolean;
 }
@@ -50,6 +51,7 @@ export function evaluateLaunchJourney(
   const built = signals.projectStatus === "ready";
   const repo = safeRepositoryName(signals.githubRepo);
   const linked = !signals.githubSimulated && signals.githubConnected === true && !!repo;
+  const sourceReady = linked && choices.sourceConfirmed;
   const databaseDone = choices.dataNeed === "none" ||
     (choices.dataNeed !== "unsure" && choices.databaseConfigured);
   const vercelDeployment = signals.deployments.find(
@@ -77,11 +79,13 @@ export function evaluateLaunchJourney(
       id: "github",
       title: "Save the code to GitHub",
       detail: linked
-        ? `Repository linked: ${repo}. Open GitHub to confirm the latest code was pushed; linking alone is not a verified push.`
+        ? choices.sourceConfirmed
+          ? `You marked generated source files present in ${repo}. This is self-reported, not a server-verified latest commit.`
+          : `Repository linked: ${repo}. Open it and confirm package.json and real application pages were pushed; linking alone does not save source.`
         : signals.githubConnected === false
           ? "Open GitHub, connect your account, create a private repository and push the verified source."
           : "Open GitHub and link a private repository for this project. Never paste access tokens into chat.",
-      state: linked ? "done" : "action",
+      state: sourceReady ? "self-reported" : "action",
     },
     {
       id: "database",
@@ -122,6 +126,7 @@ export function evaluateLaunchJourney(
   if (signals.githubSimulated) next = "This is a demo workspace. Sign in and save a real project before launching it.";
   else if (!built) next = "Open Build app and finish or repair your project.";
   else if (!linked) next = "Open GitHub and connect a private repository for your app.";
+  else if (!sourceReady) next = "Push your generated app source to GitHub, inspect its files there, and confirm the handoff.";
   else if (!databaseDone) next = "Choose whether the app needs a database, then configure it safely.";
   else if (!providerReported) next = choices.host === "cloudflare"
     ? "Prepare the generated app for Cloudflare; connect its exact GitHub repo in Workers Builds."
@@ -129,5 +134,5 @@ export function evaluateLaunchJourney(
   else if (!manualTest) next = choices.host === "cloudflare"
     ? "Find and test the actual Cloudflare Worker URL; GitHub build checks are not enough."
     : "Open the Vercel deployment and test the actual running app.";
-  return { steps, next, readyToReview: built && linked && databaseDone && providerReported && manualTest };
+  return { steps, next, readyToReview: built && sourceReady && databaseDone && providerReported && manualTest };
 }

@@ -119,7 +119,8 @@ export function evaluateLaunchJourney(
     },
   ];
   let next = "Review the app on its public HTTPS URL before advertising it.";
-  if (!built) next = "Open Build app and finish or repair your project.";
+  if (signals.githubSimulated) next = "This is a demo workspace. Sign in and save a real project before launching it.";
+  else if (!built) next = "Open Build app and finish or repair your project.";
   else if (!linked) next = "Open GitHub and connect a private repository for your app.";
   else if (!databaseDone) next = "Choose whether the app needs a database, then configure it safely.";
   else if (!providerReported) next = choices.host === "cloudflare"

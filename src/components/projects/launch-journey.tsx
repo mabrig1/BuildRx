@@ -7,7 +7,7 @@ import {
   CircleHelp,
   Cloud,
   ExternalLink,
-  Github,
+  GitBranch,
   Loader2,
   RefreshCw,
   Rocket,
@@ -252,7 +252,7 @@ export function LaunchJourney({
                         {step.id === "github" ? (
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             <Button size="sm" variant="outline" onClick={() => launchPanel("github")}>
-                              <Github className="mr-1.5 size-3.5" /> Open GitHub
+                              <GitBranch className="mr-1.5 size-3.5" /> Open GitHub
                             </Button>
                             {repo ? (
                               <a className="text-xs underline" target="_blank" rel="noreferrer" href={`https://github.com/${repo}`}>

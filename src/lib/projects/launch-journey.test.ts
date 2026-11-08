@@ -20,6 +20,7 @@ const choices: LaunchPreferences = {
   host: "cloudflare",
   dataNeed: "none",
   databaseConfigured: false,
+  sourceConfirmed: true,
   liveUrl: "",
   liveTestsConfirmed: false,
 };
@@ -41,6 +42,15 @@ describe("beginner launch journey", () => {
     expect(run({ githubRepo: null }).next).toMatch(/GitHub/i);
     expect(run({ githubConnected: false }).steps[1].state).toBe("action");
     expect(run({ githubSimulated: true }).steps[1].state).toBe("action");
+  });
+
+  it("does not mark a GitHub-linked repository complete without source confirmation", () => {
+    const pending = run({}, { sourceConfirmed: false });
+    expect(pending.steps[1].state).toBe("action");
+    expect(pending.next).toMatch(/Push your generated app source/);
+    const confirmed = run({}, { sourceConfirmed: true });
+    expect(confirmed.steps[1].state).toBe("self-reported");
+    expect(confirmed.steps[1].detail).toMatch(/self-reported/);
   });
 
   it("requires an explicit data choice and does not treat a checkbox as server evidence", () => {

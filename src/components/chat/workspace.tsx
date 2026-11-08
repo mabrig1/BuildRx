@@ -57,6 +57,7 @@ export function Workspace({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
   const [deployOpen, setDeployOpen] = useState(false);
+  const [guidedDeployHost, setGuidedDeployHost] = useState<"cloudflare" | "vercel" | null>(null);
   const [previewUrl, setPreviewUrl] = useState(project.previewUrl);
   const [filesRefreshKey, setFilesRefreshKey] = useState(0);
 
@@ -165,6 +166,7 @@ export function Workspace({
             <GitHubPanel projectId={project.id} projectName={project.name}
               open={githubOpen} onOpenChange={setGithubOpen} />
             <DeployPanel projectId={project.id}
+              preferredProvider={guidedDeployHost}
               open={deployOpen} onOpenChange={setDeployOpen} />
             <AgentRunPanel
               projectId={project.id}
@@ -204,7 +206,10 @@ export function Workspace({
             projectId={project.id}
             projectStatus={project.status}
             onOpenGithub={() => setGithubOpen(true)}
-            onOpenDeploy={() => setDeployOpen(true)}
+            onOpenDeploy={(host) => {
+              setGuidedDeployHost(host);
+              setDeployOpen(true);
+            }}
           />
         </div>
 

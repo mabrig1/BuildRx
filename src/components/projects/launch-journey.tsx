@@ -253,6 +253,7 @@ export function LaunchJourney({
                         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{step.detail}</p>
 
                         {step.id === "github" ? (
+                          <>
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             <Button size="sm" variant="outline" onClick={() => launchPanel("github")}>
                               <GitBranch className="mr-1.5 size-3.5" /> Open GitHub
@@ -271,6 +272,7 @@ export function LaunchJourney({
                               <span>I opened this app&apos;s GitHub repository and confirmed its real source files are present (including package.json and application pages). This is self-reported, not a GitHub commit verification.</span>
                             </label>
                           ) : null}
+                          </>
                         ) : null}
 
                         {step.id === "database" ? (

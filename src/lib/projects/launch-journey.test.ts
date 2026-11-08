@@ -32,6 +32,11 @@ describe("beginner launch journey", () => {
     expect(run({ projectStatus: "error" }).steps[0].detail).toMatch(/Repair/);
   });
 
+  it("does not invite demo users to publish temporary builds", () => {
+    expect(run({ githubSimulated: true }).next).toMatch(/demo workspace/i);
+    expect(run({ githubSimulated: true }).readyToReview).toBe(false);
+  });
+
   it("separates a GitHub account login from a linked app repository", () => {
     expect(run({ githubRepo: null }).next).toMatch(/GitHub/i);
     expect(run({ githubConnected: false }).steps[1].state).toBe("action");

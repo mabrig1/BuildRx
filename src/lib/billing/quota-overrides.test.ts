@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const maybeSingle = vi.fn();
-const eq = vi.fn(() => ({ maybeSingle }));
-const select = vi.fn(() => ({ eq }));
-const from = vi.fn(() => ({ select }));
-const createClient = vi.fn(async () => ({ from }));
-const isSupabaseConfigured = vi.fn(() => true);
+const { maybeSingle, eq, select, from, createClient, isSupabaseConfigured } = vi.hoisted(() => {
+  const maybeSingle = vi.fn();
+  const eq = vi.fn(() => ({ maybeSingle }));
+  const select = vi.fn(() => ({ eq }));
+  const from = vi.fn(() => ({ select }));
+  const createClient = vi.fn(async () => ({ from }));
+  const isSupabaseConfigured = vi.fn(() => true);
+  return { maybeSingle, eq, select, from, createClient, isSupabaseConfigured };
+});
 
 vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured }));
 vi.mock("@/lib/supabase/server", () => ({ createClient }));

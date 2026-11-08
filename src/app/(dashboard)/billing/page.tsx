@@ -82,6 +82,9 @@ export default async function BillingPage() {
 
   const summary = await getBillingSummary(userId);
   const isPro = summary.plan === "pro";
+  const hasOwnerQuotaAccess =
+    !Number.isFinite(summary.usage.projectLimit) &&
+    !Number.isFinite(summary.usage.aiRequestLimit);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -90,6 +93,9 @@ export default async function BillingPage() {
         description="Manage your subscription, usage, and invoices."
       >
         {summary.demo ? <Badge variant="outline">demo</Badge> : null}
+        {hasOwnerQuotaAccess && !summary.demo ? (
+          <Badge variant="outline">Owner quota access</Badge>
+        ) : null}
       </PageHeader>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -106,7 +112,9 @@ export default async function BillingPage() {
               </Badge>
             </div>
             <CardDescription>
-              {isPro ? (
+              {hasOwnerQuotaAccess ? (
+                "Owner quota access: unlimited BuildRx projects and AI requests, subject to provider capacity, cost controls, and safety limits."
+              ) : isPro ? (
                 <>
                   {summary.cancelAtPeriodEnd
                     ? "Cancels at the end of the current period"
@@ -131,7 +139,7 @@ export default async function BillingPage() {
             {isPro && !summary.cancelAtPeriodEnd ? (
               <CancelSubscriptionButton />
             ) : null}
-            {!isPro ? <UpgradeDialog /> : null}
+            {!isPro && !hasOwnerQuotaAccess ? <UpgradeDialog /> : null}
           </CardFooter>
         </Card>
 
@@ -140,7 +148,9 @@ export default async function BillingPage() {
           <CardHeader>
             <CardTitle>Usage</CardTitle>
             <CardDescription>
-              Your usage against the {isPro ? "Pro" : "Free"} plan limits.
+              {hasOwnerQuotaAccess
+                ? "Your account has no BuildRx monthly request cap; upstream provider and safety limits still apply."
+                : `Your usage against the ${isPro ? "Pro" : "Free"} plan limits.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">

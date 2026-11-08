@@ -137,15 +137,20 @@ export function DeployPanel({
   projectId,
   open: controlledOpen,
   onOpenChange,
+  preferredProvider,
 }: {
   projectId: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  preferredProvider?: "cloudflare" | "vercel" | null;
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
   const [provider, setProvider] = useState<Provider>("cloudflare");
+  useEffect(() => {
+    if (open && preferredProvider) setProvider(preferredProvider);
+  }, [open, preferredProvider]);
   const [connections, setConnections] = useState<Record<Provider, boolean>>({
     cloudflare: false,
     vercel: false,

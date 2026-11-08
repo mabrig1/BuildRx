@@ -133,8 +133,18 @@ function HistoryItem({ deployment }: { deployment: DeploymentEntry }) {
   );
 }
 
-export function DeployPanel({ projectId }: { projectId: string }) {
-  const [open, setOpen] = useState(false);
+export function DeployPanel({
+  projectId,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  projectId: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const [provider, setProvider] = useState<Provider>("cloudflare");
   const [connections, setConnections] = useState<Record<Provider, boolean>>({
     cloudflare: false,

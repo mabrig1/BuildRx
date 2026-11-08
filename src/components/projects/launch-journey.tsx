@@ -92,8 +92,9 @@ export function LaunchJourney({
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(`buildrx-journey:${projectId}`);
-      if (raw) setChoices(restoreChoice(JSON.parse(raw)));
+      setChoices(raw ? restoreChoice(JSON.parse(raw)) : { ...DEFAULT_CHOICES });
     } catch {
+      setChoices({ ...DEFAULT_CHOICES });
       // In private browsing mode the launch guide remains usable without persistence.
     }
     setLoadedFor(projectId);

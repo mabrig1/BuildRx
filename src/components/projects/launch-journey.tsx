@@ -76,7 +76,7 @@ export function LaunchJourney({
   projectId: string;
   projectStatus: string;
   onOpenGithub: () => void;
-  onOpenDeploy: () => void;
+  onOpenDeploy: (host: LaunchHost) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [choices, setChoices] = useState<LaunchPreferences>(DEFAULT_CHOICES);
@@ -164,7 +164,7 @@ export function LaunchJourney({
   function launchPanel(which: "github" | "deploy") {
     setOpen(false);
     if (which === "github") onOpenGithub();
-    else onOpenDeploy();
+    else onOpenDeploy(choices.host);
   }
 
   return (

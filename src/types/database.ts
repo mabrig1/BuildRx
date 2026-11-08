@@ -59,6 +59,34 @@ export type FixProposalStatus =
 export interface Database {
   public: {
     Tables: {
+      account_quota_overrides: {
+        Row: {
+          user_id: string;
+          unlimited_projects: boolean;
+          unlimited_ai_requests: boolean;
+          granted_at: string;
+        };
+        Insert: {
+          user_id: string;
+          unlimited_projects?: boolean;
+          unlimited_ai_requests?: boolean;
+          granted_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          unlimited_projects?: boolean;
+          unlimited_ai_requests?: boolean;
+          granted_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "account_quota_overrides_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       users: {
         Row: {
           id: string;

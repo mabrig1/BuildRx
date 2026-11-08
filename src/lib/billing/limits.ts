@@ -1,4 +1,5 @@
 import { planById } from "@/lib/constants";
+import { getAccountQuotaOverrides } from "@/lib/billing/quota-overrides";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,6 +27,9 @@ export async function checkProjectLimit(
 ): Promise<string | null> {
   if (!isSupabaseConfigured()) return null; // demo mode: unmetered
 
+  // Owner-scoped quota exemptions never bypass provider or safety limits.
+  if ((await getAccountQuotaOverrides(userId)).unlimitedProjects) return null;
+
   const plan = planById(await effectivePlan(userId));
   if (!Number.isFinite(plan.limits.projects)) return null;
 
@@ -48,6 +52,8 @@ export async function checkAiRequestLimit(
   userId: string
 ): Promise<string | null> {
   if (!isSupabaseConfigured()) return null;
+
+  if ((await getAccountQuotaOverrides(userId)).unlimitedAiRequests) return null;
 
   const plan = planById(await effectivePlan(userId));
   const monthStart = new Date();

@@ -41,6 +41,7 @@ const DEFAULT_CHOICES: LaunchPreferences = {
   host: "cloudflare",
   dataNeed: "unsure",
   databaseConfigured: false,
+  sourceConfirmed: false,
   liveUrl: "",
   liveTestsConfirmed: false,
 };
@@ -62,6 +63,7 @@ function restoreChoice(value: unknown): LaunchPreferences {
     dataNeed: ["unsure", "none", "mongodb", "supabase"].includes(String(x.dataNeed))
       ? x.dataNeed as DataNeed : "unsure",
     databaseConfigured: x.databaseConfigured === true,
+    sourceConfirmed: x.sourceConfirmed === true,
     liveUrl: typeof x.liveUrl === "string" && x.liveUrl.length <= 300 ? x.liveUrl : "",
     liveTestsConfirmed: x.liveTestsConfirmed === true,
   };
@@ -80,7 +82,7 @@ export function LaunchJourney({
 }) {
   const [open, setOpen] = useState(false);
   const [choices, setChoices] = useState<LaunchPreferences>(DEFAULT_CHOICES);
-  const [hydrated, setHydrated] = useState(false);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [signals, setSignals] = useState<LaunchSignals>({
     projectStatus, githubConnected: null, githubRepo: null,
@@ -94,17 +96,17 @@ export function LaunchJourney({
     } catch {
       // In private browsing mode the launch guide remains usable without persistence.
     }
-    setHydrated(true);
+    setLoadedFor(projectId);
   }, [projectId]);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (loadedFor !== projectId) return;
     try {
       window.localStorage.setItem(`buildrx-journey:${projectId}`, JSON.stringify(choices));
     } catch {
       // Nothing secret is saved; browser storage is an optional convenience.
     }
-  }, [choices, hydrated, projectId]);
+  }, [choices, loadedFor, projectId]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -260,6 +262,14 @@ export function LaunchJourney({
                               </a>
                             ) : null}
                           </div>
+                          {repo && signals.githubConnected && !signals.githubSimulated ? (
+                            <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs">
+                              <input type="checkbox" className="mt-0.5"
+                                checked={choices.sourceConfirmed}
+                                onChange={e => setChoices(c => ({ ...c, sourceConfirmed: e.target.checked, liveTestsConfirmed: false }))} />
+                              <span>I opened this app&apos;s GitHub repository and confirmed its real source files are present (including package.json and application pages). This is self-reported, not a GitHub commit verification.</span>
+                            </label>
+                          ) : null}
                         ) : null}
 
                         {step.id === "database" ? (

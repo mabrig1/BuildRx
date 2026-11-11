@@ -4,6 +4,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Code2,
+  FlaskConical,
   GitBranch,
   GraduationCap,
   Rocket,
@@ -65,6 +66,12 @@ export default function AcademyPage() {
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <Link href="/login?next=/course">I already have an account</Link>
+              </Button>
+              <Button size="lg" variant="secondary" asChild>
+                <Link href="/signup?next=/learn/labs">
+                  Free hands-on engineering labs
+                  <FlaskConical className="ml-2 size-4" />
+                </Link>
               </Button>
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">

@@ -15,7 +15,7 @@ export const PRACTICE_TIMEOUT_MS = 5_000;
  * If a browser blocks opaque-origin Workers, fail closed. Never fall back
  * to eval/new Function in the privileged parent app.
  */
-export const ISOLATED_JS_RUNNER_DOCUMENT = String.raw\`<!doctype html>
+export const ISOLATED_JS_RUNNER_DOCUMENT = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; worker-src blob:; connect-src 'none'; img-src 'none'; style-src 'none'; font-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none';">
@@ -124,7 +124,7 @@ export const ISOLATED_JS_RUNNER_DOCUMENT = String.raw\`<!doctype html>
     }
   });
 }());
-</script></body></html>\`;
+</script></body></html>`;
 
 /**
  * A visual-only HTML/CSS preview. Sandbox must remain empty: no scripts,

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, Code2, FlaskConical, ArrowRight } from "lucide-react";
+import { BookOpen, Code2, FlaskConical, FolderOpen, ArrowRight } from "lucide-react";
 
 import { KnowledgeAcademy } from "@/components/learn/knowledge-academy";
 import { PageHeader } from "@/components/layout/page-header";
@@ -70,6 +70,23 @@ export default async function LearnPage({
         <CardContent>
           <Button variant="outline" asChild>
             <Link href="/learn/playground">Start interactive coding <ArrowRight className="ml-2 size-4" /></Link>
+          </Button>
+        </CardContent>
+      </Card>
+      <Card className="border-primary/25">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <FolderOpen className="size-5 text-primary" /> Multi-file Project Studio
+          </CardTitle>
+          <CardDescription>
+            Edit Next.js, Expo, systems engineering or TypeScript starter files,
+            save drafts in your browser, review missing pieces and export source ZIPs.
+            This is a training workspace, not a server-side application build.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" asChild>
+            <Link href="/learn/studio">Open multi-file studio <ArrowRight className="ml-2 size-4" /></Link>
           </Button>
         </CardContent>
       </Card>

@@ -28,7 +28,7 @@ describe("client-only multi-file training studio", () => {
       "../src/app/page.tsx", "/root/file.ts", "src/../secret.ts",
       ".env", "src/.env.local", "src/.git/config.json",
       "node_modules/package.json", "src\\file.ts", "src//file.ts",
-      "src/test.js%2f.env", "src/test.exe", "README",
+      "src/test.js%2f.env", "src/test.exe", "README", "README-TRAINING.md", "readme-training.md",
     ]) expect(validStudioPath(path)).toBe(false);
   });
 

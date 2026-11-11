@@ -4,6 +4,7 @@ import { completeText, isAnyProviderConfigured } from "@/lib/ai/provider";
 import { authorizeAiRequest } from "@/lib/ai/route-helpers";
 import { recordAiUsage } from "@/lib/ai/usage";
 import { coachMessages, validateCoachRequest } from "@/lib/learn/coach";
+import { labCoachMessages, validateLabCoachRequest } from "@/lib/learn/lab-coach";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export const maxDuration = 120;
@@ -32,13 +33,28 @@ export async function POST(request: Request) {
   }
 
   const raw = await request.json().catch(() => null);
-  const validated = validateCoachRequest(raw);
-  if (!validated.ok) {
+  const isLab = !!raw && typeof raw === "object" && "labId" in raw;
+  const lab = isLab ? validateLabCoachRequest(raw) : null;
+  const lesson = isLab ? null : validateCoachRequest(raw);
+  if (lab && !lab.ok) {
     return NextResponse.json(
-      { error: validated.error },
+      { error: lab.error },
       { status: 400, headers: { "Cache-Control": "no-store" } },
     );
   }
+  if (lesson && !lesson.ok) {
+    return NextResponse.json(
+      { error: lesson.error },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  const messages = lab?.ok
+    ? labCoachMessages(lab.lab, lab.request)
+    : lesson?.ok
+      ? coachMessages(lesson.lesson, lesson.request)
+      : null;
+  if (!messages) return NextResponse.json({ error: "Choose a valid learning topic." }, { status: 400 });
+  const trainingMode = lab?.ok ? lab.request.mode : lesson?.ok ? lesson.request.mode : "lesson";
   if (!isAnyProviderConfigured()) {
     return NextResponse.json(
       { error: "AI lessons are unavailable because no AI provider is configured. The verified knowledge base remains available." },
@@ -50,8 +66,8 @@ export async function POST(request: Request) {
   const userId = auth.userId;
   try {
     const result = await completeText(
-      coachMessages(validated.lesson, validated.request),
-      { maxTokens: 1900, temperature: 0.35, timeoutMs: 85_000 },
+      messages,
+      { maxTokens: 2400, temperature: 0.35, timeoutMs: 85_000 },
     );
     if (!result.text.trim()) throw new Error("Empty training response");
     await recordAiUsage({
@@ -68,8 +84,9 @@ export async function POST(request: Request) {
     responseHeaders.set("Cache-Control", "no-store");
     return NextResponse.json(
       {
-        lessonId: validated.lesson.id,
-        mode: validated.request.mode,
+        ...(lab?.ok ? { labId: lab.lab.id } : {}),
+        ...(lesson?.ok ? { lessonId: lesson.lesson.id } : {}),
+        mode: trainingMode,
         text: result.text.slice(0, 18_000),
         provider: result.provider,
         verified: false,

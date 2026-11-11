@@ -1,5 +1,6 @@
 import { TRAINING_TRACKS, type TrainingTrackId } from "@/lib/learn/labs";
 import { starterKitForTrack } from "@/lib/learn/starter-kits";
+import { REACT_DEMO_APP, REACT_DEMO_CSS, REACT_DEMO_ENTRY, REACT_DEMO_STYLE } from "@/lib/learn/studio-react-demo";
 
 /**
  * Client-only, untrusted educational project files.
@@ -68,6 +69,12 @@ export function newStudioWorkspace(trackId: TrainingTrackId): StudioWorkspace {
   for (const source of kit.files) {
     if (!validStudioPath(source.path)) throw new Error("Unsafe built-in starter path");
     files[source.path] = source.content;
+  }
+  if (trackId === "fullstack-web") {
+    // Two reviewed UI-only practice files. Next.js source files stay intact
+    // but are not transferred to the Sandpack React preview.
+    files[REACT_DEMO_ENTRY] = REACT_DEMO_APP;
+    files[REACT_DEMO_STYLE] = REACT_DEMO_CSS;
   }
   return { version: STUDIO_VERSION, trackId, files };
 }

@@ -84,7 +84,7 @@ export function prepareReactDemoPreview(input: {
   }
   // Defensive source screening only. A third-party iframe sandbox does NOT
   // certify arbitrary code as safe, and network cannot be assumed blocked.
-  if (/(?:\bfetch\s*\(|\bWebSocket\b|\bXMLHttpRequest\b|\bsendBeacon\b|\blocalStorage\b|\bsessionStorage\b|\bdocument\s*\.\s*cookie\b|\beval\s*\(|\bimport\s*\()/i.test(app + css)) {
+  if (/(?:\bfetch\s*\(|\bWebSocket\b|\bXMLHttpRequest\b|\bsendBeacon\b|\blocalStorage\b|\bsessionStorage\b|\bdocument\s*\.\s*cookie\b|\beval\s*\(|\bimport\s*\(|\brequire\s*\(|\bwindow\s*\.\s*open\s*\(|\bprocess\s*\.\s*env\b|@import\b|\burl\s*\()/i.test(app + css)) {
     return { ok: false, reason: "The introductory UI preview does not accept network, browser storage or dynamic code-evaluation APIs." };
   }
   if (/https?:\/\//i.test(app + css)) {

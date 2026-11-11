@@ -23,9 +23,9 @@ describe("browser-only untrusted exercise runner", () => {
     expect(PRACTICE_TIMEOUT_MS).toBeLessThanOrEqual(5_000);
   });
   it("has a syntactically valid trusted iframe controller script", () => {
-    const match = ISOLATED_JS_RUNNER_DOCUMENT.match(/<script>([\\s\\S]*?)<\\/script>/i);
-    expect(match?.[1]).toBeTruthy();
-    expect(() => new Script(match![1])).not.toThrow();
+    const script = ISOLATED_JS_RUNNER_DOCUMENT.split("<script>")[1]?.split("</script>")[0];
+    expect(script).toBeTruthy();
+    expect(() => new Script(script!)).not.toThrow();
   });
   it("rejects empty or excessive code", () => {
     expect(validPracticeCode("")).toBe(false);

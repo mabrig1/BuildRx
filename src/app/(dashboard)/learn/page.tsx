@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, FlaskConical, ArrowRight } from "lucide-react";
+import { BookOpen, Code2, FlaskConical, ArrowRight } from "lucide-react";
 
 import { KnowledgeAcademy } from "@/components/learn/knowledge-academy";
 import { PageHeader } from "@/components/layout/page-header";
@@ -54,6 +54,23 @@ export default async function LearnPage({
         </CardHeader>
         <CardContent>
           <Button asChild><Link href="/learn/labs">Explore practical laboratories <ArrowRight className="ml-2 size-4" /></Link></Button>
+        </CardContent>
+      </Card>
+      <Card className="border-primary/25">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Code2 className="size-5 text-primary" /> Interactive coding playground
+          </CardTitle>
+          <CardDescription>
+            Edit real code, run isolated JavaScript tests, inspect HTML/CSS previews and
+            practice debugging with guided feedback. All execution is browser-local;
+            no production project or account is changed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" asChild>
+            <Link href="/learn/playground">Start interactive coding <ArrowRight className="ml-2 size-4" /></Link>
+          </Button>
         </CardContent>
       </Card>
       <KnowledgeAcademy initialLessonId={initialLessonId} />

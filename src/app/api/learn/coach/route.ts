@@ -64,6 +64,8 @@ export async function POST(request: Request) {
       action: "ai_generation",
     });
 
+    const responseHeaders = new Headers(auth.limitHeaders);
+    responseHeaders.set("Cache-Control", "no-store");
     return NextResponse.json(
       {
         lessonId: validated.lesson.id,
@@ -74,7 +76,7 @@ export async function POST(request: Request) {
         generated: true,
         notice: "AI-generated teaching, not verification of your project or a replacement for official documentation.",
       },
-      { headers: { ...auth.limitHeaders, "Cache-Control": "no-store" } },
+      { headers: responseHeaders },
     );
   } catch {
     await recordAiUsage({

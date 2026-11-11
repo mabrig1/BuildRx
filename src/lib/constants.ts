@@ -123,6 +123,7 @@ export const dashboardNav: NavItem[] = [
   { title: "AI Chat", href: "/chat", icon: Bot },
   { title: "Tech+ Course", href: "/course", icon: GraduationCap },
   { title: "Guide", href: "/guide", icon: BookOpen },
+  { title: "Learning Center", href: "/learn", icon: GraduationCap },
   { title: "Contact", href: "/contact", icon: Mail },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },

@@ -39,6 +39,9 @@ export function validStudioPath(value: string): boolean {
       value.startsWith("/") || value.includes("\\") || value.includes("%") ||
       value.includes("//")) return false;
 
+  // ZIP exports generate this document; do not silently overwrite a student file.
+  if (value.toLowerCase() === "readme-training.md") return false;
+
   const segments = value.split("/");
   if (segments.length > 6) return false;
   if (segments.some(segment =>

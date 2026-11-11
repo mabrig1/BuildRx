@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   CheckCircle2,
-  Code2,
   Download,
   FlaskConical,
   Lightbulb,

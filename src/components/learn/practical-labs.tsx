@@ -5,7 +5,7 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-  ArrowRight, CheckCircle2, ClipboardCheck,
+  ArrowRight, CheckCircle2, ClipboardCheck, Copy,
   Download, ExternalLink, FlaskConical, Loader2,
   Sparkles, TriangleAlert,
 } from "lucide-react";
@@ -19,6 +19,7 @@ import {
   getTrainingLab, labsForTrack, TRAINING_LABS, TRAINING_TRACKS,
   type TrainingLab, type TrainingTrackId,
 } from "@/lib/learn/labs";
+import { starterKitForTrack } from "@/lib/learn/starter-kits";
 
 type LabEntry = { tasks: boolean[]; checks: boolean[] };
 type Progress = Record<string, LabEntry>;
@@ -81,6 +82,7 @@ export function PracticalLabs({
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
   useEffect(() => {
     setProgress(readProgress());
@@ -97,6 +99,7 @@ export function PracticalLabs({
   }, [progress, hydrated]);
 
   const track = TRAINING_TRACKS.find(t => t.id === trackId) ?? TRAINING_TRACKS[0];
+  const starter = starterKitForTrack(track.id);
   const lab = getTrainingLab(selectedId) ?? labsForTrack(trackId)[0];
   const labs = useMemo(() => labsForTrack(trackId), [trackId]);
   const state = progressFor(lab, progress);
@@ -126,6 +129,16 @@ export function PracticalLabs({
       return { ...prev, [lab.id]: updated };
     });
   }
+  async function copyStarter(content: string, filePath: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedPath(filePath);
+    } catch {
+      setCopiedPath(null);
+      setError("Copy was blocked by the browser. Select and copy the visible code manually.");
+    }
+  }
+
   async function generateLabMentor() {
     setGenerating(true);
     setError(null);
@@ -158,6 +171,13 @@ export function PracticalLabs({
       "", "## Expected deliverables", ...lab.deliverables.map(d => `- ${d}`),
       "", "## Acceptance checks", ...lab.acceptance.map(d => `- [ ] ${d}`),
       "", "## Safety note", lab.caution,
+      ...(starter ? [
+        "", "## Starter source files — inspect before use",
+        ...starter.files.flatMap(file => [
+          "", `### ${file.path}`, "",
+          `\`\`\`${file.lang}`, file.content, "\`\`\`",
+        ]),
+      ] : []),
       ...(generated ? ["", "## AI-generated coaching — verify independently", generated] : []),
     ].join("\n");
     const url = URL.createObjectURL(new Blob([note], { type: "text/markdown;charset=utf-8" }));
@@ -296,6 +316,38 @@ export function PracticalLabs({
                     : "Continue the lab and tick tasks only after you do them. A checked box is not independent proof."}
                 </div>
               </section>
+
+              {starter && (
+                <details className="rounded-lg border p-3">
+                  <summary className="cursor-pointer text-sm font-semibold">
+                    Open starter code kit — {starter.name}
+                  </summary>
+                  <div className="mt-3 space-y-4">
+                    <p className="text-xs text-muted-foreground">{starter.description}</p>
+                    <p className="text-xs font-semibold">Set up on your own local training workspace:</p>
+                    <ol className="ml-5 list-decimal space-y-1 text-xs">
+                      {starter.setup.map(step => <li key={step}>{step}</li>)}
+                    </ol>
+                    {starter.files.map(file => (
+                      <div key={file.path} className="min-w-0 rounded-lg border p-2">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <code className="max-w-full break-all text-xs">{file.path}</code>
+                          <Button size="sm" variant="outline" onClick={() => void copyStarter(file.content, file.path)}>
+                            <Copy className="mr-1 size-3.5" /> {copiedPath === file.path ? "Copied" : "Copy file"}
+                          </Button>
+                        </div>
+                        <pre className="max-h-64 max-w-full overflow-auto whitespace-pre text-xs" aria-label={`Starter code for ${file.path}`}>
+                          <code>{file.content}</code>
+                        </pre>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground">
+                      These snippets are study scaffolds, not validated full applications.
+                      BuildRx never installs packages or executes the displayed code for you.
+                    </p>
+                  </div>
+                </details>
+              )}
 
               <section>
                 <h3 className="mb-2 font-semibold text-sm">Official reference materials</h3>

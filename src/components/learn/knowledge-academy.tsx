@@ -8,6 +8,7 @@ import {
   BookOpen,
   CheckCircle2,
   ChevronRight,
+  Download,
   ExternalLink,
   GraduationCap,
   Loader2,
@@ -92,6 +93,25 @@ export function KnowledgeAcademy({ initialLessonId }: { initialLessonId?: string
     } catch {
       // Browser storage is optional. There is no server-side certification.
     }
+  }
+
+  function downloadTraining() {
+    if (!generated) return;
+    // A Markdown file is a study artifact, never a deploy command or credential.
+    const markdown = [
+      `# ${lesson.title} — ${mode === "lesson" ? "AI guided lesson" : "AI five-day mini-course"}`,
+      "",
+      "> AI-generated educational draft. Verify steps against official documentation.",
+      "",
+      generated,
+    ].join("\n");
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `buildrx-training-${lesson.id}.md`;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   async function createTraining() {
@@ -348,6 +368,9 @@ export function KnowledgeAcademy({ initialLessonId }: { initialLessonId?: string
                   <p className="text-sm font-semibold">Your AI training draft</p>
                   <Badge variant="outline">Not independently verified</Badge>
                   {provider && <span className="text-xs text-muted-foreground">{provider}</span>}
+                  <Button size="sm" variant="outline" className="sm:ml-auto" onClick={downloadTraining}>
+                    <Download className="mr-1.5 size-3.5" /> Save as Markdown
+                  </Button>
                 </div>
                 <div className="prose prose-sm dark:prose-invert max-w-none break-words text-sm">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{generated}</ReactMarkdown>

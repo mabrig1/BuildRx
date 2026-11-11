@@ -374,6 +374,9 @@ export function LaunchJourney({
               >
                 Open Learning Center <ArrowRight className="size-3.5" />
               </a>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Want structured practice? <a className="underline" href="/learn/labs?track=fullstack-web">Build a real app in the Engineering Labs</a>.
+              </p>
             </div>
 
             <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">

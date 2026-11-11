@@ -211,7 +211,7 @@ export function KnowledgeAcademy({ initialLessonId }: { initialLessonId?: string
         </div>
       </aside>
 
-      <main className="min-w-0 space-y-5" aria-label="Selected beginner lesson">
+      <section className="min-w-0 space-y-5" aria-label="Selected beginner lesson">
         <Card>
           <CardHeader>
             <div className="flex flex-wrap gap-2">
@@ -382,7 +382,7 @@ export function KnowledgeAcademy({ initialLessonId }: { initialLessonId?: string
             )}
           </CardContent>
         </Card>
-      </main>
+      </section>
     </div>
   );
 }

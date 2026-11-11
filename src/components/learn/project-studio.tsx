@@ -456,7 +456,7 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
               <p className="rounded-md bg-muted/50 p-3 text-xs">
                 Next: download your source, set up the required framework locally,
                 run actual typechecks/builds and verify authentication, persistence and accessibility.
-                Then use BuildRx's guided GitHub/deployment workflow for a separately reviewed real app.
+                Then use BuildRx&apos;s guided GitHub/deployment workflow for a separately reviewed real app.
               </p>
             </CardContent>
           </Card>

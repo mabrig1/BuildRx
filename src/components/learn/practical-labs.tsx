@@ -5,7 +5,7 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-  ArrowRight, CheckCircle2, ClipboardCheck, Copy,
+  ArrowRight, CheckCircle2, ClipboardCheck, Code2, Copy,
   Download, ExternalLink, FlaskConical, Loader2,
   Sparkles, TriangleAlert,
 } from "lucide-react";
@@ -364,6 +364,11 @@ export function PracticalLabs({
               <div className="flex flex-wrap gap-2 border-t pt-3">
                 <Button size="sm" variant="outline" onClick={downloadLabPlan}>
                   <Download className="mr-1.5 size-3.5" /> Download lab brief
+                </Button>
+                <Button size="sm" variant="outline" asChild>
+                  <Link href="/learn/playground">
+                    <Code2 className="mr-1.5 size-3.5" /> Open interactive coding lab
+                  </Link>
                 </Button>
                 <Button size="sm" variant="outline" asChild>
                   <Link href="/projects"><ArrowRight className="mr-1.5 size-3.5" /> Open BuildRx projects</Link>

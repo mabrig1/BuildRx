@@ -5,15 +5,14 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-  ArrowRight, BookOpen, Check, CheckCircle2, ClipboardCheck,
-  Download, ExternalLink, FlaskConical, Loader2, RefreshCw,
+  ArrowRight, CheckCircle2, ClipboardCheck,
+  Download, ExternalLink, FlaskConical, Loader2,
   Sparkles, TriangleAlert,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {

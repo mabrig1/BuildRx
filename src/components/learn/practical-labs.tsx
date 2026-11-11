@@ -372,7 +372,7 @@ export function PracticalLabs({
                 </Button>
                 <Button size="sm" variant="outline" asChild>
                   <Link href={"/learn/studio?track=" + track.id}>
-                    <FolderOpen className="mr-1.5 size-3.5" /> Edit this track's project
+                    <FolderOpen className="mr-1.5 size-3.5" /> Edit this track&apos;s project
                   </Link>
                 </Button>
                 <Button size="sm" variant="outline" asChild>

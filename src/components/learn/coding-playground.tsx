@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Download,
+  FolderOpen,
   FlaskConical,
   Lightbulb,
   Loader2,
@@ -314,6 +315,10 @@ export function CodingPlayground({ initialExercise }: { initialExercise?: string
               </Button>
               {hintIndex >= 0 && <p className="rounded-lg bg-muted/60 p-3">{exercise.hints[hintIndex]}</p>}
               <p className="text-muted-foreground">{exercise.explanation}</p>
+              <Link href={"/learn/studio?track=" + exercise.trackId}
+                className="mr-3 inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline">
+                <FolderOpen className="size-4" /> Open multi-file studio
+              </Link>
               <Link href={`/learn/labs?lab=${exercise.lesson}`}
                 className="inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline">
                 Open full workshop <ArrowRight className="size-4" />

@@ -1,3 +1,4 @@
+import { Script } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { getPlaygroundExercise } from "./playground-exercises";
 import {
@@ -20,6 +21,11 @@ describe("browser-only untrusted exercise runner", () => {
     expect(ISOLATED_JS_RUNNER_DOCUMENT).toContain("new Worker(activeUrl)");
     expect(ISOLATED_JS_RUNNER_DOCUMENT).toContain("2.5-second runtime limit");
     expect(PRACTICE_TIMEOUT_MS).toBeLessThanOrEqual(5_000);
+  });
+  it("has a syntactically valid trusted iframe controller script", () => {
+    const match = ISOLATED_JS_RUNNER_DOCUMENT.match(/<script>([\\s\\S]*?)<\\/script>/i);
+    expect(match?.[1]).toBeTruthy();
+    expect(() => new Script(match![1])).not.toThrow();
   });
   it("rejects empty or excessive code", () => {
     expect(validPracticeCode("")).toBe(false);

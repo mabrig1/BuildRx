@@ -64,6 +64,31 @@ describe("AI tutor security and provider behavior", () => {
     expect(completeText).not.toHaveBeenCalled();
   });
 
+  it("accepts only vetted hands-on labs and meters lab mentoring", async () => {
+    const response = await send({
+      labId: "web03", level: "learning", mode: "lesson",
+      goal: "Learn to persist bookings safely",
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.labId).toBe("web03");
+    expect(payload.verified).toBe(false);
+    expect(completeText).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ role: "system" })]),
+      expect.objectContaining({ maxTokens: 2400 }),
+    );
+    expect(recordAiUsage).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "signed-in-user", status: "completed",
+    }));
+  });
+
+  it("denies unknown labs, mixed lesson/lab IDs, and secret-bearing lab goals", async () => {
+    expect((await send({ labId: "does-not-exist" })).status).toBe(400);
+    expect((await send({ labId: "web02", lessonId: "first-app" })).status).toBe(400);
+    expect((await send({ labId: "mob03", goal: "github_pat_SOMETHINGSECRET" })).status).toBe(400);
+    expect(completeText).not.toHaveBeenCalled();
+  });
+
   it("refuses to fabricate AI output if no provider is configured", async () => {
     isAnyProviderConfigured.mockReturnValue(false);
     const response = await send({ lessonId: "vercel-launch" });

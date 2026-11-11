@@ -15,6 +15,8 @@ Open `/learn/labs` from the dashboard or from `/learn`. Deep links supported by 
 
 Each lab has: 50-minute exercise, task checklist, expected artifacts, acceptance checklist, safety notes, direct official references, downloadable Markdown lab brief, optional AI Lab Mentor and a clear statement that completion is self-reported.
 
+Four curated **starter code kits** are included alongside these labs: TypeScript issue rules with Vitest tests, system context/OpenAPI design stub, accessible Next.js App Router pages, and an Expo React Native screen. Learners can inspect/copy each reviewed file or include the snippets in a downloaded Markdown lab brief. These examples are explicitly *scaffolds* rather than complete or certified applications; BuildRx does not execute or install them.
+
 ## Learning model
 
 1. **Explain:** Read one official-source-linked lab and its objective.

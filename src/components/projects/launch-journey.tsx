@@ -363,6 +363,22 @@ export function LaunchJourney({
               </ol>
             </div>
 
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <p className="text-sm font-semibold">Not sure what any of these tools mean?</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Read a simple example, complete a practical lesson, or ask AI to create training for your current hosting path.
+              </p>
+              <a
+                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-2 hover:underline"
+                href={`/learn?lesson=${choices.host === "cloudflare" ? "cloudflare-launch" : "vercel-launch"}`}
+              >
+                Open Learning Center <ArrowRight className="size-3.5" />
+              </a>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Want structured practice? <a className="underline" href="/learn/labs?track=fullstack-web">Build a real app in the Engineering Labs</a>.
+              </p>
+            </div>
+
             <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
               <CircleHelp className="mr-1 inline size-3.5" />
               BuildRx never asks you to paste MongoDB passwords, GitHub tokens or Cloudflare tokens into this guide. A connected GitHub repo, passed CI check, or personal checkbox never equals an independently tested live app.

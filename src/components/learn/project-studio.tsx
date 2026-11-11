@@ -5,8 +5,8 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   Archive, ArrowRight, CheckCircle2, Code2, Download, FileCode2, FilePlus2,
-  FileText, FolderOpen, GraduationCap, HardDriveDownload, Loader2, RotateCcw,
-  ShieldAlert, Trash2, Upload, Wrench,
+  FileText, FolderOpen, GraduationCap, HardDriveDownload, Loader2, Play, RotateCcw,
+  ShieldAlert, Square, Trash2, Upload, Wrench,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -20,6 +20,10 @@ import {
   TRAINING_TRACKS, labsForTrack, type TrainingTrackId,
 } from "@/lib/learn/labs";
 import { starterKitForTrack } from "@/lib/learn/starter-kits";
+import {
+  prepareReactDemoPreview, REACT_DEMO_APP, REACT_DEMO_CSS,
+  REACT_DEMO_ENTRY, REACT_DEMO_STYLE, type ReactDemoFiles,
+} from "@/lib/learn/studio-react-demo";
 import {
   containsStudioSecret, inspectStudioWorkspace, isStudioTrack,
   newStudioWorkspace, parseStudioWorkspace, removeStudioFile, setStudioFile,
@@ -37,6 +41,18 @@ const MonacoEditor = dynamic(
     loading: () => (
       <div className="flex min-h-64 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" /> Loading local code editor…
+      </div>
+    ),
+  },
+);
+
+const ReactPracticeSandbox = dynamic(
+  () => import("@/components/learn/react-practice-sandbox").then(mod => mod.ReactPracticeSandbox),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-52 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" /> Loading isolated React preview…
       </div>
     ),
   },
@@ -100,6 +116,9 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [importError, setImportError] = useState("");
+  const [reactPreviewConsent, setReactPreviewConsent] = useState(false);
+  const [reactPreview, setReactPreview] = useState<{ files: ReactDemoFiles; revision: number } | null>(null);
+  const [reactPreviewMessage, setReactPreviewMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { resolvedTheme } = useTheme();
   const kit = starterKitForTrack(trackId);
@@ -113,6 +132,13 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
   const fileCount = paths.length;
   const totalChars = Object.values(workspace.files).reduce((sum, source) => sum + source.length, 0);
   const presentCount = checks.filter(item => item.status === "present").length;
+  const reactPreviewStatus = useMemo(
+    () => prepareReactDemoPreview({ trackId, files: workspace.files, containsSecrets }),
+    [trackId, workspace.files, containsSecrets],
+  );
+  const reactPreviewStale = reactPreview !== null && reactPreviewStatus.ok &&
+    (reactPreview.files["/App.js"] !== reactPreviewStatus.files["/App.js"] ||
+     reactPreview.files["/styles.css"] !== reactPreviewStatus.files["/styles.css"]);
 
   useEffect(() => {
     const loaded = loadLocal(trackId);
@@ -121,6 +147,9 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
     setLoadedFor(trackId);
     setMessage("");
     setImportError("");
+    setReactPreviewConsent(false);
+    setReactPreview(null);
+    setReactPreviewMessage("");
   }, [trackId]);
 
   useEffect(() => {
@@ -191,6 +220,8 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
     setWorkspace(fresh);
     setActivePath(Object.keys(fresh.files)[0]);
     setMessage("Restored reviewed training starter files. This does not touch your actual projects.");
+    setReactPreview(null);
+    setReactPreviewMessage("");
   }
 
   function downloadBackup() {
@@ -222,9 +253,56 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
       setWorkspace(response.workspace);
       setActivePath(Object.keys(response.workspace.files)[0]);
       setMessage("Loaded validated local training files. Nothing was executed or uploaded to BuildRx.");
+      setReactPreview(null);
+      setReactPreviewMessage("");
     } catch {
       setImportError("This file is not valid BuildRx training JSON.");
     }
+  }
+
+  function restoreUiDemoOnly() {
+    if (trackId !== "fullstack-web") return;
+    let next = workspace;
+    const missing = [
+      { path: REACT_DEMO_ENTRY, content: REACT_DEMO_APP },
+      { path: REACT_DEMO_STYLE, content: REACT_DEMO_CSS },
+    ].filter(item => !Object.prototype.hasOwnProperty.call(next.files, item.path));
+    if (!missing.length) {
+      setReactPreviewMessage("Both reviewed React demo files are already present.");
+      return;
+    }
+    for (const item of missing) {
+      const result = setStudioFile(next, item.path, item.content);
+      if (!result.ok) {
+        setReactPreviewMessage(result.reason);
+        return;
+      }
+      next = result.workspace;
+    }
+    setWorkspace(next);
+    setActivePath(missing[0].path);
+    setReactPreviewMessage("Restored missing React UI demo files without replacing your other project files.");
+  }
+
+  function launchReactPreview() {
+    if (!reactPreviewConsent) {
+      setReactPreviewMessage("Confirm external sandbox processing before running the preview.");
+      return;
+    }
+    if (loadedFor !== trackId) return;
+    const snapshot = prepareReactDemoPreview({
+      trackId, files: workspace.files, containsSecrets,
+    });
+    if (!snapshot.ok) {
+      setReactPreviewMessage(snapshot.reason);
+      return;
+    }
+    // Snapshot is frozen until the learner explicitly runs again: edits do
+    // not silently send code to CodeSandbox's externally hosted bundler.
+    setReactPreview(current => ({
+      files: snapshot.files, revision: (current?.revision ?? 0) + 1,
+    }));
+    setReactPreviewMessage("Only the two selected React UI demo files were handed to the external sandbox. This does not run your Next.js server or database.");
   }
 
   async function downloadZip() {
@@ -377,6 +455,95 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
               {message && <p role="status" className="rounded-md border bg-muted/50 p-3 text-sm">{message}</p>}
             </CardContent>
           </Card>
+
+          {trackId === "fullstack-web" && (
+            <Card className="border-primary/25">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Play className="size-4 text-primary" /> React UI demo — run a real interactive preview
+                  <Badge variant="outline">Opt-in external sandbox</Badge>
+                </CardTitle>
+                <CardDescription>
+                  Edit only the reviewed <code>{REACT_DEMO_ENTRY}</code> and <code>{REACT_DEMO_STYLE}</code> files,
+                  then preview a working in-memory React interface. Your Next.js pages, API routes,
+                  MongoDB/Supabase configuration and production application are NOT executed here.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setActivePath(REACT_DEMO_ENTRY)}
+                    disabled={!Object.prototype.hasOwnProperty.call(workspace.files, REACT_DEMO_ENTRY)}>
+                    Edit React UI
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setActivePath(REACT_DEMO_STYLE)}
+                    disabled={!Object.prototype.hasOwnProperty.call(workspace.files, REACT_DEMO_STYLE)}>
+                    Edit demo CSS
+                  </Button>
+                  {!reactPreviewStatus.ok && (
+                    <Button size="sm" variant="outline" onClick={restoreUiDemoOnly}>
+                      Restore missing demo files
+                    </Button>
+                  )}
+                </div>
+                <div className="rounded-lg border border-amber-300/50 bg-amber-50/50 p-3 text-xs text-foreground dark:bg-amber-950/20">
+                  <p className="font-semibold">External sandbox privacy notice</p>
+                  <p className="mt-1">
+                    Preview uses CodeSandbox Sandpack, whose bundler is served from an external origin.
+                    Running this demo transfers ONLY the two selected React UI source files to that
+                    environment. Do not include credentials, customer information, or confidential code.
+                    CodeSandbox may receive code as part of preview processing. Nothing is transferred
+                    until you choose Run UI preview below.
+                  </p>
+                </div>
+                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-1" checked={reactPreviewConsent}
+                    onChange={event => {
+                      setReactPreviewConsent(event.target.checked);
+                      if (!event.target.checked) {
+                        setReactPreview(null);
+                        setReactPreviewMessage("");
+                      }
+                    }} />
+                  <span>I understand this demo loads an external CodeSandbox runner and will
+                    send the two selected learning files when I explicitly run it.
+                  </span>
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button disabled={!reactPreviewConsent || !reactPreviewStatus.ok}
+                    onClick={launchReactPreview} className="gap-1.5">
+                    <Play className="size-3.5" /> {reactPreview ? "Run updated UI" : "Run UI preview"}
+                  </Button>
+                  {reactPreview && (
+                    <Button variant="outline" onClick={() => {
+                      setReactPreview(null);
+                      setReactPreviewMessage("Preview stopped. Local edits are unaffected.");
+                    }} className="gap-1.5">
+                      <Square className="size-3.5" /> Stop preview
+                    </Button>
+                  )}
+                  {reactPreviewStale && <Badge variant="outline">Edited code not sent yet</Badge>}
+                </div>
+                {!reactPreviewStatus.ok && (
+                  <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">
+                    {reactPreviewStatus.reason}
+                  </p>
+                )}
+                {reactPreviewMessage && (
+                  <p role="status" className="text-xs text-muted-foreground">{reactPreviewMessage}</p>
+                )}
+                {reactPreview && (
+                  <div aria-label="CodeSandbox external React UI demonstration">
+                    <ReactPracticeSandbox key={reactPreview.revision} files={reactPreview.files} />
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  No authenticated BuildRx data, database, API keys, arbitrary packages or other
+                  training files are provided to the preview. Its React state is temporary and resets
+                  on reload. This is a frontend demonstration, not full-stack execution or certification.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

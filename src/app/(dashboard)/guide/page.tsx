@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import { BookOpen, Lightbulb } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, BookOpen, Lightbulb } from "lucide-react";
 
 import { CopyPromptButton } from "@/components/guide/copy-prompt-button";
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -24,6 +26,21 @@ export default function GuidePage() {
         title="Building apps"
         description="What the agent team does, how to describe an app so it builds well, and how to read the result."
       />
+
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle>New to app building? Start with the Learning Center.</CardTitle>
+          <CardDescription>
+            Learn GitHub, Vercel, Cloudflare, MongoDB, Supabase, secret management and debugging,
+            with practical checkpoints and optional AI-created training plans.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild>
+            <Link href="/learn">Open free beginner lessons <ArrowRight className="ml-2 size-4" /></Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

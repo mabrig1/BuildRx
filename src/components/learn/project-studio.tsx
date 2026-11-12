@@ -20,6 +20,7 @@ import {
   TRAINING_TRACKS, labsForTrack, type TrainingTrackId,
 } from "@/lib/learn/labs";
 import { starterKitForTrack } from "@/lib/learn/starter-kits";
+import { StudioFailureGuide } from "@/components/learn/studio-failure-guide";
 import { buildStudioExport } from "@/lib/learn/studio-export-kit";
 import {
   prepareReactDemoPreview, REACT_DEMO_APP, REACT_DEMO_CSS,
@@ -584,6 +585,8 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
         </section>
 
         <aside className="min-w-0 space-y-4" aria-label="Guided project diagnostics">
+          <StudioFailureGuide />
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">

@@ -41,15 +41,20 @@ export function PublicGithubEvidenceCheck({ input, blocked }: {
     setBusy(true);
     setProblem("");
     setSnapshot(null);
-    const timeout = window.setTimeout(() => controller.abort(), EVIDENCE_CHECK_TIMEOUT_MS);
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, EVIDENCE_CHECK_TIMEOUT_MS);
     try {
       const outcome = await inspectPublicGithubEvidence(input, fetch, controller.signal);
-      if (!controller.signal.aborted) {
-        if (outcome.ok) setSnapshot(outcome.snapshot);
-        else setProblem(outcome.reason);
-      } else {
-        setProblem("GitHub metadata check was stopped or timed out. No result is confirmed.");
+      if (controller.signal.aborted) {
+        // On revoked consent/unmount, never show stale results.
+        if (timedOut) setProblem("GitHub metadata check timed out. No result is confirmed.");
+        return;
       }
+      if (outcome.ok) setSnapshot(outcome.snapshot);
+      else setProblem(outcome.reason);
     } finally {
       window.clearTimeout(timeout);
       if (controllerRef.current === controller) {

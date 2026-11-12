@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, Code2, FileSearch, FlaskConical, FolderOpen, ArrowRight } from "lucide-react";
+import { BookOpen, Code2, FileSearch, FlaskConical, FolderOpen, GraduationCap, ArrowRight } from "lucide-react";
 
 import { KnowledgeAcademy } from "@/components/learn/knowledge-academy";
 import { PageHeader } from "@/components/layout/page-header";
@@ -104,6 +104,24 @@ export default async function LearnPage({
         <CardContent>
           <Button variant="outline" asChild>
             <Link href="/learn/doctor">Explain a build error <ArrowRight className="ml-2 size-4" /></Link>
+          </Button>
+        </CardContent>
+      </Card>
+      <Card className="border-primary/25">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <GraduationCap className="size-5 text-primary" /> Capstone evidence portfolio
+          </CardTitle>
+          <CardDescription>
+            Prepare a source-linked review request for a real engineering project.
+            Four track-specific rubrics, exact commit references, a private evidence journal
+            and a downloadable mentor packet. This is preparation for human verification,
+            not a certificate or a claim that BuildRx has run your tests.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" asChild>
+            <Link href="/learn/capstone">Prepare my capstone review <ArrowRight className="ml-2 size-4" /></Link>
           </Button>
         </CardContent>
       </Card>

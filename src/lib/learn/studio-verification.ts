@@ -94,6 +94,7 @@ else console.log("Training structure check passed. Source has NOT been compiled 
 > GitHub Actions runs only after YOU put the files in your OWN repository
 > and open a pull request or manually start workflow_dispatch (available
 > after this workflow is on the repository default branch).
+> This ZIP is NOT a deployed app, independently verified build, or production-ready service.
 
 ## Start safely
 

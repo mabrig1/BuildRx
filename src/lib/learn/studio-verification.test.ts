@@ -25,8 +25,9 @@ describe("read-only training verification pack", () => {
       expect(workflow).toContain("persist-credentials: false");
       expect(workflow).toContain("npm install --ignore-scripts --no-audit --no-fund");
       expect(workflow).toContain("npm run typecheck");
-      expect(workflow).not.toMatch(/^\\s*pull_request_target:/m);
-      expect(workflow).not.toMatch(/^\\s*(?:deploy|push):/m);\n      expect(workflow).not.toContain("secrets.");
+      expect(workflow).not.toMatch(/^\s*pull_request_target:/m);
+      expect(workflow).not.toMatch(/^\s*(?:deploy|push):/m);
+      expect(workflow).not.toContain("secrets.");
       expect(workflow).not.toContain("id-token: write");
 
       expect(verifier).toContain("existsSync");

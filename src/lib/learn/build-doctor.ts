@@ -168,7 +168,6 @@ function firstErrorLikeLine(lines: string[]): string | null {
 
 export function diagnoseBuildLog(raw: string): BuildDoctorResult {
   const lines = cleanLog(raw);
-  const joined = lines.join("\n");
   for (const rule of RULES) {
     const matchLine = lines.find(line => rule.pattern.test(line));
     if (!matchLine) continue;

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
-  ArrowRight, BookOpenCheck, CheckCircle2, CircleHelp, GraduationCap,
+  ArrowRight, BookOpenCheck, CheckCircle2, CircleHelp, Code2, GraduationCap,
   RotateCcw, ShieldAlert,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ import {
   type LabMasteryProgress, type LabMasteryRecord,
 } from "@/lib/learn/lab-mastery-progress";
 import { labsForTrack, type TrainingLab, type TrainingTrackId } from "@/lib/learn/labs";
+import { PLAYGROUND_EXERCISES } from "@/lib/learn/playground-exercises";
 
 export type LabLearningMode = "guided" | "explore";
 
@@ -120,6 +122,7 @@ export function LabMasteryReview({
   onChange: (next: LabMasteryRecord) => void;
 }) {
   const questions = useMemo(() => checksForLab(lab.id), [lab.id]);
+  const codingChallenges = PLAYGROUND_EXERCISES.filter(exercise => exercise.lesson === lab.id);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [report, setReport] = useState<KnowledgeGrade | null>(null);
   const [reflection, setReflection] = useState(record.reflection);
@@ -220,6 +223,26 @@ export function LabMasteryReview({
             )}
           </div>
         </div>
+        {codingChallenges.length > 0 && (
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+            <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+              <Code2 className="size-4" /> Put this concept into code
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Run the following isolated practice exercises before preparing real project evidence.
+              Their passing checks do not certify the complete workshop.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {codingChallenges.map(exercise => (
+                <Button key={exercise.id} size="sm" variant="outline" asChild>
+                  <Link href={"/learn/playground?exercise=" + exercise.id}>
+                    {exercise.title} <ArrowRight className="ml-1.5 size-3.5" />
+                  </Link>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="space-y-3 border-t pt-4">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <ShieldAlert className="size-4" /> Evidence and reflection journal — private, self-reported

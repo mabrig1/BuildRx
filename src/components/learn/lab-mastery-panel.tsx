@@ -93,6 +93,18 @@ export function LabLearningJourney({
             );
           })}
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={"/learn/capstone?track=" + trackId}>
+              <GraduationCap className="mr-1.5 size-3.5" />
+              Prepare capstone evidence
+              <ArrowRight className="ml-1.5 size-3.5" />
+            </Link>
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            A mentor must independently inspect the project before awarding any qualification.
+          </span>
+        </div>
         {suggested ? (
           <div className="flex flex-wrap items-center gap-3 rounded-lg bg-muted/50 p-3">
             <p className="min-w-0 flex-1 text-xs">

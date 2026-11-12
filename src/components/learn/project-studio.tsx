@@ -652,6 +652,11 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
                 </Button>
               )}
               <Button size="sm" variant="outline" asChild>
+                <Link href={"/learn/capstone?track=" + trackId}>
+                  <GraduationCap className="mr-1.5 size-3.5" /> Prepare capstone packet
+                </Link>
+              </Button>
+              <Button size="sm" variant="outline" asChild>
                 <Link href="/learn/doctor">
                   <FileSearch className="mr-1.5 size-3.5" /> Explain build failures
                 </Link>

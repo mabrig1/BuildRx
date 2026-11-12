@@ -34,7 +34,7 @@ export default async function PlaygroundPage({
         description="Edit code, run isolated browser checks, explore previews, receive feedback and learn to debug—without touching production."
       >
         <Badge variant="secondary" className="gap-1.5">
-          <Code2 className="size-3.5" /> Six interactive practice challenges
+          <Code2 className="size-3.5" /> Twelve interactive practice challenges
         </Badge>
       </PageHeader>
       <CodingPlayground initialExercise={chosen} />

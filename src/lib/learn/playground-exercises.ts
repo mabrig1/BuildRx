@@ -435,6 +435,486 @@ export const PLAYGROUND_EXERCISES: readonly PlaygroundExercise[] = [
       "Add @media (min-width: 40rem) { .grid { grid-template-columns: repeat(2, 1fr); } }."
     ],
     "explanation": "Responsive web CSS and native React Native styles have different engines. This is a web CSS foundations exercise, not a compiled Android/iOS app."
+  },
+  {
+    "id": "js-idempotency",
+    "trackId": "systems-engineering",
+    "kind": "javascript",
+    "title": "Remove duplicate booking requests",
+    "level": "Intermediate",
+    "minutes": 20,
+    "objective": "Deduplicate retryable submission IDs without altering the original order.",
+    "lesson": "sys02",
+    "instructions": "Implement uniqueRequestIds(ids). Return the first occurrence of every string ID, preserving input order. Never mutate the incoming array.",
+    "start": "function uniqueRequestIds(ids) {\n  // Keep the first occurrence of each identifier.\n  return ids;\n}\n",
+    "functionName": "uniqueRequestIds",
+    "tests": [
+      {
+        "label": "Keep first occurrence",
+        "args": [
+          [
+            "r1",
+            "r2",
+            "r1",
+            "r3"
+          ]
+        ],
+        "expected": [
+          "r1",
+          "r2",
+          "r3"
+        ]
+      },
+      {
+        "label": "Empty input",
+        "args": [
+          []
+        ],
+        "expected": []
+      },
+      {
+        "label": "No duplicates",
+        "args": [
+          [
+            "a",
+            "b"
+          ]
+        ],
+        "expected": [
+          "a",
+          "b"
+        ]
+      },
+      {
+        "label": "One repeated ID",
+        "args": [
+          [
+            "z",
+            "z",
+            "z"
+          ]
+        ],
+        "expected": [
+          "z"
+        ]
+      },
+      {
+        "label": "Case-sensitive IDs",
+        "args": [
+          [
+            "ID",
+            "id",
+            "ID"
+          ]
+        ],
+        "expected": [
+          "ID",
+          "id"
+        ]
+      }
+    ],
+    "hints": [
+      "Track which identifiers have already appeared.",
+      "Return [...new Set(ids)] or use a Set while iterating."
+    ],
+    "explanation": "Deduplication is a teaching example only; real request idempotency must be enforced atomically on the server."
+  },
+  {
+    "id": "js-backoff",
+    "trackId": "systems-engineering",
+    "kind": "javascript",
+    "title": "Calculate bounded retry delays",
+    "level": "Intermediate",
+    "minutes": 20,
+    "objective": "Implement exponential backoff with a reasonable maximum delay.",
+    "lesson": "sys04",
+    "instructions": "Implement retryDelay(attempt). For non-negative integer attempts return min(1000 * 2**attempt, 8000) milliseconds. Invalid inputs return -1. No timers or network requests should be started.",
+    "start": "function retryDelay(attempt) {\n  // Return -1 for invalid attempts, otherwise a capped delay.\n  return 0;\n}\n",
+    "functionName": "retryDelay",
+    "tests": [
+      {
+        "label": "First attempt",
+        "args": [
+          0
+        ],
+        "expected": 1000
+      },
+      {
+        "label": "Second attempt",
+        "args": [
+          1
+        ],
+        "expected": 2000
+      },
+      {
+        "label": "Third attempt",
+        "args": [
+          2
+        ],
+        "expected": 4000
+      },
+      {
+        "label": "Cap applies",
+        "args": [
+          10
+        ],
+        "expected": 8000
+      },
+      {
+        "label": "Negative attempt rejected",
+        "args": [
+          -1
+        ],
+        "expected": -1
+      },
+      {
+        "label": "Fractional attempt rejected",
+        "args": [
+          1.5
+        ],
+        "expected": -1
+      }
+    ],
+    "hints": [
+      "Use Number.isInteger(attempt) and check attempt >= 0.",
+      "Use Math.min(1000 * 2 ** attempt, 8000) after checking input."
+    ],
+    "explanation": "Real retries also need idempotency, limits, jitter, cancellation and a dead-letter plan."
+  },
+  {
+    "id": "js-data-summary",
+    "trackId": "fullstack-web",
+    "kind": "javascript",
+    "title": "Summarize statuses for an analytics dashboard",
+    "level": "Beginner",
+    "minutes": 20,
+    "objective": "Turn an array of status strings into count summaries.",
+    "lesson": "web03",
+    "instructions": "Implement countStatuses(statuses). Return an object with keys open, closed and pending counting matching lowercase status strings. Ignore other values. Do not mutate inputs.",
+    "start": "function countStatuses(statuses) {\n  return { open: 0, closed: 0, pending: 0 };\n}\n",
+    "functionName": "countStatuses",
+    "tests": [
+      {
+        "label": "Mixed statuses",
+        "args": [
+          [
+            "open",
+            "closed",
+            "open",
+            "pending"
+          ]
+        ],
+        "expected": {
+          "open": 2,
+          "closed": 1,
+          "pending": 1
+        }
+      },
+      {
+        "label": "Empty array",
+        "args": [
+          []
+        ],
+        "expected": {
+          "open": 0,
+          "closed": 0,
+          "pending": 0
+        }
+      },
+      {
+        "label": "Unknown ignored",
+        "args": [
+          [
+            "other",
+            "open"
+          ]
+        ],
+        "expected": {
+          "open": 1,
+          "closed": 0,
+          "pending": 0
+        }
+      },
+      {
+        "label": "All closed",
+        "args": [
+          [
+            "closed",
+            "closed"
+          ]
+        ],
+        "expected": {
+          "open": 0,
+          "closed": 2,
+          "pending": 0
+        }
+      },
+      {
+        "label": "Case sensitivity",
+        "args": [
+          [
+            "Open",
+            "open"
+          ]
+        ],
+        "expected": {
+          "open": 1,
+          "closed": 0,
+          "pending": 0
+        }
+      }
+    ],
+    "hints": [
+      "Create an output object with all three keys initially set to 0.",
+      "Loop through statuses, and increment only when the key is one of the three supported statuses."
+    ],
+    "explanation": "Frontend aggregations are not a substitute for authorization, trustworthy data queries, or analytics validation."
+  },
+  {
+    "id": "js-validation",
+    "trackId": "fullstack-web",
+    "kind": "javascript",
+    "title": "Validate a registration display name",
+    "level": "Beginner",
+    "minutes": 15,
+    "objective": "Return a clear validation result that can be unit tested.",
+    "lesson": "web02",
+    "instructions": "Implement validateName(name). Return {ok:true,value:trimmed} only for strings whose trimmed length is between 3 and 40 inclusive. Otherwise return {ok:false,value:''}. Do not modify the original input.",
+    "start": "function validateName(name) {\n  // Check the type and trimmed length.\n  return { ok: false, value: '' };\n}\n",
+    "functionName": "validateName",
+    "tests": [
+      {
+        "label": "Valid normal name",
+        "args": [
+          "Amina"
+        ],
+        "expected": {
+          "ok": true,
+          "value": "Amina"
+        }
+      },
+      {
+        "label": "Whitespace trim",
+        "args": [
+          "  Chika  "
+        ],
+        "expected": {
+          "ok": true,
+          "value": "Chika"
+        }
+      },
+      {
+        "label": "Too short",
+        "args": [
+          " Al "
+        ],
+        "expected": {
+          "ok": false,
+          "value": ""
+        }
+      },
+      {
+        "label": "Non-string rejected",
+        "args": [
+          null
+        ],
+        "expected": {
+          "ok": false,
+          "value": ""
+        }
+      },
+      {
+        "label": "Upper length boundary",
+        "args": [
+          "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        ],
+        "expected": {
+          "ok": true,
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        }
+      },
+      {
+        "label": "Over max length",
+        "args": [
+          "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        ],
+        "expected": {
+          "ok": false,
+          "value": ""
+        }
+      }
+    ],
+    "hints": [
+      "Reject when typeof name !== 'string'.",
+      "Use const cleaned = name.trim(); return based on cleaned.length >= 3 && cleaned.length <= 40."
+    ],
+    "explanation": "Use this to understand testable validation rules, but real auth systems require further server-side controls."
+  },
+  {
+    "id": "js-mobile-queue",
+    "trackId": "mobile-app",
+    "kind": "javascript",
+    "title": "Identify offline drafts awaiting synchronization",
+    "level": "Intermediate",
+    "minutes": 20,
+    "objective": "Separate offline drafts from confirmed server records.",
+    "lesson": "mob04",
+    "instructions": "Implement pendingDraftIds(drafts). Each draft has id:string and synced:boolean. Return IDs where synced is exactly false, preserving order. Ignore entries with missing IDs; do not mutate inputs.",
+    "start": "function pendingDraftIds(drafts) {\n  // Only return id strings from records with synced === false.\n  return [];\n}\n",
+    "functionName": "pendingDraftIds",
+    "tests": [
+      {
+        "label": "Mixed records",
+        "args": [
+          [
+            {
+              "id": "a",
+              "synced": false
+            },
+            {
+              "id": "b",
+              "synced": true
+            },
+            {
+              "id": "c",
+              "synced": false
+            }
+          ]
+        ],
+        "expected": [
+          "a",
+          "c"
+        ]
+      },
+      {
+        "label": "All synchronized",
+        "args": [
+          [
+            {
+              "id": "a",
+              "synced": true
+            }
+          ]
+        ],
+        "expected": []
+      },
+      {
+        "label": "Empty list",
+        "args": [
+          []
+        ],
+        "expected": []
+      },
+      {
+        "label": "Missing IDs ignored",
+        "args": [
+          [
+            {
+              "synced": false
+            },
+            {
+              "id": "x",
+              "synced": false
+            }
+          ]
+        ],
+        "expected": [
+          "x"
+        ]
+      },
+      {
+        "label": "Unknown sync status excluded",
+        "args": [
+          [
+            {
+              "id": "y"
+            },
+            {
+              "id": "z",
+              "synced": false
+            }
+          ]
+        ],
+        "expected": [
+          "z"
+        ]
+      }
+    ],
+    "hints": [
+      "Use filter then map, or build an output array with a loop.",
+      "Only include items where draft.synced === false && typeof draft.id === 'string'."
+    ],
+    "explanation": "Pending offline drafts must not be presented as confirmed server bookings. Real sync requires conflict and idempotency handling."
+  },
+  {
+    "id": "js-safe-role",
+    "trackId": "software-engineering",
+    "kind": "javascript",
+    "title": "Calculate permissions without privilege escalation",
+    "level": "Intermediate",
+    "minutes": 20,
+    "objective": "Practice default-deny role decisions and negative test cases.",
+    "lesson": "se03",
+    "instructions": "Implement canViewReport(user). Return true only when user is a non-null object with role exactly 'analyst' or 'admin'. Return false for all other inputs, including absent roles.",
+    "start": "function canViewReport(user) {\n  // Deny unless the role is an explicitly permitted value.\n  return true;\n}\n",
+    "functionName": "canViewReport",
+    "tests": [
+      {
+        "label": "Analyst allowed",
+        "args": [
+          {
+            "role": "analyst"
+          }
+        ],
+        "expected": true
+      },
+      {
+        "label": "Administrator allowed",
+        "args": [
+          {
+            "role": "admin"
+          }
+        ],
+        "expected": true
+      },
+      {
+        "label": "Guest denied",
+        "args": [
+          {
+            "role": "guest"
+          }
+        ],
+        "expected": false
+      },
+      {
+        "label": "Missing role denied",
+        "args": [
+          {}
+        ],
+        "expected": false
+      },
+      {
+        "label": "Null denied",
+        "args": [
+          null
+        ],
+        "expected": false
+      },
+      {
+        "label": "Substring is not role",
+        "args": [
+          {
+            "role": "admin-extra"
+          }
+        ],
+        "expected": false
+      }
+    ],
+    "hints": [
+      "Check the user exists and its role matches an allowlist.",
+      "Return Boolean(user && (user.role === 'analyst' || user.role === 'admin'))."
+    ],
+    "explanation": "A frontend helper is not access control. Production authorization must use server-verified identity and ownership policies."
   }
 ];
 export function getPlaygroundExercise(id: string): PlaygroundExercise | undefined {

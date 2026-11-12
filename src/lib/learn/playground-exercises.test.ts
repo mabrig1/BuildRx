@@ -3,7 +3,7 @@ import { PLAYGROUND_EXERCISES, getPlaygroundExercise } from "./playground-exerci
 
 describe("curated coding exercises", () => {
   it("has unique reviewed tasks across four engineering tracks", () => {
-    expect(PLAYGROUND_EXERCISES.length).toBeGreaterThanOrEqual(6);
+    expect(PLAYGROUND_EXERCISES).toHaveLength(12);
     expect(new Set(PLAYGROUND_EXERCISES.map(exercise => exercise.id)).size).toBe(PLAYGROUND_EXERCISES.length);
     expect(new Set(PLAYGROUND_EXERCISES.map(exercise => exercise.trackId))).toEqual(
       new Set(["software-engineering", "systems-engineering", "fullstack-web", "mobile-app"]),

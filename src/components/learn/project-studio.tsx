@@ -20,6 +20,7 @@ import {
   TRAINING_TRACKS, labsForTrack, type TrainingTrackId,
 } from "@/lib/learn/labs";
 import { starterKitForTrack } from "@/lib/learn/starter-kits";
+import { buildStudioExport } from "@/lib/learn/studio-export-kit";
 import {
   prepareReactDemoPreview, REACT_DEMO_APP, REACT_DEMO_CSS,
   REACT_DEMO_ENTRY, REACT_DEMO_STYLE, type ReactDemoFiles,
@@ -82,28 +83,6 @@ function triggerDownload(blob: Blob, name: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function makeReadme(trackId: TrainingTrackId): string {
-  const kit = starterKitForTrack(trackId);
-  return [
-    "# BuildRx Learning Project — " + (kit?.name ?? trackId),
-    "",
-    "> Educational source snippets. Not a complete installable, deployed or certified application.",
-    "> This ZIP was assembled in your browser; BuildRx has not run npm, tested source or inspected your private credentials.",
-    "",
-    "## Setup in your own development environment",
-    ...(kit?.setup.map((step, index) => (index + 1) + ". " + step) ?? []),
-    "",
-    "## Safety checklist",
-    "- Review every file and dependency before running package installation.",
-    "- Never commit API keys, .env files, passwords or real user data.",
-    "- Add required manifest, dependencies and app configuration for your chosen stack.",
-    "- Run actual tests and builds locally before deploying.",
-    "- Confirm real app data, authentication, permissions and public URL manually.",
-    "",
-    "Learning materials: /learn/labs and /learn/playground on BuildRx.",
-  ].join("\n");
-}
-
 export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId }) {
   const first = initialTrack && isStudioTrack(initialTrack) ? initialTrack : TRAINING_TRACKS[0].id;
   const [trackId, setTrackId] = useState<TrainingTrackId>(first);
@@ -132,6 +111,7 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
   const fileCount = paths.length;
   const totalChars = Object.values(workspace.files).reduce((sum, source) => sum + source.length, 0);
   const presentCount = checks.filter(item => item.status === "present").length;
+  const exportPackage = useMemo(() => buildStudioExport(workspace), [workspace]);
   const reactPreviewStatus = useMemo(
     () => prepareReactDemoPreview({ trackId, files: workspace.files, containsSecrets }),
     [trackId, workspace.files, containsSecrets],
@@ -306,25 +286,29 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
   }
 
   async function downloadZip() {
-    if (containsSecrets) {
-      setMessage("Remove possible credentials and private connection strings before exporting project files.");
+    if (busy) return;
+    const prepared = buildStudioExport(workspace);
+    if (!prepared.ok) {
+      setMessage(prepared.reason);
       return;
     }
-    if (busy) return;
     setBusy(true);
     setMessage("");
     try {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
-      for (const path of paths) zip.file(path, workspace.files[path]);
-      zip.file("README-TRAINING.md", makeReadme(trackId));
+      // Includes only local edited sources and explicitly reviewed configuration.
+      // Nothing is uploaded, installed, executed or auto-published.
+      for (const [path, source] of Object.entries(prepared.files)) {
+        zip.file(path, source);
+      }
       const blob = await zip.generateAsync({
         type: "blob",
         compression: "DEFLATE",
         compressionOptions: { level: 3 },
       });
       triggerDownload(blob, "buildrx-training-" + trackId + ".zip");
-      setMessage("Project ZIP saved locally. It contains source scaffolds—not a validated, runnable release.");
+      setMessage("Training ZIP exported with stack-specific setup instructions. No build or deployment has been performed.");
     } catch {
       setMessage("ZIP export failed in this browser. Use the JSON backup option instead.");
     } finally {
@@ -556,9 +540,9 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => void downloadZip()} disabled={busy || containsSecrets} className="gap-1.5">
+                <Button onClick={() => void downloadZip()} disabled={busy || !exportPackage.ok} className="gap-1.5">
                   {busy ? <Loader2 className="size-4 animate-spin" /> : <Archive className="size-4" />}
-                  Download source ZIP
+                  Download training project ZIP
                 </Button>
                 <Button variant="outline" onClick={downloadBackup} disabled={containsSecrets} className="gap-1.5">
                   <Download className="size-4" /> Backup JSON
@@ -574,9 +558,26 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
                   event.target.value = "";
                 }} />
               {importError && <p role="alert" className="text-sm text-destructive">{importError}</p>}
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                <p className="font-semibold">
+                  {exportPackage.ok ? exportPackage.label : "Export needs a correction"}
+                </p>
+                {exportPackage.ok ? (
+                  <>
+                    <p className="mt-1 text-xs text-muted-foreground">{exportPackage.caution}</p>
+                    <ol className="mt-2 ml-4 list-decimal space-y-1 text-xs">
+                      {exportPackage.steps.map(step => <li key={step}>{step}</li>)}
+                    </ol>
+                  </>
+                ) : (
+                  <p role="alert" className="mt-2 text-xs text-destructive">{exportPackage.reason}</p>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                The ZIP includes edited files and a learning README, not a complete dependency-installed,
-                tested or published application. JSON restores only the current selected training track.
+                Web and TypeScript exports include reviewed npm manifests and setup commands, but
+                do not include preinstalled dependencies, a verified build or live data.
+                Mobile exports remain an Expo overlay, and systems exports remain design documents.
+                JSON restores only the selected training track.
               </p>
             </CardContent>
           </Card>

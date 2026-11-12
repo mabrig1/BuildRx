@@ -22,7 +22,7 @@ describe("BuildRx stack-specific training ZIP preparation", () => {
     expect(result.files["src/app/layout.tsx"]).toContain("<html lang=\"en\">");
     expect(result.files["src/app/globals.css"]).toContain("box-sizing");
     expect(result.files[".gitignore"]).toContain(".env.*");
-    expect(result.files["README-TRAINING.md"]).toContain("no real booking persistence");
+    expect(result.files["README-TRAINING.md"]).toMatch(/no database, login, booking mutation/i);
 
     const pkg = JSON.parse(result.files["package.json"]);
     const config = JSON.parse(result.files["tsconfig.json"]);
@@ -118,8 +118,8 @@ describe("BuildRx stack-specific training ZIP preparation", () => {
       if (!result.ok) throw Error(result.reason);
       const readme = result.files["README-TRAINING.md"];
       expect(readme).toMatch(/NOT installed dependencies/);
-      expect(readme).toMatch(/no.*deploy/i);
-      expect(readme).toContain("never treat a generated package".replace("never", "Never"));
+      expect(readme).toMatch(/NOT a deployed app/);
+      expect(readme).toContain("Never treat a generated package");
       expect(readme).toContain("## Exact next steps");
       expect(result.steps.length).toBeGreaterThanOrEqual(4);
       expect(Object.keys(result.files).length).toBeGreaterThanOrEqual(4);

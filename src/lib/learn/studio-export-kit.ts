@@ -160,6 +160,7 @@ const NEXT_STEPS = [
 const TS_STEPS = [
   "Install Node.js 22 LTS; review the included source and package.json.",
   "Run npm install to fetch test and TypeScript dependencies.",
+  "If npm 10 crashes with an edgesOut error, use npm 11.6+ on a supported Node version, then repeat npm install. Do not bypass peer checks blindly.",
   "Run npm run typecheck, then npm test; add more tests in src/lib/issues.test.ts.",
   "Review errors, make one small fix, rerun tests and commit to your own Git repository.",
   "No web UI or server is included: this is a standalone unit-testing workshop.",

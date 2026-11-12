@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TRAINING_TRACKS, type TrainingTrackId } from "@/lib/learn/labs";
+import { PublicGithubEvidenceCheck } from "@/components/learn/public-github-evidence-check";
 import {
   CAPSTONE_MAX_STORAGE_CHARS, CAPSTONE_NOTE_LIMIT, CAPSTONE_REFLECTION_LIMIT,
   CAPSTONE_RUBRICS, CAPSTONE_STORAGE_KEY, CAPSTONE_TITLE_LIMIT,
@@ -343,6 +344,16 @@ export function CapstonePortfolio({ initialTrack }: { initialTrack?: TrainingTra
               )}
             </CardContent>
           </Card>
+          <PublicGithubEvidenceCheck
+            key={[trackId, record.repoUrl, record.commitSha, record.ciRunUrl].join("|")}
+            input={{
+              repoUrl: record.repoUrl,
+              commitSha: record.commitSha,
+              ciRunUrl: record.ciRunUrl,
+            }}
+            blocked={possibleSecret}
+          />
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">

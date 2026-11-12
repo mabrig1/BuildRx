@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, Code2, FlaskConical, FolderOpen, ArrowRight } from "lucide-react";
+import { BookOpen, Code2, FileSearch, FlaskConical, FolderOpen, ArrowRight } from "lucide-react";
 
 import { KnowledgeAcademy } from "@/components/learn/knowledge-academy";
 import { PageHeader } from "@/components/layout/page-header";
@@ -87,6 +87,23 @@ export default async function LearnPage({
         <CardContent>
           <Button variant="outline" asChild>
             <Link href="/learn/studio">Open multi-file studio <ArrowRight className="ml-2 size-4" /></Link>
+          </Button>
+        </CardContent>
+      </Card>
+      <Card className="border-primary/25">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <FileSearch className="size-5 text-primary" /> Build Doctor — understand errors safely
+          </CardTitle>
+          <CardDescription>
+            Paste a GitHub, Next.js, Vercel or Cloudflare build error into a browser-local
+            helper to identify the first meaningful blocker and learn a reversible repair.
+            No AI credits, secret uploads or changes to live projects.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" asChild>
+            <Link href="/learn/doctor">Explain a build error <ArrowRight className="ml-2 size-4" /></Link>
           </Button>
         </CardContent>
       </Card>

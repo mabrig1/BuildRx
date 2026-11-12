@@ -132,6 +132,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Coding Playground", href: "/learn/playground", icon: Code2 },
   { title: "Project Studio", href: "/learn/studio", icon: FolderOpen },
   { title: "Build Doctor", href: "/learn/doctor", icon: FileSearch },
+  { title: "Capstone Portfolio", href: "/learn/capstone", icon: GraduationCap },
   { title: "Contact", href: "/contact", icon: Mail },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },

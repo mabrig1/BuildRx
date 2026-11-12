@@ -1,5 +1,9 @@
 import type { TrainingTrackId } from "@/lib/learn/labs";
 import {
+  trainingVerificationFiles, VERIFICATION_GUIDE_PATH,
+  VERIFICATION_SCRIPT_PATH, VERIFICATION_WORKFLOW_PATH,
+} from "@/lib/learn/studio-verification";
+import {
   containsStudioSecret,
   parseStudioWorkspace,
   type StudioWorkspace,
@@ -260,7 +264,10 @@ export function buildStudioExport(workspace: StudioWorkspace): StudioExportResul
   const existing = Object.keys(files).map(path => path.toLowerCase());
   const generated = ["README-TRAINING.md", ".gitignore"];
   if (workspace.trackId === "fullstack-web" || workspace.trackId === "software-engineering") {
-    generated.push("package.json", "tsconfig.json");
+    generated.push(
+      "package.json", "tsconfig.json",
+      VERIFICATION_GUIDE_PATH, VERIFICATION_SCRIPT_PATH, VERIFICATION_WORKFLOW_PATH,
+    );
   }
   if (workspace.trackId === "fullstack-web") {
     generated.push("src/app/layout.tsx", "src/app/globals.css");
@@ -289,5 +296,8 @@ export function buildStudioExport(workspace: StudioWorkspace): StudioExportResul
   files["README-TRAINING.md"] = trainingReadme(
     workspace.trackId, track.label, track.steps, track.caution,
   );
+  // Files are included as instructions and reviewed CI templates only.
+  // No job is submitted, executed or configured in the user's accounts.
+  Object.assign(files, trainingVerificationFiles(workspace.trackId));
   return { ok: true, kind: track.kind, label: track.label, steps: [...track.steps], caution: track.caution, files };
 }

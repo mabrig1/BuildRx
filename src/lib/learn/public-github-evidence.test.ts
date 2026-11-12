@@ -77,6 +77,7 @@ describe("opt-in public GitHub evidence metadata checks", () => {
         cache: "no-store",
       });
       expect(JSON.stringify(options)).not.toContain("Authorization");
+      expect(JSON.stringify(options)).not.toContain("X-GitHub-Api-Version");
       expect(JSON.stringify(options)).not.toContain("token");
       expect(options.body).toBeUndefined();
     }

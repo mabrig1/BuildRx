@@ -222,7 +222,7 @@ export function capstoneReviewMarkdown(record: CapstoneRecord): string {
   return [
     "# BuildRx capstone — SELF-REPORTED review request",
     "",
-    "**Status: NOT INDEPENDENTLY VERIFIED. Not a certificate or deployment approval.**",
+    "**Status: NOT INDEPENDENTLY VERIFIED. NOT a certificate or deployment approval.**",
     "",
     "Track: " + (track?.title ?? record.trackId),
     "Title: " + record.projectTitle,

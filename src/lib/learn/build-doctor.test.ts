@@ -26,6 +26,23 @@ describe("privacy-aware deterministic Build Doctor", () => {
     expect(diagnoseBuildLog("Failed to compile").area).toBe("Build");
   });
 
+  it("prioritizes the earliest concrete error in the provided log, not rule order", () => {
+    const output = diagnoseBuildLog([
+      "Build failed",
+      "src/app/page.tsx(4,5): error TS2322: Type number is not assignable to string",
+      "npm ci can only install packages when lockfile exists",
+    ].join("\n"));
+    expect(output.area).toBe("TypeScript");
+    expect(output.firstRelevantLine).toContain("TS2322");
+
+    const reverse = diagnoseBuildLog([
+      "Module not found: Can't resolve 'missing'",
+      "src/app/page.tsx(4,5): error TS2322: Type number is not assignable to string",
+    ].join("\n"));
+    expect(reverse.area).toBe("Dependencies");
+    expect(reverse.firstRelevantLine).toContain("Module not found");
+  });
+
   it("redacts credentials from the displayed evidence", () => {
     const testCases = [
       "Error: missing env MONGODB_URI mongodb+srv://user:pass@cluster.example.com/database",

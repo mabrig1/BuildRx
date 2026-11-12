@@ -20,6 +20,11 @@ import {
   type TrainingLab, type TrainingTrackId,
 } from "@/lib/learn/labs";
 import { starterKitForTrack } from "@/lib/learn/starter-kits";
+import { LabLearningJourney, LabMasteryReview, type LabLearningMode } from "@/components/learn/lab-mastery-panel";
+import {
+  LAB_MASTERY_STORAGE_KEY, emptyLabMasteryRecord, readLabMasteryProgress,
+  type LabMasteryProgress, type LabMasteryRecord,
+} from "@/lib/learn/lab-mastery-progress";
 
 type LabEntry = { tasks: boolean[]; checks: boolean[] };
 type Progress = Record<string, LabEntry>;
@@ -75,6 +80,8 @@ export function PracticalLabs({
     firstLab?.id ?? labsForTrack(initialTrack ?? TRAINING_TRACKS[0].id)[0].id,
   );
   const [progress, setProgress] = useState<Progress>({});
+  const [mastery, setMastery] = useState<LabMasteryProgress>({});
+  const [learningMode, setLearningMode] = useState<LabLearningMode>("guided");
   const [hydrated, setHydrated] = useState(false);
   const [level, setLevel] = useState<"first-time" | "learning" | "building">("first-time");
   const [mode, setMode] = useState<"lesson" | "five-day-plan">("lesson");
@@ -86,6 +93,14 @@ export function PracticalLabs({
 
   useEffect(() => {
     setProgress(readProgress());
+    try {
+      const saved = window.localStorage.getItem(LAB_MASTERY_STORAGE_KEY);
+      if (saved && saved.length < 80_000) setMastery(readLabMasteryProgress(JSON.parse(saved)));
+      const savedMode = window.localStorage.getItem("buildrx-lab-learning-mode-v1");
+      if (savedMode === "guided" || savedMode === "explore") setLearningMode(savedMode);
+    } catch {
+      // Local progress is optional; no externally asserted accreditation.
+    }
     setHydrated(true);
   }, []);
 
@@ -98,6 +113,16 @@ export function PracticalLabs({
     }
   }, [progress, hydrated]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(LAB_MASTERY_STORAGE_KEY, JSON.stringify(mastery));
+      window.localStorage.setItem("buildrx-lab-learning-mode-v1", learningMode);
+    } catch {
+      // Browser-local progress may be unavailable; never block course access.
+    }
+  }, [hydrated, mastery, learningMode]);
+
   const track = TRAINING_TRACKS.find(t => t.id === trackId) ?? TRAINING_TRACKS[0];
   const starter = starterKitForTrack(track.id);
   const lab = getTrainingLab(selectedId) ?? labsForTrack(trackId)[0];
@@ -106,6 +131,15 @@ export function PracticalLabs({
   const completed = labs.filter(item => selfReportedDone(item, progress)).length;
   const totalReported = TRAINING_LABS.filter(item => selfReportedDone(item, progress)).length;
   const currentIndex = labs.findIndex(item => item.id === lab.id);
+  const finishedLabIds = useMemo(
+    () => new Set(TRAINING_LABS.filter(item => selfReportedDone(item, progress)).map(item => item.id)),
+    [progress],
+  );
+
+  function saveMasteryRecord(labId: string, record: LabMasteryRecord) {
+    if (!allLabIds.has(labId)) return;
+    setMastery(previous => ({ ...previous, [labId]: record }));
+  }
 
   function selectTrack(id: TrainingTrackId) {
     const chosen = labsForTrack(id)[0];
@@ -223,6 +257,10 @@ export function PracticalLabs({
           </p>
         </CardContent>
       </Card>
+
+      <LabLearningJourney trackId={trackId} selectedLabId={lab.id}
+        doneLabIds={finishedLabIds} mastery={mastery} mode={learningMode}
+        setMode={setLearningMode} selectLab={selectLab} />
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,310px)_minmax(0,1fr)]">
         <aside className="space-y-3" aria-label="Track laboratories">
@@ -386,6 +424,12 @@ export function PracticalLabs({
               </div>
             </CardContent>
           </Card>
+
+          {hydrated && (
+            <LabMasteryReview key={lab.id} lab={lab}
+              record={mastery[lab.id] ?? emptyLabMasteryRecord()}
+              onChange={next => saveMasteryRecord(lab.id, next)} />
+          )}
 
           <Card className="border-primary/25">
             <CardHeader>

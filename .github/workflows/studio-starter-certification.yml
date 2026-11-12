@@ -49,6 +49,14 @@ jobs:
           BUILDRX_STUDIO_CERTIFY_DIR: ${{ runner.temp }}/studio-export-fixtures
         run: npx vitest run src/lib/learn/studio-export-fixtures.test.ts
 
+      # npm 10's Arborist peer resolution can crash on Vitest 4.1 without
+      # a lockfile ("reading edgesOut"). CI-only npm 11.19.1 avoids the
+      # confirmed npm/cli#9787 bug without weakening peer resolution.
+      - name: Use fixed npm for freshly generated starter dependency trees
+        run: |
+          npm install --global npm@11.19.1 --ignore-scripts --no-audit --no-fund
+          npm --version
+
       - name: Install and typecheck reviewed TypeScript package
         working-directory: ${{ runner.temp }}/studio-export-fixtures/software-engineering
         run: |

@@ -97,7 +97,7 @@ describe("capstone reviewer evidence model", () => {
       ...sample, evidence: { ...sample.evidence, interface: "a".repeat(CAPSTONE_NOTE_LIMIT + 1) },
     }).ok).toBe(false);
     expect(parseCapstoneRecord({
-      ...sample, reflection: "github_pat_abc123456789012345" },
+      ...sample, reflection: "github_pat_abc123456789012345",
     }).ok).toBe(false);
   });
 

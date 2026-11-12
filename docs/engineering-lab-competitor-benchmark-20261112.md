@@ -27,6 +27,8 @@ Compare documented user workflows rather than arbitrary popularity scores. For e
 - StackBlitz WebContainers versus frontend-only runtimes: https://developer.stackblitz.com/guides/user-guide/available-environments
 - WebContainers October 2026 browser and isolation caveats: https://webcontainers.io/guides/browser-support
 - GitHub Codespaces with forwarded ports: https://docs.github.com/en/codespaces/developing-in-a-codespace/forwarding-ports-in-your-codespace
+- Replit Git history, branches, GitHub integration and checkpoint rollback: https://docs.replit.com/replit-workspace/workspace-features/version-control
+- Replit Agent app testing and code optimization modes: https://docs.replit.com/replitai/assistant/
 
 ## Upgrade implemented in the current branch
 

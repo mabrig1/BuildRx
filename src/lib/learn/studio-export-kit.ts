@@ -15,11 +15,6 @@ export type StudioExportResult =
   | { ok: true; kind: ExportKind; label: string; files: Record<string, string>; steps: string[]; caution: string }
   | { ok: false; reason: string };
 
-const STUDENT_CONFLICTS = [
-  "package.json", "tsconfig.json", "README-TRAINING.md", ".gitignore",
-  "src/app/layout.tsx", "src/app/globals.css",
-] as const;
-
 const GITIGNORE = [
   "# BuildRx training project - private keys and user records must not be committed",
   "node_modules/",

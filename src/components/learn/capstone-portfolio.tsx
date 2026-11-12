@@ -109,7 +109,7 @@ export function CapstonePortfolio({ initialTrack }: { initialTrack?: TrainingTra
     } else {
       saveDownload(name + "-review.md", capstoneReviewMarkdown(checked.record), "text/markdown;charset=utf-8");
     }
-    setMessage("Downloaded a self-reported review packet. No repository, test, CI run or deployment has been inspected by BuildRx.");
+    setMessage("Downloaded a self-reported review packet. Optional public GitHub metadata check results are not included; no tests or deployment were independently verified.");
   }
 
   async function importPacket(file?: File) {
@@ -155,7 +155,7 @@ export function CapstonePortfolio({ initialTrack }: { initialTrack?: TrainingTra
           <CardDescription>
             Prepare a clear, structured project review request linked to a specific GitHub
             repository and commit. Your information stays in this browser unless you explicitly
-            download or share the packet. No source, CI result, URL or identity is independently verified.
+            download or share the packet. Metadata checking is available separately, by consent, for public GitHub repositories only. Project source, tests, hosted demos and learner identity are not independently assessed.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">

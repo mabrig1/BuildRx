@@ -224,6 +224,7 @@ function trainingReadme(
     "",
     "> Educational starter only. BuildRx has NOT installed dependencies, executed this ZIP,",
     "> verified these user-edited files, connected a database or deployed an app.",
+    "> This ZIP is NOT a deployed app, verified build, or production-ready service.",
     "",
     "## Exact next steps",
     ...steps.map((step, i) => (i + 1) + ". " + step),

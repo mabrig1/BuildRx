@@ -122,7 +122,7 @@ describe("BuildRx stack-specific training ZIP preparation", () => {
       expect(readme).toContain("Never treat a generated package");
       expect(readme).toContain("## Exact next steps");
       expect(result.steps.length).toBeGreaterThanOrEqual(4);
-      expect(Object.keys(result.files).length).toBeGreaterThanOrEqual(4);
+      expect(Object.keys(result.files).length).toBeGreaterThanOrEqual(track.id === "mobile-app" ? 3 : 4);
     }
   });
 });

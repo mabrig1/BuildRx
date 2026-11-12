@@ -66,10 +66,9 @@ function apiFailure(status: number): string {
   return "GitHub public API returned HTTP " + status + ". This evidence could not be confirmed.";
 }
 
-const requestHeaders = {
-  Accept: "application/vnd.github+json",
-  "X-GitHub-Api-Version": "2022-11-28",
-};
+// Keep this a CORS-simple browser GET: a version header would trigger
+// a custom-header preflight that some GitHub/browser configurations reject.
+const requestHeaders = { Accept: "application/vnd.github+json" };
 
 /** URLs are composed entirely from validated repo+SHA+numeric run ID. */
 function githubApiUrl(parts: readonly string[]): string {

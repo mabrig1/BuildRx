@@ -45,9 +45,19 @@ describe("BuildRx stack-specific training ZIP preparation", () => {
     if (!result.ok) throw Error(result.reason);
     const sourceFiles = Object.entries(result.files).filter(([path]) => /\.tsx?$/.test(path));
     for (const [path, source] of sourceFiles) {
-      const kind = path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-      const parsed = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, kind);
-      expect(parsed.parseDiagnostics, path).toHaveLength(0);
+      const result = ts.transpileModule(source, {
+        fileName: path,
+        reportDiagnostics: true,
+        compilerOptions: {
+          target: ts.ScriptTarget.ES2022,
+          module: ts.ModuleKind.ESNext,
+          jsx: ts.JsxEmit.Preserve,
+        },
+      });
+      const errors = (result.diagnostics ?? []).filter(
+        diagnosis => diagnosis.category === ts.DiagnosticCategory.Error,
+      );
+      expect(errors, path).toHaveLength(0);
     }
   });
 

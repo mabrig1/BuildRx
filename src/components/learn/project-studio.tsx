@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
-  Archive, ArrowRight, CheckCircle2, Code2, Download, FileCode2, FilePlus2,
+  Archive, ArrowRight, CheckCircle2, Code2, Download, FileCode2, FilePlus2, FileSearch,
   FileText, FolderOpen, GraduationCap, HardDriveDownload, Loader2, Play, RotateCcw,
   ShieldAlert, Square, Trash2, Upload, Wrench,
 } from "lucide-react";
@@ -574,8 +574,10 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Web and TypeScript exports include reviewed npm manifests and setup commands, but
-                do not include preinstalled dependencies, a verified build or live data.
+                Web and TypeScript exports include npm manifests, setup commands and a read-only
+                GitHub Actions verification template. The workflow only runs after you review the files
+                and push them to your own repository; BuildRx does not initiate GitHub runs.
+                Neither type of export includes preinstalled dependencies, a verified build or live data.
                 Mobile exports remain an Expo overlay, and systems exports remain design documents.
                 JSON restores only the selected training track.
               </p>
@@ -649,6 +651,11 @@ export function ProjectStudio({ initialTrack }: { initialTrack?: TrainingTrackId
                   </Link>
                 </Button>
               )}
+              <Button size="sm" variant="outline" asChild>
+                <Link href="/learn/doctor">
+                  <FileSearch className="mr-1.5 size-3.5" /> Explain build failures
+                </Link>
+              </Button>
               <Button size="sm" variant="outline" asChild>
                 <Link href="/guide">
                   Read deployment guide <ArrowRight className="ml-1.5 size-3.5" />

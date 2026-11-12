@@ -168,14 +168,29 @@ function firstErrorLikeLine(lines: string[]): string | null {
 
 export function diagnoseBuildLog(raw: string): BuildDoctorResult {
   const lines = cleanLog(raw);
-  for (const rule of RULES) {
-    const matchLine = lines.find(line => rule.pattern.test(line));
-    if (!matchLine) continue;
+  // Read the log in its original order rather than prioritizing a later
+  // higher-ranked regex. Generic "build failed" lines are fallbacks; prefer
+  // earlier concrete diagnostics wherever they occur in the excerpt.
+  const specificRules = RULES.filter(rule => rule.area !== "Build");
+  const candidates = specificRules.flatMap(rule => {
+    const index = lines.findIndex(line => rule.pattern.test(line));
+    return index < 0 ? [] : [{ index, rule }];
+  });
+  candidates.sort((a, b) => a.index - b.index);
+  const generic = RULES.find(rule => rule.area === "Build");
+  const selected = candidates[0] ?? (generic
+    ? (() => {
+      const index = lines.findIndex(line => generic.pattern.test(line));
+      return index < 0 ? undefined : { index, rule: generic };
+    })()
+    : undefined);
+  if (selected) {
+    const { rule, index } = selected;
     return {
       area: rule.area,
       title: rule.title,
       confidence: "evidence in pasted log",
-      firstRelevantLine: matchLine,
+      firstRelevantLine: lines[index],
       why: rule.why,
       nextSteps: rule.steps,
       limitation: "This is deterministic guidance based only on the pasted excerpt. It has not inspected your repository, checked hosting services, or applied a fix.",

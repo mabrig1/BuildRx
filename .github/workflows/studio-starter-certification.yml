@@ -1,0 +1,74 @@
+name: Reviewed Studio Starter Build Certification
+
+# Only reviewed, in-repository TRAINING baseline files are materialized and
+# built. This job never accepts a student ZIP, untrusted project URL, runtime
+# secret or user-supplied package manifest.
+on:
+  push:
+    branches:
+      - "feat/studio-export-certification-*"
+    paths:
+      - ".github/workflows/studio-starter-certification.yml"
+      - "src/lib/learn/studio-*"
+      - "src/lib/learn/starter-kits.ts"
+      - "src/lib/learn/labs.ts"
+  pull_request:
+    paths:
+      - ".github/workflows/studio-starter-certification.yml"
+      - "src/lib/learn/studio-*"
+      - "src/lib/learn/starter-kits.ts"
+      - "src/lib/learn/labs.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reviewed-starter-builds:
+    name: Compile reviewed baseline web and TS starter ZIPs
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout reviewed repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Node 22 without cloud credentials
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install BuildRx development dependencies (no package scripts)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Create isolated trusted baseline source fixtures
+        env:
+          BUILDRX_STUDIO_CERTIFY_DIR: ${{ runner.temp }}/studio-export-fixtures
+        run: npx vitest run src/lib/learn/studio-export-fixtures.test.ts
+
+      - name: Install and typecheck reviewed TypeScript package
+        working-directory: ${{ runner.temp }}/studio-export-fixtures/software-engineering
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm test
+
+      - name: Install and compile reviewed Next.js App Router package
+        working-directory: ${{ runner.temp }}/studio-export-fixtures/fullstack-web
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Record strictly scoped certification result
+        if: success()
+        run: |
+          echo "### BuildRx Studio trusted baseline check" >> "$GITHUB_STEP_SUMMARY"
+          echo "The reviewed Next.js starter passed installation, TypeScript and a Next.js production build." >> "$GITHUB_STEP_SUMMARY"
+          echo "The reviewed TypeScript/Vitest starter passed installation, TypeScript and unit tests." >> "$GITHUB_STEP_SUMMARY"
+          echo "This does **not** validate student edits, native mobile packages, server APIs, authentication, databases, deployments or production readiness." >> "$GITHUB_STEP_SUMMARY"

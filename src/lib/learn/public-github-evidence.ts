@@ -195,7 +195,7 @@ export async function inspectPublicGithubEvidence(
       (snapshot.runStatus ?? "unknown") + ", conclusion: " + (snapshot.runConclusion ?? "not available") + ".");
     snapshot.details.push("A successful workflow is not independently rerun tests, validated user workflows or a deployed application.");
     return { ok: true, snapshot };
-  } catch (err) {
+  } catch {
     if (signal?.aborted) return { ok: false, reason: "The public GitHub metadata check was stopped." };
     // No exception objects or remote errors sent to the UI: these can
     // contain headers, credentials or third-party response data.

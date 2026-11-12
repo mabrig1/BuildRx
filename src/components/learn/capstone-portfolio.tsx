@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TRAINING_TRACKS, type TrainingTrackId } from "@/lib/learn/labs";
+import { PublicGithubEvidenceCheck } from "@/components/learn/public-github-evidence-check";
 import {
   CAPSTONE_MAX_STORAGE_CHARS, CAPSTONE_NOTE_LIMIT, CAPSTONE_REFLECTION_LIMIT,
   CAPSTONE_RUBRICS, CAPSTONE_STORAGE_KEY, CAPSTONE_TITLE_LIMIT,
@@ -108,7 +109,7 @@ export function CapstonePortfolio({ initialTrack }: { initialTrack?: TrainingTra
     } else {
       saveDownload(name + "-review.md", capstoneReviewMarkdown(checked.record), "text/markdown;charset=utf-8");
     }
-    setMessage("Downloaded a self-reported review packet. No repository, test, CI run or deployment has been inspected by BuildRx.");
+    setMessage("Downloaded a self-reported review packet. Optional public GitHub metadata check results are not included; no tests or deployment were independently verified.");
   }
 
   async function importPacket(file?: File) {
@@ -154,7 +155,7 @@ export function CapstonePortfolio({ initialTrack }: { initialTrack?: TrainingTra
           <CardDescription>
             Prepare a clear, structured project review request linked to a specific GitHub
             repository and commit. Your information stays in this browser unless you explicitly
-            download or share the packet. No source, CI result, URL or identity is independently verified.
+            download or share the packet. Metadata checking is available separately, by consent, for public GitHub repositories only. Project source, tests, hosted demos and learner identity are not independently assessed.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -343,6 +344,16 @@ export function CapstonePortfolio({ initialTrack }: { initialTrack?: TrainingTra
               )}
             </CardContent>
           </Card>
+          <PublicGithubEvidenceCheck
+            key={[trackId, record.repoUrl, record.commitSha, record.ciRunUrl].join("|")}
+            input={{
+              repoUrl: record.repoUrl,
+              commitSha: record.commitSha,
+              ciRunUrl: record.ciRunUrl,
+            }}
+            blocked={possibleSecret}
+          />
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">

@@ -228,7 +228,7 @@ export function PracticalLabs({
       <Card className="border-primary/30">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg"><Code2 className="size-5 text-primary" /> Build the selected lab application with AI</CardTitle>
-          <CardDescription>Prefill a new BuildRx project from this exercise's actual tasks and acceptance checks. Inspect generated code; project creation is not proof of a working deployment.</CardDescription>
+          <CardDescription>Prefill a new BuildRx project from the selected exercise tasks and acceptance checks. Inspect generated code; project creation is not proof of a working deployment.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <CreateProjectDialog

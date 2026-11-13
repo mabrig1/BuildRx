@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Circle, Code2, Rocket } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Circle, Code2, Rocket, FlaskConical, FolderOpen } from "lucide-react";
 
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { courseModules } from "@/lib/course/buildrx-tech-plus";
+import { academyLabUrl, academyStudioUrl } from "@/lib/course/academy-bundle";
 
 const STORAGE_KEY = "buildrx-tech-plus-progress-v1";
 
@@ -49,7 +51,7 @@ export function CourseExperience() {
             <div>
               <CardTitle>Build-to-production progress</CardTitle>
               <CardDescription>
-                Complete each module only after you can show its required artifact.
+                Build with AI, practise in the labs, and submit project evidence to a human reviewer. Local progress is self-reported.
               </CardDescription>
             </div>
             <Badge variant="secondary">{progress}% complete</Badge>
@@ -58,7 +60,7 @@ export function CourseExperience() {
         <CardContent className="pt-6">
           <Progress value={progress} />
           <p className="text-muted-foreground mt-3 text-sm">
-            {completed.length} of {courseModules.length} production milestones verified.
+            {completed.length} of {courseModules.length} milestones self-marked complete in this browser, not independently verified.
           </p>
         </CardContent>
       </Card>
@@ -73,7 +75,7 @@ export function CourseExperience() {
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">{module.week}</Badge>
-                      {done ? <Badge>Evidence complete</Badge> : <Badge variant="secondary">Practical module</Badge>}
+                      {done ? <Badge>Self-marked complete</Badge> : <Badge variant="secondary">Practical module</Badge>}
                     </div>
                     <CardTitle>{module.title}</CardTitle>
                     <CardDescription className="max-w-3xl">{module.outcome}</CardDescription>
@@ -123,6 +125,11 @@ export function CourseExperience() {
                         </Button>
                       }
                     />
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" asChild><Link href={academyLabUrl(module.id)}><FlaskConical className="mr-1 size-4" /> Guided labs</Link></Button>
+                      <Button size="sm" variant="outline" asChild><Link href={academyStudioUrl(module.id)}><FolderOpen className="mr-1 size-4" /> Project Studio</Link></Button>
+                      <Button size="sm" variant="outline" asChild><Link href="/learn/playground">Coding playground</Link></Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>

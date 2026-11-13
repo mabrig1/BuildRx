@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -224,6 +225,37 @@ export function PracticalLabs({
   const done = selfReportedDone(lab, progress);
   return (
     <div className="space-y-5">
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg"><Code2 className="size-5 text-primary" /> Build the selected lab application with AI</CardTitle>
+          <CardDescription>Prefill a new BuildRx project from this exercise's actual tasks and acceptance checks. Inspect generated code; project creation is not proof of a working deployment.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <CreateProjectDialog
+            key={lab.id}
+            defaultValues={{
+              name: "Academy Lab - " + lab.title,
+              description: "BuildRx Academy: " + lab.objective,
+              prompt: [
+                "Create a realistic modern app for the BuildRx Software Engineering Academy practical.",
+                "Track: " + track.title,
+                "Exercise: " + lab.title,
+                "Goal: " + lab.objective,
+                "Tasks:",
+                ...lab.tasks.map((item, i) => String(i + 1) + ". " + item),
+                "Deliverables:",
+                ...lab.deliverables.map(item => "- " + item),
+                "Acceptance checks:",
+                ...lab.acceptance.map(item => "- " + item),
+                "Produce editable source and explicit test, debugging and GitHub instructions. No placeholder-only success claims, secrets, or automatic production publication."
+              ].join("\n"),
+            }}
+            trigger={<Button><Code2 className="mr-1 size-4" /> Create this app with AI <ArrowRight className="ml-1 size-4" /></Button>}
+          />
+          <Button size="sm" variant="outline" asChild><Link href={"/learn/studio?track=" + track.id}><FolderOpen className="mr-1 size-4" /> Open Project Studio</Link></Button>
+          <Button size="sm" variant="outline" asChild><Link href="/learn/playground">Coding playground</Link></Button>
+        </CardContent>
+      </Card>
       <Card className="border-primary/25">
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">

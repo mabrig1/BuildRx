@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, FileText, LayoutTemplate, Loader2, Plus, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -29,6 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { APP_STARTERS } from "@/lib/projects/app-starters";
+import { BEGINNER_CODE_TEMPLATES } from "@/lib/projects/beginner-catalog";
 import { GITHUB_APP_TEMPLATES } from "@/lib/projects/github-app-templates";
 import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
 import {
@@ -167,7 +169,7 @@ export function CreateProjectDialog({
         <DialogHeader className="shrink-0 border-b px-6 py-5 pr-12">
           <DialogTitle>Create a new project</DialogTitle>
           <DialogDescription>
-            Search ready-to-customize app ideas, import approved open-source GitHub code, or describe your own product.
+            Pick a simple app, copy original code, clone approved GitHub examples, or describe your own product.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -181,6 +183,15 @@ export function CreateProjectDialog({
                   Demo mode: drafts stay in this browser session. Generated files are temporary on the server; connect a database before creating real customer projects.
                 </p>
               )}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <div>
+                  <p className="text-sm font-semibold">New to app development?</p>
+                  <p className="text-muted-foreground text-xs">Copy real editable code from the Clone Vault instead of starting from scratch.</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" asChild>
+                  <Link href="/templates" onClick={() => setOpen(false)}>Browse 8 code starters</Link>
+                </Button>
+              </div>
               <section aria-label="Starter app ideas" className="space-y-2">
                 <div className="flex items-center gap-2">
                   <LayoutTemplate className="size-4 text-primary" aria-hidden="true" />
@@ -234,6 +245,34 @@ export function CreateProjectDialog({
                   These {APP_STARTERS.length} original briefs prefill an editable specification; the AI still needs to build and verify your app.
                 </p>
               </section>
+              <section aria-label="Beginner source-code templates" className="space-y-3 rounded-xl border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">Start from real beginner-friendly code</h3>
+                  <Link href="/templates" onClick={() => setOpen(false)}
+                    className="text-xs text-primary underline underline-offset-4">
+                    Browse complete Clone Vault →
+                  </Link>
+                </div>
+                <p className="text-muted-foreground text-xs leading-5">
+                  Four small original BuildRx apps with editable files, instructions and no third-party account requirements.
+                  Tasks and stock data are browser-only demos, not shared production databases.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {BEGINNER_CODE_TEMPLATES.map(template => (
+                    <div key={template.id} className="flex flex-col gap-2 rounded-lg border p-3">
+                      <span className="text-muted-foreground text-[10px]">{template.category} · {template.difficulty} · Original code</span>
+                      <strong className="text-sm">{template.name}</strong>
+                      <p className="text-muted-foreground flex-1 text-xs leading-5">{template.description}</p>
+                      <Button type="button" variant="outline" className="w-full" size="sm"
+                        disabled={Boolean(importingGithub) || isPending || demoMode}
+                        onClick={() => void importGithubTemplate(template.id)}>
+                        {importingGithub === template.id ? <Loader2 className="size-4 animate-spin" /> : <LayoutTemplate className="size-4" />}
+                        {importingGithub === template.id ? "Copying source…" : "Clone editable app"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </section>
               <section aria-label="Clone vetted GitHub template source" className="space-y-3 rounded-xl border p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">Clone real open-source code from GitHub</h3>
@@ -246,9 +285,10 @@ export function CreateProjectDialog({
                 <div className="grid gap-2 sm:grid-cols-2">
                   {GITHUB_APP_TEMPLATES.map((template) => (
                     <div key={template.id} className="flex flex-col gap-2 rounded-lg border p-3">
-                      <span className="text-muted-foreground text-[10px]">{template.category} · GitHub</span>
+                      <span className="text-muted-foreground text-[10px]">{template.category} · {template.difficulty} · GitHub</span>
                       <strong className="text-sm">{template.name}</strong>
                       <p className="text-muted-foreground flex-1 text-xs leading-5">{template.description}</p>
+                      {template.requiresExternalService && <p className="text-xs text-amber-700">Requires extra account configuration.</p>}
                       <a href={template.sourceUrl} target="_blank" rel="noopener noreferrer"
                         className="text-xs text-primary underline underline-offset-4">View original source ↗</a>
                       <Button type="button" variant="outline" className="w-full" size="sm"

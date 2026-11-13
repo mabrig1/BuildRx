@@ -406,7 +406,7 @@ export const repairAgent: Agent = {
       emit({
         type: "agent_complete",
         agent: "repair",
-        message: "Nothing to repair — all checks green",
+        message: "No source-check defects found. Runtime behavior and the reported user issue still need reproduction.",
       });
       return;
     }
@@ -479,7 +479,7 @@ export const repairAgent: Agent = {
       type: "agent_complete",
       agent: "repair",
       message: checksPass(findings)
-        ? `Applied ${totalFixes} fix(es) — all checks now pass`
+        ? `Applied ${totalFixes} fix(es) — source checks now pass; runtime behavior remains untested`
         : `Applied ${totalFixes} fix(es); ${remaining.length} issue(s) remain: ${remaining
             .slice(0, 3)
             .map((f) => f.message)

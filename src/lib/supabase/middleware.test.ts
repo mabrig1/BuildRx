@@ -71,4 +71,22 @@ describe("Supabase routing middleware", () => {
     );
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it("requires sign-in for the coding laboratory", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_HOST", "");
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const response = await updateSession(new NextRequest("https://www.buildrx.online/lab", { headers: { host: "www.buildrx.online" } }));
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("https://www.buildrx.online/login?next=%2Flab");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("routes the laboratory to the configured app host before authentication", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_HOST", "app.buildrx.online");
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const response = await updateSession(new NextRequest("https://www.buildrx.online/lab", { headers: { host: "www.buildrx.online" } }));
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("https://app.buildrx.online/lab");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });

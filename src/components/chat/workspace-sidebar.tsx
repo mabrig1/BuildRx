@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   FolderKanban,
+  FlaskConical,
   LayoutDashboard,
   LayoutTemplate,
   Plus,
@@ -124,6 +125,13 @@ export function WorkspaceSidebar({
 
       {/* Footer nav */}
       <div className="grid shrink-0 gap-0.5 border-t p-3">
+        <Link
+          href="/lab"
+          className="text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
+        >
+          <FlaskConical className="size-4" aria-hidden />
+          Coding Lab
+        </Link>
         <Link
           href="/dashboard"
           className="text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"

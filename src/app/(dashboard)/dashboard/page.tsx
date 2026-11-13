@@ -6,6 +6,7 @@ import {
   Bot,
   CreditCard,
   FolderKanban,
+  FlaskConical,
   Rocket,
 } from "lucide-react";
 
@@ -118,6 +119,17 @@ export default async function DashboardPage() {
       </PageHeader>
 
       {!configured ? <ConnectSupabaseNotice /> : null}
+
+      <section className="flex flex-col gap-4 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-5 sm:flex-row sm:items-center sm:justify-between" aria-label="Coding laboratory">
+        <div className="flex items-start gap-3">
+          <FlaskConical className="mt-1 size-5 shrink-0 text-emerald-600" aria-hidden />
+          <div>
+            <h2 className="font-semibold">Learn by building</h2>
+            <p className="text-muted-foreground mt-1 text-sm">Run exercises, practice GitHub, and rehearse a Vercel or Cloudflare release in the private coding lab.</p>
+          </div>
+        </div>
+        <Button variant="outline" asChild className="shrink-0"><Link href="/lab">Explore Coding Lab<ArrowRight aria-hidden /></Link></Button>
+      </section>
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard

@@ -16,7 +16,7 @@ export const qaAgent: Agent = {
     emit({
       type: "agent_start",
       agent: "qa",
-      message: "Running build and test checks…",
+      message: "Running deterministic source checks (no runtime build)…",
     });
 
     const findings = runStaticChecks(context, context.plan!);
@@ -37,7 +37,7 @@ export const qaAgent: Agent = {
       type: "agent_complete",
       agent: "qa",
       message: checksPass(findings)
-        ? `All checks passed (${context.files.size} files${warnings > 0 ? `, ${warnings} warning(s)` : ""})`
+        ? `Source checks passed (${context.files.size} files${warnings > 0 ? `, ${warnings} warning(s)` : ""}); runtime tests not run`
         : `${errors.length} error(s), ${warnings} warning(s) — handing off to the Repair Agent`,
     });
   },

@@ -3,6 +3,7 @@ import {
   Bot,
   CreditCard,
   FolderKanban,
+  FlaskConical,
   GraduationCap,
   HeartPulse,
   LayoutDashboard,
@@ -107,6 +108,7 @@ export const marketingNav = [
   { title: "Features", href: "/features" },
   { title: "Pricing", href: "/pricing" },
   { title: "Tech+ Course", href: "/academy" },
+  { title: "Coding Lab", href: "/lab" },
   { title: "Docs", href: "/docs" },
 ] as const;
 
@@ -122,6 +124,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Projects", href: "/projects", icon: FolderKanban },
   { title: "AI Chat", href: "/chat", icon: Bot },
   { title: "Tech+ Course", href: "/course", icon: GraduationCap },
+  { title: "Coding Lab", href: "/lab", icon: FlaskConical },
   { title: "Guide", href: "/guide", icon: BookOpen },
   { title: "Contact", href: "/contact", icon: Mail },
   { title: "Billing", href: "/billing", icon: CreditCard },

@@ -118,6 +118,8 @@ export interface WorkflowContext {
   previewUrl?: string;
   /** Final blocking verification result set by the deployment agent. */
   verificationPassed?: boolean;
+  /** Essential generation failures observed during this run, not fixed by static repairs. */
+  generationBlockers?: Array<{ agent: string; message: string }>;
   /**
    * Absolute timestamp (ms) the whole pipeline must finish by, set once
    * by the orchestrator. Agents divide their remaining slice of it

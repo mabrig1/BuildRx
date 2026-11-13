@@ -179,21 +179,45 @@ async function requestChatCompletion(
     );
   }
 
-  const response = await fetch(`${openrouterBaseUrl()}/chat/completions`, {
+  // A rejected request may include an affordable output ceiling. Reduce
+  // the same request once, inside the original deadline; never increase
+  // an account limit or change the selected model to hide a billing error.
+  const signal = AbortSignal.timeout(budgetMs);
+  const send = (requestBody: Record<string, unknown>) => fetch(`${openrouterBaseUrl()}/chat/completions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       ...attributionHeaders(),
     },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(budgetMs),
+    body: JSON.stringify(requestBody),
+    signal,
   });
-
+  let response = await send(body);
   if (!response.ok) {
-    throw errorForStatus(response.status, await parseErrorDetail(response));
+    const detail = await parseErrorDetail(response);
+    const affordable = response.status === 402
+      ? affordableOutputBudget(detail, body.max_tokens)
+      : null;
+    if (affordable === null) throw errorForStatus(response.status, detail);
+    response = await send({ ...body, max_tokens: affordable });
+    if (!response.ok) {
+      await parseErrorDetail(response);
+      throw errorForStatus(response.status, response.statusText);
+    }
   }
   return response;
+}
+
+/** Legacy 402 messages report this number before a provider is called. */
+function affordableOutputBudget(detail: string, requested: unknown): number | null {
+  const match = /can only afford\s+([\d,]+)(?:\s+tokens)?/i.exec(detail);
+  const affordable = match ? Number(match[1].replace(/,/g, "")) : NaN;
+  if (typeof requested !== "number" || !Number.isFinite(requested) ||
+      !Number.isSafeInteger(affordable) || affordable >= requested) return null;
+  const reduced = Math.floor(affordable * 0.9);
+  // Below this floor the code/plan would almost certainly be truncated.
+  return reduced >= 256 ? reduced : null;
 }
 
 /** Streaming chat completion through OpenRouter. */

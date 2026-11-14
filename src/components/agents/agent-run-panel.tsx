@@ -170,7 +170,8 @@ export function AgentRunPanel({
           toast.success(`Build checks passed — ${event.fileCount} files saved`);
         }
         window.dispatchEvent(new CustomEvent("vfs-changed", { detail: {} }));
-        onDeployed?.(event.previewUrl);
+        // Do not navigate away from retry controls on a failed build.
+        if (event.verificationPassed && event.previewUrl) onDeployed?.(event.previewUrl);
         break;
       }
       case "agent_degraded":

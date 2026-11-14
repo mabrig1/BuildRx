@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { updateChatMessage } from "@/app/(workspace)/actions";
 import { Markdown } from "@/components/chat/markdown";
+import { customerVisibleAssistantMessage } from "@/lib/agents/legacy-build-message";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,11 +28,12 @@ export function ChatMessageItem({
   const updateMessage = useChatStore((s) => s.updateMessage);
 
   const isUser = message.role === "user";
+  const displayContent = isUser ? message.content : customerVisibleAssistantMessage(message.content);
   // Optimistic messages (not yet persisted) have temp ids — not editable.
   const isPersisted = !message.id.startsWith("temp-");
 
   function handleCopy() {
-    navigator.clipboard.writeText(message.content);
+    navigator.clipboard.writeText(displayContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -126,7 +128,7 @@ export function ChatMessageItem({
           </p>
         ) : (
           <>
-            <Markdown content={message.content} />
+            <Markdown content={displayContent} />
             {isStreaming ? (
               <span className="bg-foreground ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm align-text-bottom" />
             ) : null}

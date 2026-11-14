@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { ArrowUpRight, LifeBuoy, Mail, MessageCircle, ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,8 @@ import {
 } from "@/lib/support/support-messages";
 
 export function SupportRequest() {
+  const [ticketPending, setTicketPending] = useState(false);
+  const [savedTicketId, setSavedTicketId] = useState<string | null>(null);
   const [draft, setDraft] = useState<SupportDraft>({
     issue: "paid-course", name: "", email: "", reference: "", description: "",
   });
@@ -28,7 +31,34 @@ export function SupportRequest() {
   const email = useMemo(() => supportEmailUrl(draft), [draft]);
 
   function change<K extends keyof SupportDraft>(field: K, value: SupportDraft[K]) {
+    setSavedTicketId(null);
     setDraft(previous => ({ ...previous, [field]: value }));
+  }
+
+  async function createTrackedTicket() {
+    if (!valid || ticketPending) return;
+    setTicketPending(true);
+    try {
+      const response = await fetch("/api/support/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: draft.issue,
+          message: draft.description.trim(),
+          reference: draft.reference.trim(),
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ticketId) {
+        throw new Error(data?.error ?? "Unable to save support ticket");
+      }
+      setSavedTicketId(data.ticketId);
+      toast.success("Your private support ticket was created");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to create ticket");
+    } finally {
+      setTicketPending(false);
+    }
   }
 
   return (
@@ -36,7 +66,7 @@ export function SupportRequest() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><LifeBuoy className="size-5" /> Describe the problem</CardTitle>
-          <CardDescription>Choose an issue, enter a short description, then send it using your own WhatsApp or email app. This page does not create a stored ticket or send a message automatically.</CardDescription>
+          <CardDescription>Choose a topic and describe your issue. Signed-in customers can submit a private tracked support ticket, or prepare a WhatsApp/email message. WhatsApp/email messages are not sent automatically.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-2">
@@ -94,7 +124,24 @@ export function SupportRequest() {
               </>
             )}
           </div>
-          <p className="text-muted-foreground text-xs">You send the message from the app you open. No response time or ticket number is guaranteed here.</p>
+          <div className="space-y-2 rounded-md border p-3">
+            <p className="text-sm font-semibold">Create a tracked BuildRx support ticket</p>
+            <p className="text-muted-foreground text-xs">
+              Available to signed-in BuildRx customers. Your verified account is linked to the request, and only you and platform administrators may view it.
+              A submission creates a ticket but does not send a WhatsApp message.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="secondary" onClick={createTrackedTicket}
+                disabled={!valid || ticketPending || Boolean(savedTicketId)}>
+                {ticketPending ? "Submitting..." : savedTicketId ? "Ticket created" : "Submit private ticket"}
+              </Button>
+              <Link href="/login?next=/support" className="text-primary text-xs underline underline-offset-4">Sign in first</Link>
+            </div>
+            {savedTicketId ? <p role="status" className="break-all text-sm">
+              Ticket received: <strong>{savedTicketId}</strong>. Your request is now in the administrator support inbox.
+            </p> : null}
+          </div>
+          <p className="text-muted-foreground text-xs">WhatsApp/email messages must be sent by you. Ticket submission stores your issue privately. No response-time guarantee is made.</p>
         </CardContent>
       </Card>
 

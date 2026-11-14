@@ -1,7 +1,6 @@
 import type { Database } from "@/types/database";
 import { getClientAdminSession } from "@/lib/clients/admin-session";
 
-type ClientRow = Database["public"]["Tables"]["users"]["Row"];
 type TicketRow = Database["public"]["Tables"]["support_tickets"]["Row"];
 const LIMIT = 20;
 

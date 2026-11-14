@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { ticketStatuses, type TicketStatus } from "@/lib/clients/admin-data";
+import { ticketStatuses, type TicketStatus } from "@/lib/clients/ticket-status";
 
 const labels: Record<TicketStatus, string> = {
   open: "Open",

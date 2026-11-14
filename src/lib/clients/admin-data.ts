@@ -14,8 +14,9 @@ export function safeQuery(value: string | undefined): string {
 export function validClientId(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
-export const ticketStatuses = ["open", "in_progress", "waiting", "resolved", "closed"] as const;
-export type TicketStatus = (typeof ticketStatuses)[number];
+import { ticketStatuses, type TicketStatus } from "@/lib/clients/ticket-status";
+export { ticketStatuses } from "@/lib/clients/ticket-status";
+export type { TicketStatus } from "@/lib/clients/ticket-status";
 export function validTicketStatus(v: unknown): v is TicketStatus {
   return typeof v === "string" && ticketStatuses.includes(v as TicketStatus);
 }

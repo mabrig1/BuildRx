@@ -462,7 +462,7 @@ export function runStaticChecks(
       });
     }
     if (isCommerce) {
-      const hasRichMedia = /<img\\b|<Image\\b|ProductImage|product-image|backgroundImage|image_url|imageUrl|thumbnailUrl/.test(home);
+      const hasRichMedia = /<img\b|<Image\b|ProductImage|product-image|backgroundImage|image_url|imageUrl|thumbnailUrl/.test(home);
       if (home && !hasRichMedia) {
         findings.push({
           rule: "unpopulated-commerce-home",
@@ -473,7 +473,7 @@ export function runStaticChecks(
         });
       }
       const preview = context.files.get("preview/index.html")?.content ?? "";
-      if (preview && (/<ul\\s+id=["']rows["']/.test(preview) || preview.length < 1800)) {
+      if (preview && (/<ul\s+id=["']rows["']/.test(preview) || preview.length < 1800)) {
         findings.push({
           rule: "generic-commerce-preview",
           severity: "error",
@@ -483,7 +483,7 @@ export function runStaticChecks(
         });
       }
     }
-    if (home && !/\\b(?:sm|md|lg|xl):|@media|grid-template-columns/.test(home)) {
+    if (home && !/\b(?:sm|md|lg|xl):|@media|grid-template-columns/.test(home)) {
       findings.push({
         rule: "missing-responsive-design",
         severity: "warning",

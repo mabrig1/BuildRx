@@ -16,6 +16,7 @@ import type {
   WorkflowContext,
 } from "@/lib/agents/types";
 import { inspectSchema, listFiles } from "@/lib/agents/tools";
+import { classifyProductIndustry } from "@/lib/agents/premium-ux";
 
 const CODE_EXT = /\.(tsx?|jsx?)$/;
 
@@ -435,6 +436,59 @@ export function runStaticChecks(
         severity: "warning",
         file: "supabase/schema.sql",
         message: `planned table "${table.table}" is not in schema.sql`,
+        fix: "llm",
+      });
+    }
+  }
+
+  // UX evidence gate: successful compilation alone is not a sellable app.
+  // These rules identify the old generic scaffold and visibly empty commerce
+  // experiences without falsely claiming a browser or real-user test.
+  const home = context.files.get("src/app/page.tsx")?.content ?? "";
+  const industry = classifyProductIndustry(plan);
+  const isCommerce = industry === "retail" || industry === "restaurant";
+  const meaningfulPlan = plan.pages.length > 0 && plan.dataModel.length > 0;
+  if (meaningfulPlan) {
+    const genericDashboard =
+      /Quarterly review|Customer discovery|Launch readiness/.test(home) &&
+      /Create record|Active records|Ready for review/.test(home);
+    if (genericDashboard) {
+      findings.push({
+        rule: "generic-business-home",
+        severity: "error",
+        file: "src/app/page.tsx",
+        message: "the homepage is a generic placeholder dashboard instead of the planned business experience",
+        fix: "llm",
+      });
+    }
+    if (isCommerce) {
+      const hasRichMedia = /<img\\b|<Image\\b|ProductImage|product-image|backgroundImage|image_url|imageUrl|thumbnailUrl/.test(home);
+      if (home && !hasRichMedia) {
+        findings.push({
+          rule: "unpopulated-commerce-home",
+          severity: "error",
+          file: "src/app/page.tsx",
+          message: "storefront lacks product/menu imagery; add image-led cards, meaningful merchandise and accessible fallbacks",
+          fix: "llm",
+        });
+      }
+      const preview = context.files.get("preview/index.html")?.content ?? "";
+      if (preview && (/<ul\\s+id=["']rows["']/.test(preview) || preview.length < 1800)) {
+        findings.push({
+          rule: "generic-commerce-preview",
+          severity: "error",
+          file: "preview/index.html",
+          message: "commerce prototype is an empty or generic row list, not a realistic interactive store or menu",
+          fix: "llm",
+        });
+      }
+    }
+    if (home && !/\\b(?:sm|md|lg|xl):|@media|grid-template-columns/.test(home)) {
+      findings.push({
+        rule: "missing-responsive-design",
+        severity: "warning",
+        file: "src/app/page.tsx",
+        message: "homepage has no evident mobile/tablet responsive layout rules",
         fix: "llm",
       });
     }

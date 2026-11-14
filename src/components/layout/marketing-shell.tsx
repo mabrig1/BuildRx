@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, MessageCircle } from "lucide-react";
 
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -29,6 +29,12 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-1">
+            <Button variant="ghost" size="icon" asChild>
+              <a href={brandConfig.contacts.whatsapp.href} target="_blank" rel="noopener noreferrer"
+                aria-label="WhatsApp BuildRx support" title="WhatsApp support">
+                <MessageCircle className="size-4" />
+              </a>
+            </Button>
             <ThemeToggle />
             <Button variant="ghost" className="hidden sm:inline-flex" asChild>
               <Link href="/login">Sign in</Link>
@@ -77,7 +83,10 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div>
-              <p className="mb-3 text-sm font-semibold">Contact MABRIG Technologies</p>
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <p className="text-sm font-semibold">Contact MABRIG Technologies</p>
+                <Link href="/support" className="text-primary text-sm font-medium underline underline-offset-4">Get help with BuildRx</Link>
+              </div>
               <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
                 {brandContactLinks.map((contact) => (
                   <a

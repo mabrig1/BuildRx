@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { ExternalLink, Mail, MessageCircle, Phone } from "lucide-react";
+import Link from "next/link";
+import { ExternalLink, Mail, MessageCircle, Phone, LifeBuoy } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,21 @@ export default function ContactPage() {
             partnerships, training, product enquiries or business communication.
           </CardDescription>
         </CardHeader>
+      </Card>
+
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><LifeBuoy className="size-5" /> Need help with payments, training or a broken app?</CardTitle>
+          <CardDescription>Choose a topic in the Support Center and prepare a WhatsApp or email request with troubleshooting guidance.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button asChild><Link href="/support">Open Support Center</Link></Button>
+          <Button variant="outline" asChild>
+            <a href={brandConfig.contacts.whatsapp.href} target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="size-4" /> WhatsApp +234 706 534 2818
+            </a>
+          </Button>
+        </CardContent>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

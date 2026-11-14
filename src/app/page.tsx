@@ -6,6 +6,7 @@ import {
   GraduationCap,
   FlaskConical,
   Rocket,
+  Stethoscope,
   ShieldCheck,
   Sparkles,
   Zap,
@@ -43,21 +44,21 @@ const features = [
   },
   {
     icon: Rocket,
-    title: "One-click deploy",
+    title: "Guided publishing",
     description:
-      "Ship straight to Vercel, Netlify, or Railway with a production-grade stack underneath.",
+      "Prepare GitHub and choose Vercel or Cloudflare, then verify the actual public app before sharing it.",
   },
   {
     icon: ShieldCheck,
-    title: "Auth & data built in",
+    title: "Auth and data guidance",
     description:
-      "Supabase authentication and Postgres come pre-wired with row-level security.",
+      "Generate backend and authentication source with setup instructions, then configure and test the real database.",
   },
   {
     icon: Sparkles,
-    title: "Beautiful by default",
+    title: "App Doctor and AI repair",
     description:
-      "Every generated app starts from a polished, accessible design system.",
+      "Inspect saved project files, see the first source blocker and approve an AI repair before rechecking.",
   },
 ];
 
@@ -82,18 +83,18 @@ export default function LandingPage() {
             </span>
           </h1>
           <p className="text-muted-foreground max-w-2xl text-lg text-balance">
-            {siteConfig.description} From idea to deployed product — no
-            boilerplate, no setup, no friction.
+            {siteConfig.description} Answer three simple questions, build an editable project,
+            fix source issues with App Doctor, and follow your own launch checklist.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button size="lg" asChild>
               <Link href="/signup">
-                Start building free
+                Create an app with AI
                 <ArrowRight />
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/dashboard">View dashboard</Link>
+              <Link href="/demo">See how it works</Link>
             </Button>
           </div>
           <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
@@ -117,6 +118,19 @@ export default function LandingPage() {
       </section>
 
       <section className="border-y bg-muted/20">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-12 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="flex items-center gap-2 text-xl font-semibold"><Stethoscope className="size-5 text-primary" /> You create it. BuildRx guides you through it.</h2>
+            <p className="text-muted-foreground mt-2 text-sm">
+              Describe the app in three answers, inspect its saved source for errors, review repair suggestions and see your next step from GitHub to hosting.
+            </p>
+          </div>
+          <Button variant="outline" className="w-fit shrink-0" asChild>
+            <Link href="/demo">Explore the product walkthrough <ArrowRight className="size-4" /></Link>
+          </Button>
+        </div>
+      </section>
+      <section className="border-b bg-background">
         <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-12 md:grid-cols-[1.2fr_.8fr] md:items-center">
           <div className="space-y-3">
             <Badge variant="secondary"><GraduationCap className="mr-1 size-4" /> BuildRx Software Engineering Academy</Badge>

@@ -112,6 +112,7 @@ export const siteConfig = {
 /** Marketing site navigation (buildrx.online). */
 export const marketingNav = [
   { title: "Features", href: "/features" },
+  { title: "How it works", href: "/demo" },
   { title: "Pricing", href: "/pricing" },
   { title: "Engineering Academy", href: "/academy" },
   { title: "Practical Labs", href: "/learn/labs" },

@@ -21,7 +21,7 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
       <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-4">
           <Logo />
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="hidden items-center gap-1 lg:flex">
             {marketingNav.map((item) => (
               <Button key={item.href} variant="ghost" size="sm" asChild>
                 <Link href={item.href}>{item.title}</Link>

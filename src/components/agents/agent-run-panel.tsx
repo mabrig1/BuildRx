@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Brain,
@@ -90,13 +90,27 @@ export function AgentRunPanel({
   projectId,
   defaultPrompt,
   onDeployed,
+  repairRequest = 0,
+  buildRequest = 0,
 }: {
   projectId: string;
   defaultPrompt?: string;
   onDeployed?: (previewUrl: string | null) => void;
+  repairRequest?: number;
+  buildRequest?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState(defaultPrompt ?? "");
+  useEffect(() => {
+    if (!repairRequest) return;
+    setPrompt("Repair");
+    setOpen(true);
+  }, [repairRequest]);
+  useEffect(() => {
+    if (!buildRequest) return;
+    setPrompt(defaultPrompt && isBuildBrief(defaultPrompt) ? defaultPrompt : "");
+    setOpen(true);
+  }, [buildRequest, defaultPrompt]);
   const [running, setRunning] = useState(false);
   const workspaceBusy = useChatStore((state) => state.isStreaming);
   const setWorkspaceBusy = useChatStore((state) => state.setStreaming);

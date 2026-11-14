@@ -34,7 +34,7 @@ export type EngineeringMission = {
 export const ENGINEERING_MISSIONS: readonly EngineeringMission[] = [
   {
     id: "devices", trackId: "software-engineering", title: "Campus Device Trade", duration: "60–90 min",
-    audience: "Student marketplace operators", labId: "se03", exerciseId: "js-validation",
+    audience: "Student marketplace operators", labId: "se03", exerciseId: "js-safe-role",
     stack: ["TypeScript", "React", "Validation", "GitHub", "Vitest"],
     problem: "Students need a reliable way to offer used laptops and phones without exposing ownership documents to buyers.",
     outcome: "A moderated device listing workflow with server-side validation, private evidence and test cases.",
@@ -81,7 +81,7 @@ export const ENGINEERING_MISSIONS: readonly EngineeringMission[] = [
   },
   {
     id: "inventory", trackId: "fullstack-web", title: "BOSAL Store Inventory", duration: "60–90 min",
-    audience: "Supermarket and restaurant operators", labId: "web03", exerciseId: "js-totals",
+    audience: "Supermarket and restaurant operators", labId: "web03", exerciseId: "js-data-summary",
     stack: ["Next.js", "TypeScript", "Supabase", "Payments", "Tests"],
     problem: "A local retailer needs searchable items, stock changes, order records and accurate cart totals.",
     outcome: "A full-stack product catalogue with valid checkout totals, protected inventory and reliable order states.",

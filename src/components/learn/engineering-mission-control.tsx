@@ -280,7 +280,7 @@ export function EngineeringMissionControl({ initialMission }: { initialMission?:
                 placeholder="Example: add a staff dashboard" />
               <p className="text-xs text-muted-foreground">Do not enter API keys or private customer data. This field is not saved in browser progress.</p>
               <CreateProjectDialog
-                key={mission.id}
+                key={mission.id + ":" + goal}
                 defaultValues={{ name: "Engineering Mission - " + mission.title,
                   description: mission.problem.slice(0, 300), prompt }}
                 trigger={<Button className="w-full"><Code2 className="mr-1 size-4" /> Create app in BuildRx <ArrowRight className="ml-1 size-4" /></Button>}

@@ -72,12 +72,17 @@ const fixtures: Record<ProductIndustry, ShowcaseItem[]> = {
 };
 
 export function classifyProductIndustry(plan: AppPlan): ProductIndustry {
-  const words = [plan.appName,plan.summary,...plan.pages.map(p=>p.name),...plan.dataModel.map(d=>d.table),...plan.features].join(" ").toLowerCase();
-  if (/\b(restauran|menu|kitchen|food order|meal|cater)/.test(words)) return "restaurant";
-  if (/\b(supermarket|grocery|retail|store|shop|cart|checkout|inventory|catalog|marketplace|product|pos\b)/.test(words)) return "retail";
-  if (/\b(school|student|course|classroom|learning|educat|academy|lesson|campus)/.test(words)) return "education";
-  if (/\b(bookin|appointment|salon|clinic|reservation|consultation|schedule)/.test(words)) return "booking";
-  if (/\b(statistic|survey|dataset|analysis|anova|regression|research)/.test(words)) return "research";
+  // Identify what the business IS from its name, summary, and data model.
+  // Generic features like a "catalog" or "search" belong to every app and
+  // must never turn a school, research lab, or booking tool into a shop.
+  const primary = [plan.appName, plan.summary, ...plan.dataModel.map(d => d.table)].join(" ").toLowerCase();
+  const all = [primary, ...plan.pages.map(p => p.name)].join(" ").toLowerCase();
+  if (/restauran|kitchen|menu_items|meal|cater|food order/.test(primary)) return "restaurant";
+  if (/school|student|course|classroom|learn|educat|academy|lesson|campus/.test(primary)) return "education";
+  if (/bookin|appointment|salon|clinic|reservation|consultation|schedule/.test(primary)) return "booking";
+  if (/statistic|survey|dataset|analysis|anova|regression|research/.test(primary)) return "research";
+  if (/supermarket|grocery|retail|store|shop|cart|checkout|inventory|marketplace|products?\b|pos\b/.test(primary)) return "retail";
+  if (/product|menu|shop|inventory/.test(all) && !/client|employee|crm|course|student/.test(all)) return "retail";
   return "business";
 }
 

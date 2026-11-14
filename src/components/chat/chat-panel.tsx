@@ -72,9 +72,17 @@ export function ChatPanel({
 
   useEffect(() => {
     setMessages(initialMessages);
-    setRetryPrompt(projectStatus === "error" || projectStatus === "generating"
-      ? [...initialMessages].reverse().find((m) => m.role === "user" && isBuildBrief(m.content))?.content ?? null
-      : null);
+    // A failed first build may not have persisted a chat message yet.
+    // Keep its brief in tab-scoped storage so refresh does not erase retry.
+    let savedPrompt: string | null = null;
+    try {
+      const value = window.sessionStorage.getItem(`buildrx-retry-brief:${projectId}`);
+      if (value && isBuildBrief(value)) savedPrompt = value;
+    } catch {
+      // Private mode may disable storage; the live retry still works.
+    }
+    const priorPrompt = [...initialMessages].reverse().find((m) => m.role === "user" && isBuildBrief(m.content))?.content ?? null;
+    setRetryPrompt(projectStatus === "ready" ? null : (savedPrompt ?? ((projectStatus === "error" || projectStatus === "generating") ? priorPrompt : null)));
     return () => useChatStore.getState().clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
@@ -151,6 +159,11 @@ export function ChatPanel({
     });
     setStreaming(true);
     setRetryPrompt(null);
+    try {
+      window.sessionStorage.setItem(`buildrx-retry-brief:${projectId}`, prompt);
+    } catch {
+      // Storage is optional; keep the in-memory prompt regardless.
+    }
 
     const lineForAgent: Partial<Record<AgentName, number>> = {};
     const lines: string[] = [];
@@ -233,6 +246,9 @@ export function ChatPanel({
               // A failed verification must remain retryable from the composer.
               setHasBuilt(event.verificationPassed === true);
               setRetryPrompt(event.verificationPassed && degraded.length === 0 ? null : prompt);
+              if (event.verificationPassed && degraded.length === 0) {
+                try { window.sessionStorage.removeItem(`buildrx-retry-brief:${projectId}`); } catch { /* Optional storage. */ }
+              }
               if (!event.verificationPassed) {
                 lines.push(`\n⚠️ **Files saved, but verification failed** — ${event.fileCount} files. Review the failed checks above and retry; the preview is not certified.`);
                 toast.error("Build saved but failed verification", {

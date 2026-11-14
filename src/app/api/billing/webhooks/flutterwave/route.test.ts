@@ -3,7 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
 
 const activateProSubscription = vi.hoisted(() => vi.fn());
+const fulfillCourseWebhook = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/billing/service", () => ({ activateProSubscription }));
+vi.mock("@/lib/course/entitlements", () => ({
+  fulfillCourseWebhook,
+  isCourseCheckout: (metadata: unknown, reference: unknown) => {
+    const meta = metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {};
+    return meta.product === "mabrig-tech-plus-buildrx" ||
+      meta.purchase_type === "one_time_course" ||
+      (typeof reference === "string" && reference.startsWith("techplus_"));
+  },
+}));
+
 
 const HASH = "flw_secret_hash_value";
 const savedEnv = { ...process.env };
@@ -33,6 +44,7 @@ const chargeCompleted = {
 beforeEach(() => {
   process.env.FLUTTERWAVE_SECRET_HASH = HASH;
   activateProSubscription.mockReset().mockResolvedValue(undefined);
+  fulfillCourseWebhook.mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -41,6 +53,27 @@ afterEach(() => {
 });
 
 describe("POST /api/billing/webhooks/flutterwave", () => {
+
+  it("automatically grants course enrollment instead of Pro for confirmed course payments", async () => {
+    const payload = { event: "charge.completed", data: {
+      id: 191919, tx_ref: "techplus_9aa6ce88-9e87-492c-b704-5bd89e01fb89_uuid",
+      status: "successful", amount: 100000, currency: "NGN",
+      meta: { user_id: "9aa6ce88-9e87-492c-b704-5bd89e01fb89", product: "mabrig-tech-plus-buildrx", purchase_type: "one_time_course" },
+    } };
+    const response = await POST(webhook(payload));
+    expect(response.status).toBe(200);
+    expect(fulfillCourseWebhook).toHaveBeenCalledWith({ provider: "flutterwave", reference: payload.data.tx_ref, transactionId: "191919" });
+    expect(activateProSubscription).not.toHaveBeenCalled();
+  });
+  it("does not grant Pro for course payments without a transaction id", async () => {
+    const response = await POST(webhook({ event: "charge.completed", data: {
+      tx_ref: "techplus_bad", status: "successful", meta: { product: "mabrig-tech-plus-buildrx" },
+    } }));
+    expect(response.status).toBe(500);
+    expect(fulfillCourseWebhook).not.toHaveBeenCalled();
+    expect(activateProSubscription).not.toHaveBeenCalled();
+  });
+
   describe("authentication", () => {
     it("activates the subscription for a valid hash and successful charge", async () => {
       const response = await POST(webhook(chargeCompleted));

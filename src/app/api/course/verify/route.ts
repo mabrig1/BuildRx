@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     }
     await activateVerifiedCoursePayment({
       payment,
-      provider,
+      provider: provider === "paystack" ? "paystack" : "flutterwave",
       signedInUserId: user.id,
     });
 

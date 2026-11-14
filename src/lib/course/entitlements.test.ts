@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { VerifiedPayment } from "@/lib/billing/providers";
 import { COURSE_SLUG } from "@/lib/course/buildrx-tech-plus";
 

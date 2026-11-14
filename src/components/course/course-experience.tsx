@@ -129,6 +129,7 @@ export function CourseExperience() {
                       <Button size="sm" variant="outline" asChild><Link href={academyLabUrl(module.id)}><FlaskConical className="mr-1 size-4" /> Guided labs</Link></Button>
                       <Button size="sm" variant="outline" asChild><Link href={academyStudioUrl(module.id)}><FolderOpen className="mr-1 size-4" /> Project Studio</Link></Button>
                       <Button size="sm" variant="outline" asChild><Link href="/learn/playground">Coding playground</Link></Button>
+                      <Button size="sm" variant="outline" asChild><Link href="/learn/engineering">Engineering mission drills</Link></Button>
                     </div>
                   </div>
                 </div>

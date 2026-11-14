@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, Code2, FileSearch, FlaskConical, FolderOpen, GraduationCap, ArrowRight } from "lucide-react";
+import { BookOpen, BookOpenCheck, Code2, FileSearch, FlaskConical, FolderOpen, GraduationCap, ArrowRight } from "lucide-react";
 
 import { KnowledgeAcademy } from "@/components/learn/knowledge-academy";
 import { PageHeader } from "@/components/layout/page-header";
@@ -41,6 +41,20 @@ export default async function LearnPage({
           <BookOpen className="size-3.5" /> Free knowledge base + optional AI training
         </Badge>
       </PageHeader>
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <BookOpenCheck className="size-5 text-primary" /> Interactive Software Engineering Training
+          </CardTitle>
+          <CardDescription>
+            Four realistic projects, 20 scored engineering decisions, immediate explanations and a guided five-stage workflow.
+            Generate an editable BuildRx project, run a linked coding challenge, practise in the studio and prepare an evidence pack.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild><Link href="/learn/engineering">Enter interactive engineering training <ArrowRight className="ml-2 size-4" /></Link></Button>
+        </CardContent>
+      </Card>
       <Card className="border-primary/25">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">

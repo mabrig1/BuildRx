@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  BookOpenCheck,
   Bot,
   CreditCard,
   FolderKanban,
@@ -129,6 +130,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Engineering Academy", href: "/course", icon: GraduationCap },
   { title: "Guide", href: "/guide", icon: BookOpen },
   { title: "Learning Center", href: "/learn", icon: GraduationCap },
+  { title: "Interactive Engineering Training", href: "/learn/engineering", icon: BookOpenCheck },
   { title: "Engineering Labs", href: "/learn/labs", icon: FlaskConical },
   { title: "Coding Playground", href: "/learn/playground", icon: Code2 },
   { title: "Project Studio", href: "/learn/studio", icon: FolderOpen },

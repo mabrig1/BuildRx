@@ -8,6 +8,7 @@ import {
   GitBranch,
   GraduationCap,
   FolderOpen,
+  BookOpenCheck,
   Rocket,
   ShieldCheck,
   Sparkles,
@@ -169,7 +170,7 @@ export default function AcademyPage() {
               </Card>
             ))}
           </div>
-          <Button variant="outline" asChild><Link href="/academy/library">Browse 64-topic advanced roadmap and real app case studies <ArrowRight className="ml-1 size-4" /></Link></Button>
+          <div className="flex flex-wrap gap-2"><Button asChild><Link href="/learn/engineering"><BookOpenCheck className="mr-1 size-4" /> Try interactive software engineering training</Link></Button><Button variant="outline" asChild><Link href="/academy/library">Browse 64-topic advanced roadmap <ArrowRight className="ml-1 size-4" /></Link></Button></div>
           <p className="text-xs text-muted-foreground">The 64-topic roadmap is indexed from a separate MABRIG repository, not 64 lessons imported into this course. Local progress is self-reported and not certification.</p>
         </div>
       </section>

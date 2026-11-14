@@ -32,3 +32,10 @@ create policy "Users can view own course enrollments"
 create policy "Admins can view all course enrollments"
   on public.course_enrollments for select
   using (public.is_admin());
+
+-- Explicit Data API privileges: signed-in learners read only their own rows
+-- under RLS; only trusted server role writes payments/enrollments.
+revoke all on public.course_enrollments from anon;
+revoke insert, update, delete on public.course_enrollments from authenticated;
+grant select on public.course_enrollments to authenticated;
+grant select, insert, update, delete on public.course_enrollments to service_role;

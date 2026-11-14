@@ -1,6 +1,7 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import Link from "next/link";
+import { LifeBuoy, Menu } from "lucide-react";
 
 import { Logo } from "@/components/layout/logo";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
@@ -37,6 +38,11 @@ export function AppHeader() {
         </SheetContent>
       </Sheet>
       <div className="ml-auto flex items-center gap-1">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/support" aria-label="Open BuildRx support" title="Support Center">
+            <LifeBuoy className="size-4" />
+          </Link>
+        </Button>
         <ThemeToggle />
         <UserNav />
       </div>

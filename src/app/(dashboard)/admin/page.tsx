@@ -44,7 +44,8 @@ export const metadata: Metadata = {
 
 export default async function AdminPage() {
   let verifiedAdminEmail: string | null = null;
-  // Gate: admins only (demo mode is open for exploration).
+  // Administrative account details must never appear in demo mode.
+  if (!isSupabaseConfigured()) redirect("/login?next=/admin");
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
     const {

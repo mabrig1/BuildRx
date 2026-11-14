@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { APP_STARTERS } from "@/lib/projects/app-starters";
+import { EasyBriefBuilder } from "@/components/projects/easy-brief-builder";
 import { GITHUB_APP_TEMPLATES } from "@/lib/projects/github-app-templates";
 import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
 import {
@@ -167,7 +168,7 @@ export function CreateProjectDialog({
         <DialogHeader className="shrink-0 border-b px-6 py-5 pr-12">
           <DialogTitle>Create a new project</DialogTitle>
           <DialogDescription>
-            Search ready-to-customize app ideas, import approved open-source GitHub code, or describe your own product.
+            Answer three simple questions to describe your app, choose a proven starter, or customize your own detailed brief.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -181,6 +182,14 @@ export function CreateProjectDialog({
                   Demo mode: drafts stay in this browser session. Generated files are temporary on the server; connect a database before creating real customer projects.
                 </p>
               )}
+              <EasyBriefBuilder onUse={(result) => {
+                const existingName = form.getValues("name").trim();
+                if (!existingName) form.setValue("name", result.name, { shouldValidate: true, shouldDirty: true });
+                const existingDescription = (form.getValues("description") ?? "").trim();
+                if (!existingDescription) form.setValue("description", result.description, { shouldValidate: true, shouldDirty: true });
+                form.setValue("prompt", result.prompt, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+                setSelectedStarter(null);
+              }} />
               <section aria-label="Starter app ideas" className="space-y-2">
                 <div className="flex items-center gap-2">
                   <LayoutTemplate className="size-4 text-primary" aria-hidden="true" />
@@ -379,7 +388,7 @@ export function CreateProjectDialog({
               </Button>
               <Button type="submit" disabled={isPending}>
                 {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-                Create project
+                Create project & start building
               </Button>
             </DialogFooter>
           </form>

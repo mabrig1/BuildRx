@@ -9,6 +9,7 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { DeployPanel } from "@/components/deploy/deploy-panel";
 import { GitHubPanel } from "@/components/github/github-panel";
 import { LaunchJourney } from "@/components/projects/launch-journey";
+import { ProjectDoctor } from "@/components/projects/project-doctor";
 import {
   WorkspaceSidebar,
   type SidebarProject,
@@ -60,6 +61,8 @@ export function Workspace({
   const [guidedDeployHost, setGuidedDeployHost] = useState<"cloudflare" | "vercel" | null>(null);
   const [previewUrl, setPreviewUrl] = useState(project.previewUrl);
   const [filesRefreshKey, setFilesRefreshKey] = useState(0);
+  const [repairRequest, setRepairRequest] = useState(0);
+  const [journeyRequest, setJourneyRequest] = useState(0);
 
   useEffect(() => {
     if (!isDemoProject) return;
@@ -171,6 +174,7 @@ export function Workspace({
             <AgentRunPanel
               projectId={project.id}
               defaultPrompt={lastUserMessage}
+              repairRequest={repairRequest}
               onDeployed={handleBuildDeployed}
             />
             {/* Chat/Preview toggle — below xl the preview is a tab */}
@@ -202,7 +206,16 @@ export function Workspace({
             <p className="truncate text-xs font-semibold">Finished building? Here is exactly what to do next.</p>
             <p className="hidden text-xs text-muted-foreground sm:block">GitHub, database setup, Cloudflare or Vercel, and live app checks.</p>
           </div>
+          <div className="flex shrink-0 items-center gap-2">
+          <ProjectDoctor
+            projectId={project.id}
+            filesRefreshKey={filesRefreshKey}
+            onRepair={() => setRepairRequest(value => value + 1)}
+            onNext={() => setJourneyRequest(value => value + 1)}
+            onPreview={() => setMobileView("preview")}
+          />
           <LaunchJourney
+            openRequest={journeyRequest}
             projectId={project.id}
             projectStatus={project.status}
             onOpenGithub={() => setGithubOpen(true)}
@@ -211,6 +224,7 @@ export function Workspace({
               setDeployOpen(true);
             }}
           />
+          </div>
         </div>
 
         {isDemoProject && (

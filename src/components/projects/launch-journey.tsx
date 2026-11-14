@@ -74,13 +74,18 @@ export function LaunchJourney({
   projectStatus,
   onOpenGithub,
   onOpenDeploy,
+  openRequest = 0,
 }: {
   projectId: string;
   projectStatus: string;
+  openRequest?: number;
   onOpenGithub: () => void;
   onOpenDeploy: (host: LaunchHost) => void;
 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (openRequest) setOpen(true);
+  }, [openRequest]);
   const [choices, setChoices] = useState<LaunchPreferences>(DEFAULT_CHOICES);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);

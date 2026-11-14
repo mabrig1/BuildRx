@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     .select("id")
     .eq("user_id", user.id)
     .eq("course_slug", COURSE_SLUG)
-    .eq("status", "active")
+    .in("status", ["active", "completed"])
     .maybeSingle();
 
   // Never collect tuition when its entitlement cannot be persisted.

@@ -80,6 +80,7 @@ export default function AcademyPage() {
             <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
               <span><strong>{COURSE_DURATION}</strong> intensive track</span>
               <span><strong>₦{COURSE_PRICE_NGN.toLocaleString()}</strong> one-time</span>
+              <span><strong>Automatic access</strong> after verified payment</span>
               <span><strong>8</strong> portfolio milestones</span>
             </div>
           </div>

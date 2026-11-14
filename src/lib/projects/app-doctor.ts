@@ -64,7 +64,7 @@ const LABELS: Record<string, { title: string; explanation: string }> = {
   "hardcoded-secret-key": { title: "Possible embedded secret", explanation: "Review the saved code securely and rotate any exposed credential before continuing." },
   "hardcoded-nvidia-key": { title: "Possible embedded provider key", explanation: "Review the saved code securely and rotate any exposed credential before continuing." },
   "hardcoded-jwt": { title: "Possible embedded token", explanation: "Review the saved code securely and revoke or rotate exposed tokens before continuing." },
-  "eval-usage": { title: "Dynamic code execution", explanation: "Replace eval() with safer explicit logic where possible." },
+  "eval-usage": { title: "Dynamic code execution", explanation: "Avoid dynamic evaluation of untrusted strings; use explicit logic." },
 };
 
 function safeLocation(input: string | undefined): string | undefined {

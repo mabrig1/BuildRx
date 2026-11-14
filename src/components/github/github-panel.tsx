@@ -50,11 +50,17 @@ interface Status {
 export function GitHubPanel({
   projectId,
   projectName,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   projectId: string;
   projectName: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const [status, setStatus] = useState<Status | null>(null);
   const [token, setToken] = useState("");
   const [repoName, setRepoName] = useState(

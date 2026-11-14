@@ -8,6 +8,7 @@ import { AgentRunPanel } from "@/components/agents/agent-run-panel";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { DeployPanel } from "@/components/deploy/deploy-panel";
 import { GitHubPanel } from "@/components/github/github-panel";
+import { LaunchJourney } from "@/components/projects/launch-journey";
 import {
   WorkspaceSidebar,
   type SidebarProject,
@@ -54,6 +55,9 @@ export function Workspace({
     nonce: number;
   } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [githubOpen, setGithubOpen] = useState(false);
+  const [deployOpen, setDeployOpen] = useState(false);
+  const [guidedDeployHost, setGuidedDeployHost] = useState<"cloudflare" | "vercel" | null>(null);
   const [previewUrl, setPreviewUrl] = useState(project.previewUrl);
   const [filesRefreshKey, setFilesRefreshKey] = useState(0);
 
@@ -159,8 +163,11 @@ export function Workspace({
                 <Download className="size-4" />
               </a>
             </Button>
-            <GitHubPanel projectId={project.id} projectName={project.name} />
-            <DeployPanel projectId={project.id} />
+            <GitHubPanel projectId={project.id} projectName={project.name}
+              open={githubOpen} onOpenChange={setGithubOpen} />
+            <DeployPanel projectId={project.id}
+              preferredProvider={guidedDeployHost}
+              open={deployOpen} onOpenChange={setDeployOpen} />
             <AgentRunPanel
               projectId={project.id}
               defaultPrompt={lastUserMessage}
@@ -189,6 +196,22 @@ export function Workspace({
             <UserNav />
           </div>
         </header>
+
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b bg-muted/20 px-3 py-2">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold">Finished building? Here is exactly what to do next.</p>
+            <p className="hidden text-xs text-muted-foreground sm:block">GitHub, database setup, Cloudflare or Vercel, and live app checks.</p>
+          </div>
+          <LaunchJourney
+            projectId={project.id}
+            projectStatus={project.status}
+            onOpenGithub={() => setGithubOpen(true)}
+            onOpenDeploy={(host) => {
+              setGuidedDeployHost(host);
+              setDeployOpen(true);
+            }}
+          />
+        </div>
 
         {isDemoProject && (
           <p role="status" className="border-b bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:bg-amber-900/20 dark:text-amber-100">

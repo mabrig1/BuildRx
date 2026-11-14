@@ -3,6 +3,8 @@ import {
   ArrowRight,
   Bot,
   Eye,
+  GraduationCap,
+  FlaskConical,
   Rocket,
   ShieldCheck,
   Sparkles,
@@ -114,6 +116,30 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="border-y bg-muted/20">
+        <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-12 md:grid-cols-[1.2fr_.8fr] md:items-center">
+          <div className="space-y-3">
+            <Badge variant="secondary"><GraduationCap className="mr-1 size-4" /> BuildRx Software Engineering Academy</Badge>
+            <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">Build Realistic Modern Apps by Chatting with AI</h2>
+            <p className="text-muted-foreground">Hands-on laboratory coaching for Nigerian and international learners. Eight-week premium training, four engineering tracks, 20 guided labs, and a real app-creating workspace.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild><Link href="/academy">₦100,000 flagship course <ArrowRight className="ml-1 size-4" /></Link></Button>
+              <Button asChild variant="outline"><Link href="/learn/labs"><FlaskConical className="mr-1 size-4" /> Practice labs</Link></Button>
+              <Button asChild variant="outline"><Link href="/academy/library">Explore course library</Link></Button>
+            </div>
+          </div>
+          <div className="rounded-xl border bg-background p-5">
+            <p className="font-semibold">From idea to verifiable app</p>
+            <ol className="mt-3 list-inside list-decimal space-y-2 text-sm text-muted-foreground">
+              <li>Chat with AI about a real problem.</li>
+              <li>Create a new editable BuildRx project.</li>
+              <li>Practise and debug in the lab and studio.</li>
+              <li>Review the source and push to GitHub.</li>
+              <li>Deploy, verify, and present your capstone.</li>
+            </ol>
+          </div>
+        </div>
+      </section>
       {/* Features */}
       <section className="bg-muted/30 border-t">
         <div className="mx-auto w-full max-w-6xl px-4 py-20">

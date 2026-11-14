@@ -1,6 +1,6 @@
 export const COURSE_SLUG = "mabrig-tech-plus-buildrx";
-export const COURSE_TITLE = "MABRIG Tech+ BuildRx Full-Stack Launchpad";
-export const COURSE_SUBTITLE = "Build, Deploy & Monetize Real Apps with AI";
+export const COURSE_TITLE = "BuildRx Software Engineering Academy";
+export const COURSE_SUBTITLE = "Build Realistic Modern Apps by Chatting with AI";
 export const COURSE_PRICE_NGN = 100_000;
 export const COURSE_DURATION = "8 weeks";
 
@@ -176,13 +176,13 @@ export const courseModules: CourseModule[] = [
   {
     id: "capstone",
     week: "Week 8",
-    title: "Capstone: From Problem to Certified Production App",
+    title: "Capstone: From Problem to Reviewed Production App",
     outcome:
       "Plan, build, test, deploy and defend a complete application that demonstrates frontend, backend, data, security, integrations and release discipline.",
     skills: ["Architecture", "Full-stack delivery", "Security review", "Testing", "Deployment", "Technical presentation"],
     deliverable: "One portfolio-grade capstone, public case study and live demo with production evidence.",
     lab: {
-      name: "BuildRx Certified Capstone",
+      name: "BuildRx Production Capstone",
       description: "Choose a real problem, build the solution end-to-end, and graduate with verifiable evidence.",
       prompt: prompt([
         "Create my BuildRx Full-Stack Capstone application.",
@@ -203,6 +203,6 @@ export const courseBenefits = [
   "Next.js, TypeScript, Supabase, MongoDB, APIs, AI and payments",
   "Production testing, security and deployment discipline",
   "Founder/product thinking for turning apps into income",
-  "Capstone technical defense and completion certificate",
+  "Capstone technical defense and human-reviewed project evidence",
   "Reusable templates, prompts, checklists and release evidence"
 ];

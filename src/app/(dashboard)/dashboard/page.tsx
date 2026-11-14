@@ -6,6 +6,8 @@ import {
   Bot,
   CreditCard,
   FolderKanban,
+  GraduationCap,
+  BookOpenCheck,
   FlaskConical,
   Rocket,
 } from "lucide-react";
@@ -119,6 +121,17 @@ export default async function DashboardPage() {
       </PageHeader>
 
       {!configured ? <ConnectSupabaseNotice /> : null}
+      <section className="rounded-xl border border-primary/30 bg-primary/5 p-5">
+        <h2 className="flex items-center gap-2 text-xl font-semibold"><GraduationCap className="size-5 text-primary" /> BuildRx Software Engineering Academy</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Learn to build realistic modern applications by chatting with AI, then practise code, tests, debugging, GitHub and deployment.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" asChild><Link href="/course">Flagship course <ArrowRight className="ml-1 size-4" /></Link></Button>
+          <Button size="sm" variant="outline" asChild><Link href="/learn/engineering"><BookOpenCheck className="mr-1 size-4" /> Interactive training</Link></Button>
+          <Button size="sm" variant="outline" asChild><Link href="/learn/labs">Guided labs</Link></Button>
+          <Button size="sm" variant="outline" asChild><Link href="/learn/studio">App Project Studio</Link></Button>
+          <Button size="sm" variant="outline" asChild><Link href="/learn/playground">Coding playground</Link></Button>
+        </div>
+      </section>
 
       <section className="flex flex-col gap-4 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-5 sm:flex-row sm:items-center sm:justify-between" aria-label="Coding laboratory">
         <div className="flex items-start gap-3">

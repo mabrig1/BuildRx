@@ -4,14 +4,18 @@ import {
   ArrowRight,
   CheckCircle2,
   Code2,
+  FlaskConical,
   GitBranch,
   GraduationCap,
+  FolderOpen,
+  BookOpenCheck,
   Rocket,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
 
 import { MarketingShell } from "@/components/layout/marketing-shell";
+import { academyLabTracks } from "@/lib/course/academy-bundle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,7 +49,7 @@ export default function AcademyPage() {
           <div className="space-y-6">
             <Badge variant="secondary" className="gap-1.5">
               <GraduationCap className="size-3.5" />
-              MABRIG Tech+ Premium Program
+              BuildRx Software Engineering Academy · MABRIG Technologies
             </Badge>
             <div className="space-y-4">
               <h1 className="text-4xl font-semibold tracking-tighter text-balance md:text-6xl">
@@ -53,18 +57,24 @@ export default function AcademyPage() {
               </h1>
               <p className="text-primary text-xl font-medium">{COURSE_SUBTITLE}</p>
               <p className="text-muted-foreground max-w-2xl text-lg leading-8">
-                An AI-native full-stack developer program built around one rule: every lesson must produce something you can run, test, deploy or defend.
+                Practical software engineering coaching for Nigerian and international learners. Chat with AI, generate editable apps, practice code, and learn to test, debug and deploy with engineering evidence.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <Button size="lg" asChild>
                 <Link href="/signup?next=/course">
-                  Join the premium cohort
+                  Enrol in the ₦100,000 academy
                   <ArrowRight />
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <Link href="/login?next=/course">I already have an account</Link>
+              </Button>
+              <Button size="lg" variant="secondary" asChild>
+                <Link href="/signup?next=/learn/labs">
+                  Open connected engineering labs
+                  <FlaskConical className="ml-2 size-4" />
+                </Link>
               </Button>
             </div>
             <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
@@ -144,6 +154,26 @@ export default function AcademyPage() {
         </div>
       </section>
 
+      <section className="border-t">
+        <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-16">
+          <h2 className="text-3xl font-semibold tracking-tight">Build in connected coding playgrounds and AI app laboratories</h2>
+          <p className="text-muted-foreground">Every lab opens a real BuildRx project-creation brief, with shortcuts to isolated coding practice and multi-file editing.</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            {academyLabTracks.map(track => (
+              <Card key={track.id}>
+                <CardHeader><CardTitle>{track.title}</CardTitle><CardDescription>{track.labCount} guided labs · {track.outcome}</CardDescription></CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                  <Button size="sm" asChild><Link href={"/learn/labs?track=" + track.id}>Start labs <ArrowRight className="ml-1 size-4" /></Link></Button>
+                  <Button size="sm" variant="outline" asChild><Link href={"/learn/studio?track=" + track.id}><FolderOpen className="mr-1 size-4" /> Project Studio</Link></Button>
+                  <Button size="sm" variant="outline" asChild><Link href="/learn/playground">Playground</Link></Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2"><Button asChild><Link href="/learn/engineering"><BookOpenCheck className="mr-1 size-4" /> Try interactive software engineering training</Link></Button><Button variant="outline" asChild><Link href="/academy/library">Browse 64-topic advanced roadmap <ArrowRight className="ml-1 size-4" /></Link></Button></div>
+          <p className="text-xs text-muted-foreground">The 64-topic roadmap is indexed from a separate MABRIG repository, not 64 lessons imported into this course. Local progress is self-reported and not certification.</p>
+        </div>
+      </section>
       <section>
         <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-6 px-4 py-20 text-center">
           <Badge>₦{COURSE_PRICE_NGN.toLocaleString()} one-time</Badge>
@@ -155,7 +185,7 @@ export default function AcademyPage() {
           </p>
           <Button size="lg" asChild>
             <Link href="/signup?next=/course">
-              Start MABRIG Tech+
+              Join BuildRx Software Engineering Academy
               <ArrowRight />
             </Link>
           </Button>

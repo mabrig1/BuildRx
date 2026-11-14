@@ -20,7 +20,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Tech+ Full-Stack Course",
+  title: "BuildRx Software Engineering Academy",
 };
 
 async function enrollmentState() {
@@ -78,7 +78,7 @@ export default async function CoursePage() {
               </div>
               <CardTitle>Learn by shipping, not by watching.</CardTitle>
               <CardDescription>
-                Eight practical modules. Eight BuildRx labs. One production-grade capstone.
+                Eight project-based modules connected to 20 engineering labs, a coding playground and a multi-file Project Studio.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -117,7 +117,7 @@ export default async function CoursePage() {
                 <EnrollButton provider="flutterwave" variant="outline">Enroll with Flutterwave</EnrollButton>
               </div>
               <p className="text-muted-foreground text-xs">
-                Access activates only after the payment provider confirms the transaction server-side.
+                Tuition is charged in NGN. Foreign-card acceptance depends on the provider. Access activates after server-side payment verification; BuildRx subscriptions and external hosting costs are separate.
               </p>
             </CardContent>
           </Card>

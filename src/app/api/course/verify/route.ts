@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { flutterwaveVerify, paystackVerify } from "@/lib/billing/providers";
-import { COURSE_PRICE_NGN, COURSE_SLUG } from "@/lib/course/buildrx-tech-plus";
+import { activateVerifiedCoursePayment } from "@/lib/course/entitlements";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -26,39 +26,18 @@ export async function GET(request: Request) {
           : null;
 
     if (!payment) throw new Error("Unknown payment provider");
-    const expectedReferencePrefix = "techplus_" + user.id + "_";
-    if (!payment.reference.startsWith(expectedReferencePrefix)) {
-      throw new Error("Payment reference does not belong to this account");
+    // The provider's verified response, not the URL parameters, identifies
+    // the purchaser and the product. Never grant access based on query data.
+    const returnedReference =
+      searchParams.get("reference") ?? searchParams.get("tx_ref");
+    if (returnedReference && returnedReference !== payment.reference) {
+      throw new Error("Checkout reference does not match verified payment");
     }
-    if (payment.currency.toUpperCase() !== "NGN") {
-      throw new Error("Unexpected payment currency");
-    }
-    if (payment.amount < COURSE_PRICE_NGN) {
-      throw new Error("Payment amount does not match the course price");
-    }
-
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("Service-role key is required to activate course enrollment");
-    }
-
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const admin = createAdminClient();
-
-    const { error } = await admin.from("course_enrollments").upsert(
-      {
-        user_id: user.id,
-        course_slug: COURSE_SLUG,
-        status: "active",
-        provider,
-        provider_ref: payment.reference,
-        amount: payment.amount,
-        currency: payment.currency,
-        enrolled_at: payment.paidAt,
-      },
-      { onConflict: "user_id,course_slug" }
-    );
-
-    if (error) throw error;
+    await activateVerifiedCoursePayment({
+      payment,
+      provider,
+      signedInUserId: user.id,
+    });
 
     return NextResponse.redirect(origin + "/course?enrolled=1");
   } catch {

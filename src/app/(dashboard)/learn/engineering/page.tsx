@@ -23,7 +23,18 @@ export default async function EngineeringTrainingPage({
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect("/login?next=/learn/engineering");
+    const { data: profile } = await supabase.from("users")
+      .select("role").eq("id", user.id).maybeSingle();
+    if (profile?.role !== "admin") {
+      const { COURSE_SLUG } = await import("@/lib/course/buildrx-tech-plus");
+      const { data: enrollment } = await supabase.from("course_enrollments")
+        .select("id")
+        .eq("user_id", user.id).eq("course_slug", COURSE_SLUG)
+        .in("status", ["active", "completed"]).maybeSingle();
+      if (!enrollment) redirect("/course");
+    }
   }
+  if (!isSupabaseConfigured()) redirect("/course");
   const params = await searchParams;
   const initialMission = missionById(params.mission)?.id;
   return (

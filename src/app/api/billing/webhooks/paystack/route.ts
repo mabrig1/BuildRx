@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { paystackVerifySignature } from "@/lib/billing/providers";
 import { activateProSubscription } from "@/lib/billing/service";
+import { fulfillCourseWebhook, isCourseCheckout } from "@/lib/course/entitlements";
 import { reportMabrigConversion } from "@/lib/mabrig-growth";
 
 /**
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
       amount?: number;
       currency?: string;
       paid_at?: string;
-      metadata?: { user_id?: string; mabrig_attribution?: string };
+      metadata?: { user_id?: string; product?: string; purchase_type?: string; mabrig_attribution?: string };
       customer?: { email?: string };
     };
   };
@@ -31,6 +32,21 @@ export async function POST(request: Request) {
     event = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  if (event.event === "charge.success" &&
+      isCourseCheckout(event.data?.metadata, event.data?.reference)) {
+    try {
+      if (!event.data?.reference) throw new Error("Missing course reference");
+      await fulfillCourseWebhook({
+        provider: "paystack",
+        reference: event.data.reference,
+      });
+      return NextResponse.json({ received: true });
+    } catch {
+      // Non-2xx instructs Paystack to redeliver; never credit a SaaS plan.
+      return NextResponse.json({ error: "Course activation pending" }, { status: 500 });
+    }
   }
 
   if (event.event === "charge.success" && event.data?.metadata?.user_id) {

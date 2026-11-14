@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { flutterwaveVerifySignature } from "@/lib/billing/providers";
 import { activateProSubscription } from "@/lib/billing/service";
+import { fulfillCourseWebhook, isCourseCheckout } from "@/lib/course/entitlements";
 import { reportMabrigConversion } from "@/lib/mabrig-growth";
 
 /**
@@ -19,16 +20,36 @@ export async function POST(request: Request) {
     event?: string;
     data?: {
       tx_ref?: string;
+      id?: string | number;
       amount?: number;
       currency?: string;
       created_at?: string;
       status?: string;
-      meta?: { user_id?: string; mabrig_attribution?: string };
+      meta?: { user_id?: string; product?: string; purchase_type?: string; mabrig_attribution?: string };
       customer?: { email?: string };
     };
   } | null;
   if (!event) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  if (event.event === "charge.completed" &&
+      event.data?.status === "successful" &&
+      isCourseCheckout(event.data?.meta, event.data?.tx_ref)) {
+    try {
+      if (!event.data?.tx_ref || event.data.id === undefined) {
+        throw new Error("Missing provider transaction fields");
+      }
+      await fulfillCourseWebhook({
+        provider: "flutterwave",
+        reference: event.data.tx_ref,
+        transactionId: String(event.data.id),
+      });
+      return NextResponse.json({ received: true });
+    } catch {
+      // Authentication and direct provider verification must both succeed.
+      return NextResponse.json({ error: "Course activation pending" }, { status: 500 });
+    }
   }
 
   if (

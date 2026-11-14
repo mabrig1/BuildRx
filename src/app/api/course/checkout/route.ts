@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   }
 
   if (!isSupabaseConfigured()) {
-    return NextResponse.json({ simulated: true, url: "/course?enrolled=1" });
+    return NextResponse.json({ error: "Enrollment is not configured" }, { status: 503 });
   }
 
   const supabase = await createClient();
@@ -68,13 +68,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const headerList = await headers();
-  const origin =
-    headerList.get("origin") ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    "http://localhost:3000";
-  const reference = "techplus_" + user.id + "_" + Date.now();
-  const callbackUrl = origin + "/api/course/verify?provider=" + provider;
+  // Do not trust a caller-supplied Origin header for financial redirects.
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl = configuredUrl ? new URL(configuredUrl) : new URL(request.url);
+  if (!["https:", "http:"].includes(appUrl.protocol)) {
+    return NextResponse.json({ error: "Invalid checkout configuration" }, { status: 503 });
+  }
+  const reference = "techplus_" + user.id + "_" + randomUUID();
+  const callbackUrl = new URL("/api/course/verify?provider=" + provider, appUrl.origin).toString();
   const metadata = {
     user_id: user.id,
     product: COURSE_SLUG,

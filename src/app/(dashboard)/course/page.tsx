@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 async function enrollmentState() {
-  if (!isSupabaseConfigured()) return { enrolled: true, demo: true };
+  if (!isSupabaseConfigured()) return { enrolled: false, demo: false };
 
   const supabase = await createClient();
   const {
@@ -33,12 +33,16 @@ async function enrollmentState() {
 
   if (!user) redirect("/login?next=/course");
 
+  const { data: adminProfile } = await supabase
+    .from("users").select("role").eq("id", user.id).maybeSingle();
+  if (adminProfile?.role === "admin") return { enrolled: true, demo: false };
+
   const { data } = await supabase
     .from("course_enrollments")
     .select("id, status")
     .eq("user_id", user.id)
     .eq("course_slug", COURSE_SLUG)
-    .eq("status", "active")
+    .in("status", ["active", "completed"])
     .maybeSingle();
 
   return { enrolled: Boolean(data), demo: false };

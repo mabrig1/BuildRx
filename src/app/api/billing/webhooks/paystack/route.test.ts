@@ -5,7 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
 
 const activateProSubscription = vi.hoisted(() => vi.fn());
+const fulfillCourseWebhook = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/billing/service", () => ({ activateProSubscription }));
+vi.mock("@/lib/course/entitlements", () => ({
+  fulfillCourseWebhook,
+  isCourseCheckout: (metadata: unknown, reference: unknown) => {
+    const meta = metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {};
+    return meta.product === "mabrig-tech-plus-buildrx" ||
+      meta.purchase_type === "one_time_course" ||
+      (typeof reference === "string" && reference.startsWith("techplus_"));
+  },
+}));
+
 
 const SECRET = "sk_test_paystack_secret";
 const savedEnv = { ...process.env };
@@ -41,6 +52,7 @@ const chargeSuccess = {
 beforeEach(() => {
   process.env.PAYSTACK_SECRET_KEY = SECRET;
   activateProSubscription.mockReset().mockResolvedValue(undefined);
+  fulfillCourseWebhook.mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -49,6 +61,30 @@ afterEach(() => {
 });
 
 describe("POST /api/billing/webhooks/paystack", () => {
+
+  it("automatically enrolls a verified course payment without granting Pro", async () => {
+    const payload = {
+      event: "charge.success",
+      data: {
+        reference: "techplus_9aa6ce88-9e87-492c-b704-5bd89e01fb89_uuid",
+        amount: 10000000,
+        currency: "NGN",
+        metadata: { user_id: "9aa6ce88-9e87-492c-b704-5bd89e01fb89", product: "mabrig-tech-plus-buildrx", purchase_type: "one_time_course" },
+      },
+    };
+    const response = await POST(webhook(payload));
+    expect(response.status).toBe(200);
+    expect(fulfillCourseWebhook).toHaveBeenCalledWith({ provider: "paystack", reference: payload.data.reference });
+    expect(activateProSubscription).not.toHaveBeenCalled();
+  });
+  it("does not grant any access on a failed course activation", async () => {
+    fulfillCourseWebhook.mockRejectedValueOnce(new Error("provider verification failed"));
+    const response = await POST(webhook({ event: "charge.success",
+      data: { reference: "techplus_bad_ref", metadata: { product: "mabrig-tech-plus-buildrx" } } }));
+    expect(response.status).toBe(500);
+    expect(activateProSubscription).not.toHaveBeenCalled();
+  });
+
   describe("authentication", () => {
     it("activates the subscription for a correctly signed charge.success", async () => {
       const response = await POST(webhook(chargeSuccess));

@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   }
 
   if (!isSupabaseConfigured()) {
-    return NextResponse.json({ simulated: true, url: "/course?enrolled=1" });
+    return NextResponse.json({ error: "Enrollment is not configured" }, { status: 503 });
   }
 
   const supabase = await createClient();
@@ -41,14 +41,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: enrollmentError } = await supabase
     .from("course_enrollments")
     .select("id")
     .eq("user_id", user.id)
     .eq("course_slug", COURSE_SLUG)
-    .eq("status", "active")
+    .in("status", ["active", "completed"])
     .maybeSingle();
 
+  // Never collect tuition when its entitlement cannot be persisted.
+  if (enrollmentError || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({
+      error: "Course access is temporarily unavailable; no payment has been taken.",
+    }, { status: 503 });
+  }
   if (existing) {
     return NextResponse.json({ url: "/course" });
   }
@@ -57,6 +63,11 @@ export async function POST(request: Request) {
   const configured =
     provider === "paystack" ? isPaystackConfigured() : isFlutterwaveConfigured();
 
+  if (provider === "flutterwave" && !process.env.FLUTTERWAVE_SECRET_HASH) {
+    return NextResponse.json({
+      error: "Flutterwave automatic enrollment webhook is not configured; no payment has been taken.",
+    }, { status: 503 });
+  }
   if (!configured) {
     return NextResponse.json(
       {
@@ -68,13 +79,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const headerList = await headers();
-  const origin =
-    headerList.get("origin") ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    "http://localhost:3000";
-  const reference = "techplus_" + user.id + "_" + Date.now();
-  const callbackUrl = origin + "/api/course/verify?provider=" + provider;
+  // Do not trust a caller-supplied Origin header for financial redirects.
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl = configuredUrl ? new URL(configuredUrl) : new URL(request.url);
+  if (!["https:", "http:"].includes(appUrl.protocol)) {
+    return NextResponse.json({ error: "Invalid checkout configuration" }, { status: 503 });
+  }
+  const reference = "techplus_" + user.id + "_" + randomUUID();
+  const callbackUrl = new URL("/api/course/verify?provider=" + provider, appUrl.origin).toString();
   const metadata = {
     user_id: user.id,
     product: COURSE_SLUG,

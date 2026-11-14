@@ -199,10 +199,10 @@ export function Workspace({
 
         <div className="flex shrink-0 items-center justify-between gap-3 border-b bg-muted/20 px-3 py-2">
           <div className="min-w-0">
-            <p className="truncate text-xs font-semibold">Finished building? Here is exactly what to do next.</p>
-            <p className="hidden text-xs text-muted-foreground sm:block">GitHub, database setup, Cloudflare or Vercel, and live app checks.</p>
+            <p className="truncate text-xs font-semibold">{project.status === "ready" ? "Your app is ready for the next steps" : project.status === "error" ? "Build needs attention — retry from the chat below" : "Describe your idea and build it with AI"}</p>
+            <p className="hidden text-xs text-muted-foreground sm:block">{project.status === "ready" ? "Preview your app, then connect GitHub and prepare for publishing." : "BuildRx guides you through creating, checking, and improving your app."}</p>
           </div>
-          <LaunchJourney
+          {project.status === "ready" && <LaunchJourney
             projectId={project.id}
             projectStatus={project.status}
             onOpenGithub={() => setGithubOpen(true)}
@@ -210,7 +210,7 @@ export function Workspace({
               setGuidedDeployHost(host);
               setDeployOpen(true);
             }}
-          />
+          />}
         </div>
 
         {isDemoProject && (

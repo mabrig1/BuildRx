@@ -27,6 +27,14 @@ async function buildVerification(
     );
 
   const items: VerificationItem[] = [];
+  const blockers = context.generationBlockers ?? [];
+  items.push({
+    label: "Essential generation completed",
+    status: blockers.length === 0 ? "pass" : context.persist ? "fail" : "warn",
+    detail: blockers.length
+      ? `${blockers.map(item => item.agent).join(", ")} used a fallback or failed. Static repairs do not verify the requested product behavior.`
+      : "No essential generation fallback was observed in this run; user acceptance remains untested.",
+  });
 
   const evidenceFiles = [
     "docs/PRODUCT-BRIEF.md",
@@ -43,7 +51,7 @@ async function buildVerification(
 
   const frontend = rules(["missing-preview", "missing-home-page", "missing-layout", "broken-file", "missing-import", "undeclared-dependency", "invalid-package-json", "missing-package-json", "missing-page"]);
   items.push({
-    label: "Frontend builds (static checks)",
+    label: "Frontend source checks",
     status: frontend.length === 0 ? "pass" : "fail",
     detail: frontend.length > 0 ? frontend[0].message : undefined,
   });
@@ -66,7 +74,7 @@ async function buildVerification(
     label: "Authentication",
     status: isSupabaseConfigured() ? "pass" : "warn",
     detail: isSupabaseConfigured()
-      ? "platform auth connected (Supabase)"
+      ? "BuildRx platform auth configured; generated-app login not runtime-tested"
       : "demo mode — no auth provider connected",
   });
 
@@ -196,7 +204,7 @@ export const deploymentAgent: Agent = {
         role: "assistant",
         metadata: { kind: "build-result", prompt: context.prompt, plan: JSON.parse(JSON.stringify(plan)) },
         content: verified
-          ? `🚀 **Build complete and verified** — **${plan?.appName ?? "your app"}**, ${context.files.size} files (${plan?.pages.length ?? 0} pages, ${plan?.dataModel.length ?? 0} tables). Blocking checks passed. Open the workspace preview to try the app.`
+          ? `**Workspace files saved; static checks passed** — **${plan?.appName ?? "your app"}**, ${context.files.size} files (${plan?.pages.length ?? 0} pages, ${plan?.dataModel.length ?? 0} tables). The saved HTML preview was read successfully. A production build and end-to-end feature tests have not run. Test the requested workflows before external deployment.`
           : [
               `⚠️ **Build finished but did not pass verification** — **${plan?.appName ?? "your app"}**, ${context.files.size} files saved.`,
               "",
@@ -220,7 +228,7 @@ export const deploymentAgent: Agent = {
       type: "agent_complete",
       agent: "deployment",
       message: verified
-        ? `Deployed and verified — preview live at ${previewUrl}`
+        ? `Workspace preview saved; static checks passed — runtime build and user workflows still need testing: ${previewUrl}`
         : `Verification failed: ${failures.map((f) => f.label).join(", ")} — files saved for repair, preview at ${previewUrl}`,
     });
   },

@@ -113,6 +113,7 @@ export const marketingNav = [
   { title: "Pricing", href: "/pricing" },
   { title: "Engineering Academy", href: "/academy" },
   { title: "Practical Labs", href: "/learn/labs" },
+  { title: "Coding Lab", href: "/lab" },
   { title: "Docs", href: "/docs" },
 ] as const;
 
@@ -128,6 +129,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Projects", href: "/projects", icon: FolderKanban },
   { title: "AI Chat", href: "/chat", icon: Bot },
   { title: "Engineering Academy", href: "/course", icon: GraduationCap },
+  { title: "Coding Lab", href: "/lab", icon: FlaskConical },
   { title: "Guide", href: "/guide", icon: BookOpen },
   { title: "Learning Center", href: "/learn", icon: GraduationCap },
   { title: "Interactive Engineering Training", href: "/learn/engineering", icon: BookOpenCheck },

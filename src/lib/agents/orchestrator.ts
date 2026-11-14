@@ -133,8 +133,16 @@ const HEARTBEAT_INTERVAL_MS = 5_000;
 
 export async function runWorkflow(
   context: WorkflowContext,
-  emit: EmitFn
+  downstreamEmit: EmitFn
 ): Promise<void> {
+  context.generationBlockers = [];
+  const essential = new Set(["planner", "ui", "database", "coding"]);
+  const emit: EmitFn = (event) => {
+    if (event.type === "agent_degraded" && (!event.agent || essential.has(event.agent))) {
+      context.generationBlockers!.push({ agent: event.agent ?? "provider", message: event.message });
+    }
+    downstreamEmit(event);
+  };
   const startedAt = Date.now();
   context.deadlineAt = startedAt + pipelineBudgetMs();
   context.requestId =
@@ -204,6 +212,9 @@ export async function runWorkflow(
         // stays fatal. Every other step degrades: the user gets the app
         // built so far instead of losing the whole run to one bad step.
         if (name === "deployment") throw error;
+        if (essential.has(name)) {
+          context.generationBlockers!.push({ agent: name, message: "Essential generation step failed; inspect its error report." });
+        }
 
         const { classifyThrown } = await import("@/lib/health/error-response");
         const { logError } = await import("@/lib/health/logger");

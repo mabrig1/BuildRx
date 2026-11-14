@@ -26,6 +26,7 @@ const protectedPrefixes = [
   "/billing",
   "/admin",
   "/profile",
+  "/lab",
 ];
 
 /** Auth pages a signed-in user should be bounced away from. */
@@ -91,7 +92,7 @@ function hostRedirect(request: NextRequest): NextResponse | null {
   const { pathname } = request.nextUrl;
 
   const isAppPath =
-    ["/dashboard", "/projects", "/chat", "/settings", "/billing", "/admin", "/profile"].some(
+    protectedPrefixes.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
     ) ||
     [...authPages, "/reset-password"].includes(pathname);

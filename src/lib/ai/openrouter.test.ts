@@ -248,3 +248,33 @@ describe("streamChatCompletion", () => {
     });
   });
 });
+
+describe("bounded affordability recovery", () => {
+  beforeEach(() => { process.env.OPENROUTER_API_KEY = "sk-or-test"; });
+  const denied = (message: string) => ({ ok: false, status: 402, statusText: "Payment Required", json: async () => ({ error: { message } }) });
+  it("retries the screenshot's 4000/2276 rejection once below the affordable ceiling", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(denied("You requested up to 4000 tokens, but can only afford 2276."))
+      .mockImplementationOnce(async () => sseResponse(['{"choices":[{"delta":{"content":"recovered"}}]}']));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await streamChatCompletion([{ role: "user", content: "plan my app" }], { model: "vendor/model", maxTokens: 4000 });
+    expect(await drain(result.stream)).toBe("recovered");
+    await result.completion;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const first = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const second = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(second).toEqual({ ...first, max_tokens: 2048 });
+    expect(fetchMock.mock.calls[1][1].signal).toBe(fetchMock.mock.calls[0][1].signal);
+  });
+  it.each(["Balance exhausted", "can only afford 0", "can only afford 100", "can only afford 9000"])("does not loop on an unrecoverable limit: %s", async message => {
+    const fetchMock = vi.fn().mockResolvedValue(denied(message));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(streamChatCompletion([], { maxTokens: 4000 })).rejects.toBeInstanceOf(OpenRouterApiError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it("stops after a second rejection", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(denied("can only afford 2,276 tokens"));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(streamChatCompletion([], { maxTokens: 4000 })).rejects.toBeInstanceOf(OpenRouterApiError);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});

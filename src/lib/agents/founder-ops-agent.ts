@@ -97,8 +97,8 @@ const assessInfrastructure = tool({
   },
 });
 
-function founderModel() {
-  const openrouterKey = openrouterApiKey();
+function founderModel(preferNvidia = false) {
+  const openrouterKey = preferNvidia ? null : openrouterApiKey();
   if (openrouterKey) {
     return createOpenAICompatible({
       name: "openrouter",
@@ -328,9 +328,17 @@ export const founderOpsAgent: Agent = {
     const model = founderModel();
 
     if (model && canCallModel(context)) {
-      try {
+      // A provider may reject a token budget before generating anything.
+      // Try the separately configured NVIDIA tier before using starter files.
+      const candidates = openrouterApiKey() && nvidiaApiKey()
+        ? [model, founderModel(true)]
+        : [model];
+      let failure: unknown = null;
+      for (const candidate of candidates) {
+        if (!candidate || !canCallModel(context)) break;
+        try {
         const agent = new ToolLoopAgent({
-          model,
+          model: candidate,
           instructions: [
             "You are the FounderOps Agent for an application builder.",
             "Turn a product plan into the smallest production-worthy operating contract before code is generated.",
@@ -364,14 +372,17 @@ export const founderOpsAgent: Agent = {
         });
         spec = normalizedSpec(result.output, fallback);
         source = "agent";
-      } catch (error) {
-        emit(
-          degradedEvent(
-            "founder_ops",
-            "The FounderOps model pass failed; BuildRx used the deterministic production contract instead.",
-            diagnoseModelFailure(error)
-          )
-        );
+        break;
+        } catch (error) {
+          failure = error;
+        }
+      }
+      if (source === "deterministic" && failure) {
+        emit(degradedEvent(
+          "founder_ops",
+          "The FounderOps model pass failed; BuildRx used the deterministic production contract instead.",
+          diagnoseModelFailure(failure)
+        ));
       }
     } else {
       const note = outOfTimeNote(context);

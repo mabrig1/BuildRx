@@ -12,6 +12,7 @@ import {
 } from "@/lib/agents/llm";
 import type { Agent, AppPlan, GeneratedFile } from "@/lib/agents/types";
 import { generatePremiumPreview } from "@/lib/agents/premium-ux";
+import { generatePremiumNextPage } from "@/lib/agents/premium-next";
 
 /**
  * Two prompts, run as two concurrent calls, because one call could not
@@ -68,7 +69,10 @@ function mockFiles(plan: AppPlan): GeneratedFile[] {
       content: `@import "tailwindcss";
 
 :root {
-  --brand: #8b5cf6;
+  --brand: #214c3b;
+  --brand-surface: #e6efe3;
+  --surface: #fafaf7;
+  --ink: #18232c;
 }
 
 body {
@@ -78,43 +82,12 @@ body {
     },
   ];
 
-  // A page file for every page in the plan.
+  // A cohesive, interactive, domain-specific Next.js page for each
+  // planned route — never a Hello World or inert generic sample list.
   for (const page of plan.pages) {
-    const isHome = page.path === "/";
     files.push({
       path: pagePath(page.path),
-      content: isHome
-        ? // Self-contained on purpose: this file may be filling a gap in
-          // a partly-generated app, where any component it imported
-          // might not exist.
-          `const metrics = ["Active records", "Ready for review", "Updated this week"];
-
-export default function HomePage() {
-  return (
-    <main className="min-h-screen bg-zinc-50 px-6 py-10 text-zinc-950">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div><p className="text-sm font-medium text-violet-700">Product workspace</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">${plan.appName}</h1><p className="mt-2 max-w-2xl text-zinc-600">${plan.summary}</p></div>
-          <button className="rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white">Create record</button>
-        </div>
-        <section className="mt-8 grid gap-4 md:grid-cols-3">{metrics.map((metric, index) => <article key={metric} className="rounded-xl border border-zinc-200 bg-white p-5"><p className="text-sm text-zinc-500">{metric}</p><strong className="mt-2 block text-2xl">{[12, 4, 7][index]}</strong></article>)}</section>
-        <section className="mt-6 overflow-hidden rounded-xl border border-zinc-200 bg-white"><div className="flex items-center justify-between border-b border-zinc-200 p-5"><div><h2 className="font-semibold">Recent work</h2><p className="text-sm text-zinc-500">Search, review, and continue your records.</p></div><input aria-label="Search records" className="rounded-lg border border-zinc-300 px-3 py-2 text-sm" placeholder="Search…" /></div><div className="divide-y divide-zinc-100">{["Quarterly review", "Customer discovery", "Launch readiness"].map((name, index) => <div key={name} className="flex items-center justify-between gap-4 p-5"><div><p className="font-medium">{name}</p><p className="text-sm text-zinc-500">Updated {index + 1} day{index ? "s" : ""} ago</p></div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Ready</span></div>)}</div></section>
-      </div>
-    </main>
-  );
-}
-`
-        : `export default function ${page.name.replace(/\W/g, "")}Page() {
-  return (
-    <main className="min-h-screen bg-zinc-50 px-6 py-10">
-      <section className="mx-auto max-w-5xl rounded-xl border border-zinc-200 bg-white p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-3xl font-semibold tracking-tight">${page.name}</h1><p className="mt-2 max-w-2xl text-zinc-600">${page.description}</p></div><button className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white">New ${page.name.replace(/s$/, "")}</button></div>
-        <div className="mt-8 grid gap-3"><input aria-label="Search" className="rounded-lg border border-zinc-300 px-3 py-2" placeholder="Search and filter…" />{["Ready for review", "In progress", "Recently updated"].map((label, index) => <article key={label} className="flex items-center justify-between rounded-lg border border-zinc-200 p-4"><div><h2 className="font-medium">{label}</h2><p className="text-sm text-zinc-500">Record {index + 1} · owned by you</p></div><button className="text-sm font-semibold text-violet-700">Open →</button></article>)}</div>
-      </section>
-    </main>
-  );
-}
-`,
+      content: generatePremiumNextPage(plan, page),
     });
   }
 

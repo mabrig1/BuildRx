@@ -343,7 +343,9 @@ export const founderOpsAgent: Agent = {
           tools: { assessInfrastructure },
           output: Output.object({ schema: founderOpsSchema }),
           stopWhen: isStepCount(3),
-          maxOutputTokens: 4_000,
+          // Keep under common output-credit ceilings; a large fixed token request
+          // can be rejected before generation starts, even for a short contract.
+          maxOutputTokens: 1_800,
           temperature: 0.1,
           prepareStep: ({ stepNumber }) =>
             stepNumber === 0

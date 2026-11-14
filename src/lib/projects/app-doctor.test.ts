@@ -22,6 +22,13 @@ describe("Saved app health: automatic read-only diagnosis", () => {
     expect(report.nextAction).toBe("repair");
     expect(report.findings.some(f => f.id === "starter-placeholder")).toBe(true);
   });
+  it("finds a Hello World preview even when the homepage has real content", () => {
+    const files = good.map(f => f.path === "preview/index.html"
+      ? { ...f, content: "<!doctype html><html><body><h1>Hello World</h1></body></html>" } : f);
+    const report = auditSavedApp(files, "ready");
+    expect(report.findings.some(f => f.id === "preview-starter-placeholder")).toBe(true);
+    expect(report.nextAction).toBe("repair");
+  });
   it("reports actionable import errors without exposing source contents", () => {
     const report = auditSavedApp(good.map(f => f.path === "src/app/page.tsx" ?
       { ...f, content: 'import Missing from "@/components/not-here"; export default function Page(){return <Missing/>}' } : f), "ready");

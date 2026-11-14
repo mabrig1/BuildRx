@@ -121,6 +121,15 @@ export function auditSavedApp(files: GeneratedFile[], projectStatus: string): Pr
       location: "src/app/page.tsx", repairable: true,
     });
   }
+  const preview = files.find(f => f.path === "preview/index.html");
+  if (preview && sourceMatchesPlaceholder(preview.content)) {
+    findings.unshift({
+      id: "preview-starter-placeholder", severity: "blocker",
+      title: "Preview is still showing Hello World",
+      explanation: "The saved preview is still a generic starter. Re-run the existing repair pipeline and confirm the rendered app is updated before sharing the URL.",
+      location: "preview/index.html", repairable: true,
+    });
+  }
   const security = scanDevShieldSource(files);
   if (!security.complete || security.status === "blocked") {
     findings.unshift({

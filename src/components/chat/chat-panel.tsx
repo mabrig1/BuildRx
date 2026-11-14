@@ -15,7 +15,7 @@ import { PromptSuggestions } from "@/components/chat/prompt-suggestions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiErrorFrom } from "@/lib/health/client-error";
-import { AGENT_LABELS } from "@/lib/agents/types";
+import { CUSTOMER_BUILD_STAGES } from "@/lib/agents/public-progress";
 import { AgentEventStream } from "@/lib/agents/event-stream";
 import type { AgentEvent, AgentName } from "@/lib/agents/types";
 import { cn } from "@/lib/utils";
@@ -61,11 +61,20 @@ export function ChatPanel({
   // otherwise a single failed attempt (e.g. a provider timeout) would
   // strand the project in chat-only mode forever with no way to retry.
   const [hasBuilt, setHasBuilt] = useState(projectStatus === "ready");
+  // Keep the last app brief ready for one-click recovery, including after refresh.
+  const [retryPrompt, setRetryPrompt] = useState<string | null>(() =>
+    projectStatus === "error" || projectStatus === "generating"
+      ? [...initialMessages].reverse().find((m) => m.role === "user" && isBuildBrief(m.content))?.content ?? null
+      : null
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setMessages(initialMessages);
+    setRetryPrompt(projectStatus === "error" || projectStatus === "generating"
+      ? [...initialMessages].reverse().find((m) => m.role === "user" && isBuildBrief(m.content))?.content ?? null
+      : null);
     return () => useChatStore.getState().clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
@@ -141,6 +150,7 @@ export function ChatPanel({
       createdAt: new Date().toISOString(),
     });
     setStreaming(true);
+    setRetryPrompt(null);
 
     const lineForAgent: Partial<Record<AgentName, number>> = {};
     const lines: string[] = [];
@@ -183,7 +193,7 @@ export function ChatPanel({
             case "agent_start":
             case "agent_complete": {
               const icon = event.type === "agent_start" ? "⏳" : "✅";
-              const line = `${icon} **${AGENT_LABELS[event.agent]}** — ${event.message}`;
+              const line = `${icon} ${event.type === "agent_start" ? event.message : `${CUSTOMER_BUILD_STAGES[event.agent]} — complete.`}`;
               if (event.agent in lineForAgent) {
                 lines[lineForAgent[event.agent]!] = line;
               } else {
@@ -222,6 +232,7 @@ export function ChatPanel({
               // Only a verified build advances chat into modification mode.
               // A failed verification must remain retryable from the composer.
               setHasBuilt(event.verificationPassed === true);
+              setRetryPrompt(event.verificationPassed && degraded.length === 0 ? null : prompt);
               if (!event.verificationPassed) {
                 lines.push(`\n⚠️ **Files saved, but verification failed** — ${event.fileCount} files. Review the failed checks above and retry; the preview is not certified.`);
                 toast.error("Build saved but failed verification", {
@@ -248,21 +259,13 @@ export function ChatPanel({
               // "the model call failed" on its own just leaves the user
               // guessing whether they got an app or a template.
               degraded.push(event.message);
-              const who = event.agent ? `**${AGENT_LABELS[event.agent]}** — ` : "";
-              lines.push(
-                [
-                  `\n⚠️ ${who}${event.message}`,
-                  `> **Why:** ${event.cause}`,
-                  `> **Fix:** ${event.suggestedFix}`,
-                ].join("\n")
-              );
+              lines.push([`\n⚠️ ${event.message}`, `> **Next:** ${event.suggestedFix}`].join("\n"));
               render();
               break;
             }
             case "error": {
-              const line = event.agent
-                ? `❌ **${AGENT_LABELS[event.agent]}** — ${event.message}`
-                : `❌ ${event.message}`;
+              setRetryPrompt(prompt);
+              const line = `❌ ${event.message}`;
               lines.push(event.suggestedFix ? `${line} — ${event.suggestedFix}` : line);
               render();
               toast.error(event.message, { description: event.suggestedFix ?? event.cause });
@@ -290,6 +293,7 @@ export function ChatPanel({
           ? error.message
           : "Failed to start the build";
       lines.push(`❌ ${message}`);
+      setRetryPrompt(prompt);
       render();
       toast.error(message);
     } finally {
@@ -441,6 +445,18 @@ export function ChatPanel({
         </div>
       ) : null}
 
+      {/* Prominent, one-click recovery from failed or degraded builds. */}
+      {retryPrompt && !isStreaming ? (
+        <div role="alert" className="mx-3 mb-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-400/40 bg-amber-500/5 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Build needs attention</p>
+            <p className="text-xs text-muted-foreground">Your app description is saved here. Retry the build without starting over; review the preview before publishing.</p>
+          </div>
+          <Button type="button" size="sm" onClick={() => void runBuild(retryPrompt, { announceUser: false })}>
+            Retry build
+          </Button>
+        </div>
+      ) : null}
       {/* Composer */}
       <div className="border-t p-3">
         <form

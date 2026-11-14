@@ -266,7 +266,8 @@ export function ChatPanel({
               }
               render();
               window.dispatchEvent(new CustomEvent("vfs-changed", { detail: {} }));
-              onBuildDeployed?.(event.previewUrl);
+              // Keep failed builds on the chat view so Retry build remains visible.
+              if (event.verificationPassed && event.previewUrl) onBuildDeployed?.(event.previewUrl);
               break;
             }
             case "agent_degraded": {

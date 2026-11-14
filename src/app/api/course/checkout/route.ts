@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: enrollmentError } = await supabase
     .from("course_enrollments")
     .select("id")
     .eq("user_id", user.id)
@@ -49,6 +49,12 @@ export async function POST(request: Request) {
     .eq("status", "active")
     .maybeSingle();
 
+  // Never collect tuition when its entitlement cannot be persisted.
+  if (enrollmentError || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({
+      error: "Course access is temporarily unavailable; no payment has been taken.",
+    }, { status: 503 });
+  }
   if (existing) {
     return NextResponse.json({ url: "/course" });
   }
@@ -57,6 +63,11 @@ export async function POST(request: Request) {
   const configured =
     provider === "paystack" ? isPaystackConfigured() : isFlutterwaveConfigured();
 
+  if (provider === "flutterwave" && !process.env.FLUTTERWAVE_SECRET_HASH) {
+    return NextResponse.json({
+      error: "Flutterwave automatic enrollment webhook is not configured; no payment has been taken.",
+    }, { status: 503 });
+  }
   if (!configured) {
     return NextResponse.json(
       {

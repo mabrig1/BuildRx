@@ -30,12 +30,14 @@ export function ProjectDoctor({
   projectId,
   filesRefreshKey,
   onRepair,
+  onBuild,
   onNext,
   onPreview,
 }: {
   projectId: string;
   filesRefreshKey: number;
   onRepair: () => void;
+  onBuild: () => void;
   onNext: () => void;
   onPreview: () => void;
 }) {
@@ -117,7 +119,7 @@ export function ProjectDoctor({
                 <p className="text-sm font-medium">{report.nextTitle}</p>
                 <p className="text-muted-foreground text-sm">{report.nextExplanation}</p>
                 {report.nextAction === "build" ? (
-                  <Button size="sm" onClick={requestRepair}><Wrench className="size-4" /> Open Build app</Button>
+                  <Button size="sm" onClick={() => { setOpen(false); onBuild(); }}><Wrench className="size-4" /> Open Build app</Button>
                 ) : report.nextAction === "repair" ? (
                   <Button size="sm" onClick={requestRepair}><Wrench className="size-4" /> Review AI repair</Button>
                 ) : report.nextAction === "security" ? (

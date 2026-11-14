@@ -62,6 +62,7 @@ export function Workspace({
   const [previewUrl, setPreviewUrl] = useState(project.previewUrl);
   const [filesRefreshKey, setFilesRefreshKey] = useState(0);
   const [repairRequest, setRepairRequest] = useState(0);
+  const [buildRequest, setBuildRequest] = useState(0);
   const [journeyRequest, setJourneyRequest] = useState(0);
 
   useEffect(() => {
@@ -175,6 +176,7 @@ export function Workspace({
               projectId={project.id}
               defaultPrompt={lastUserMessage}
               repairRequest={repairRequest}
+              buildRequest={buildRequest}
               onDeployed={handleBuildDeployed}
             />
             {/* Chat/Preview toggle — below xl the preview is a tab */}
@@ -211,6 +213,7 @@ export function Workspace({
             projectId={project.id}
             filesRefreshKey={filesRefreshKey}
             onRepair={() => setRepairRequest(value => value + 1)}
+            onBuild={() => setBuildRequest(value => value + 1)}
             onNext={() => setJourneyRequest(value => value + 1)}
             onPreview={() => setMobileView("preview")}
           />

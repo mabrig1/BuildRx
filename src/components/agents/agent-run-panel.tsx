@@ -91,11 +91,13 @@ export function AgentRunPanel({
   defaultPrompt,
   onDeployed,
   repairRequest = 0,
+  buildRequest = 0,
 }: {
   projectId: string;
   defaultPrompt?: string;
   onDeployed?: (previewUrl: string | null) => void;
   repairRequest?: number;
+  buildRequest?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState(defaultPrompt ?? "");
@@ -104,6 +106,11 @@ export function AgentRunPanel({
     setPrompt("Repair");
     setOpen(true);
   }, [repairRequest]);
+  useEffect(() => {
+    if (!buildRequest) return;
+    setPrompt(defaultPrompt && isBuildBrief(defaultPrompt) ? defaultPrompt : "");
+    setOpen(true);
+  }, [buildRequest, defaultPrompt]);
   const [running, setRunning] = useState(false);
   const workspaceBusy = useChatStore((state) => state.isStreaming);
   const setWorkspaceBusy = useChatStore((state) => state.setStreaming);

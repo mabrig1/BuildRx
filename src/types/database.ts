@@ -87,6 +87,92 @@ export interface Database {
           },
         ];
       };
+      support_tickets: {
+        Row: {
+          id: string;
+          user_id: string;
+          category: string;
+          subject: string;
+          message: string;
+          reference: string | null;
+          status: "open" | "in_progress" | "waiting" | "resolved" | "closed";
+          priority: "normal" | "high" | "urgent";
+          last_updated_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          category: string;
+          subject: string;
+          message: string;
+          reference?: string | null;
+          status?: "open" | "in_progress" | "waiting" | "resolved" | "closed";
+          priority?: "normal" | "high" | "urgent";
+          last_updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          category?: string;
+          subject?: string;
+          message?: string;
+          reference?: string | null;
+          status?: "open" | "in_progress" | "waiting" | "resolved" | "closed";
+          priority?: "normal" | "high" | "urgent";
+          last_updated_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      client_notes: {
+        Row: {
+          id: string;
+          client_id: string;
+          author_id: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          author_id: string;
+          content: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          author_id?: string;
+          content?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "client_notes_client_id_fkey";
+            columns: ["client_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_notes_author_id_fkey";
+            columns: ["author_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       users: {
         Row: {
           id: string;

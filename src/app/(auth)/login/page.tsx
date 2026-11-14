@@ -44,7 +44,7 @@ export default async function LoginPage({
         ) : null}
         <LoginForm next={next} />
       </CardContent>
-      <CardFooter className="justify-center">
+      <CardFooter className="flex flex-col justify-center gap-3">
         <p className="text-muted-foreground text-sm">
           Don&apos;t have an account?{" "}
           <Link
@@ -54,6 +54,7 @@ export default async function LoginPage({
             Sign up
           </Link>
         </p>
+        <Link href="/support" className="text-muted-foreground text-xs underline-offset-4 hover:underline">Need help accessing your account? Contact support</Link>
       </CardFooter>
     </Card>
   );

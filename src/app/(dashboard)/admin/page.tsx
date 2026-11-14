@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   Activity,
@@ -8,6 +9,7 @@ import {
   FolderKanban,
   GraduationCap,
   KeyRound,
+  MessageCircle,
   Users,
 } from "lucide-react";
 
@@ -41,6 +43,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminPage() {
+  let verifiedAdminEmail: string | null = null;
   // Gate: admins only (demo mode is open for exploration).
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
@@ -54,6 +57,7 @@ export default async function AdminPage() {
       .eq("id", user.id)
       .single();
     if (me?.role !== "admin") redirect("/dashboard");
+    verifiedAdminEmail = user.email ?? null;
   }
 
   const data = await getAdminAnalytics();
@@ -82,6 +86,19 @@ export default async function AdminPage() {
           </Button>
         ))}
       </PageHeader>
+
+      <Card className="border-primary/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><KeyRound className="size-5" /> Administrator account & support</CardTitle>
+          <CardDescription>Visible only on your authenticated administrator dashboard. The sign-in address is read from your verified session, not an editable public contact field.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-3">
+          <p className="text-sm"><strong>Signed-in admin email:</strong> {verifiedAdminEmail ?? "Sign in to your configured admin account"}</p>
+          <Button variant="outline" size="sm" asChild><Link href="/forgot-password">Password recovery</Link></Button>
+          <Button variant="outline" size="sm" asChild><Link href="/support">Support Center</Link></Button>
+          <Button variant="outline" size="sm" asChild><a href="https://wa.me/2347065342818" target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" /> WhatsApp</a></Button>
+        </CardContent>
+      </Card>
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">

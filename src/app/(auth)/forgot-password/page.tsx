@@ -27,13 +27,14 @@ export default function ForgotPasswordPage() {
       <CardContent>
         <ForgotPasswordForm />
       </CardContent>
-      <CardFooter className="justify-center">
+      <CardFooter className="flex flex-col justify-center gap-3">
         <Link
           href="/login"
           className="text-muted-foreground text-sm underline-offset-4 hover:underline"
         >
           Back to sign in
         </Link>
+        <Link href="/support" className="text-muted-foreground text-xs underline-offset-4 hover:underline">Having trouble recovering your account? Contact support</Link>
       </CardFooter>
     </Card>
   );

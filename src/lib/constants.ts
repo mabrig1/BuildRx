@@ -115,6 +115,7 @@ export const marketingNav = [
   { title: "Practical Labs", href: "/learn/labs" },
   { title: "Coding Lab", href: "/lab" },
   { title: "Docs", href: "/docs" },
+  { title: "Support", href: "/support" },
 ] as const;
 
 export type NavItem = {
@@ -138,6 +139,7 @@ export const dashboardNav: NavItem[] = [
   { title: "Project Studio", href: "/learn/studio", icon: FolderOpen },
   { title: "Build Doctor", href: "/learn/doctor", icon: FileSearch },
   { title: "Capstone Portfolio", href: "/learn/capstone", icon: GraduationCap },
+  { title: "Support Center", href: "/support", icon: Mail },
   { title: "Contact", href: "/contact", icon: Mail },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },

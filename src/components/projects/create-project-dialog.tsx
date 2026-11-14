@@ -190,6 +190,10 @@ export function CreateProjectDialog({
                 form.setValue("prompt", result.prompt, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
                 setSelectedStarter(null);
               }} />
+              <details className="rounded-xl border p-4">
+                <summary className="cursor-pointer text-sm font-semibold">Or choose a ready-made app idea / GitHub starter</summary>
+                <p className="text-muted-foreground mt-2 text-xs">Optional: browse starter app ideas or import approved code from GitHub. The easy three-answer builder above works without selecting a template.</p>
+                <div className="mt-4 space-y-5">
               <section aria-label="Starter app ideas" className="space-y-2">
                 <div className="flex items-center gap-2">
                   <LayoutTemplate className="size-4 text-primary" aria-hidden="true" />
@@ -272,6 +276,8 @@ export function CreateProjectDialog({
                 {demoMode && <p className="text-xs text-amber-700">Sign in and connect permanent storage to clone code.</p>}
                 <p className="text-muted-foreground text-xs">Import does not install dependencies, activate databases, or deploy a live website. Binary images are excluded from the text-only editor.</p>
               </section>
+                </div>
+              </details>
               <FormField
                 control={form.control}
                 name="name"
@@ -388,7 +394,7 @@ export function CreateProjectDialog({
               </Button>
               <Button type="submit" disabled={isPending}>
                 {isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-                Create project & start building
+                {promptValue.trim() ? "Create project & start building" : "Create empty project"}
               </Button>
             </DialogFooter>
           </form>

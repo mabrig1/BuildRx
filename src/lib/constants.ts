@@ -12,6 +12,8 @@ import {
   HeartPulse,
   LayoutDashboard,
   Mail,
+  UsersRound,
+  LifeBuoy,
   Settings,
   ShieldCheck,
   type LucideIcon,
@@ -144,6 +146,8 @@ export const dashboardNav: NavItem[] = [
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Settings", href: "/settings", icon: Settings },
   { title: "Admin", href: "/admin", icon: ShieldCheck, adminOnly: true },
+  { title: "Manage Clients", href: "/admin/clients", icon: UsersRound, adminOnly: true },
+  { title: "Support Inbox", href: "/admin/clients/tickets", icon: LifeBuoy, adminOnly: true },
   { title: "Health", href: "/admin/health", icon: HeartPulse, adminOnly: true },
 ];
 

@@ -14,11 +14,11 @@ export default function SupportPage() {
     <MarketingShell>
       <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-10 md:py-16">
         <div className="max-w-3xl space-y-3">
-          <Badge variant="secondary" className="gap-2"><MessageCircle className="size-3.5" /> WhatsApp & email assistance</Badge>
+          <Badge variant="secondary" className="gap-2"><MessageCircle className="size-3.5" /> Support tickets, WhatsApp & email</Badge>
           <h1 className="text-3xl font-semibold tracking-tight md:text-5xl">BuildRx Support Center</h1>
           <p className="text-muted-foreground text-lg">
             Need help building an app, joining the Software Engineering Academy, troubleshooting a release,
-            or recovering access? Find the next safe step and contact MABRIG Technologies directly.
+            or recovering access? Sign in to create a tracked ticket, or contact MABRIG Technologies on WhatsApp.
           </p>
         </div>
         <SupportRequest />

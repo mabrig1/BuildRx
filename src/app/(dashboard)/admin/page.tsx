@@ -11,6 +11,8 @@ import {
   KeyRound,
   MessageCircle,
   Users,
+  UsersRound,
+  LifeBuoy,
 } from "lucide-react";
 
 import { AdminCharts } from "@/components/admin/admin-charts";
@@ -98,6 +100,17 @@ export default async function AdminPage() {
           <Button variant="outline" size="sm" asChild><Link href="/forgot-password">Password recovery</Link></Button>
           <Button variant="outline" size="sm" asChild><Link href="/support">Support Center</Link></Button>
           <Button variant="outline" size="sm" asChild><a href="https://wa.me/2347065342818" target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" /> WhatsApp</a></Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Client management</CardTitle>
+          <CardDescription>Manage actual BuildRx clients, projects, payments, Academy access and support tickets.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button asChild><Link href="/admin/clients"><UsersRound className="size-4" /> Open Client Management Center</Link></Button>
+          <Button variant="outline" asChild><Link href="/admin/clients/tickets"><LifeBuoy className="size-4" /> Support inbox</Link></Button>
         </CardContent>
       </Card>
 

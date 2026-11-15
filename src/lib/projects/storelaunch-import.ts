@@ -31,6 +31,9 @@ export async function extractStoreLaunchArchive(zipBytes:Uint8Array,edition:Stor
  try{archive=await JSZip.loadAsync(zipBytes,{checkCRC32:true});}
  catch{throw new StoreLaunchImportError("Invalid or damaged ZIP archive.");}
  const entries=Object.values(archive.files);
+ // JSZip normalizes traversal paths. Reject originals that differ instead of silently importing a sanitized archive.
+ if(entries.some(e=>((e as typeof e & {unsafeOriginalName?:string}).unsafeOriginalName??e.name)!==e.name))
+   throw new StoreLaunchImportError("Unsafe traversal filename in ZIP.");
  if(entries.length>200)throw new StoreLaunchImportError("Too many archive entries.");
  const roots=entries.filter(e=>!e.dir&&e.name.endsWith("/src/worker.js"))
   .map(e=>e.name.slice(0,-"src/worker.js".length))

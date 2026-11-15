@@ -12,7 +12,7 @@ const MAX_ZIP_BYTES = 1_000_000;
 const MAX_FILE_BYTES = 180_000;
 const MAX_TOTAL_BYTES = 1_700_000;
 const MAX_FILES = 50;
-const ALLOWED = /^(?:src\/[\w.-]+\.js|public\/(?:index|admin)\.html|public\/assets\/[\w.-]+\.(?:js|css)|scripts\/[\w.-]+\.mjs|tests\/[\w.-]+\.mjs|(?:schema\.sql|package\.json|wrangler\.jsonc|README\.md|OWNER_GUIDE\.md|SECURITY\.md|SETUP\.md|API_GUIDE\.md|LICENSE|EDITION\.md|\.gitignore|\.dev\.vars\.example|\.env\.example))$/;
+const ALLOWED = /^(?:src\/[\w.-]+\.js|public\/(?:index|admin)\.html|public\/assets\/[\w.-]+\.(?:js|css)|scripts\/[\w.-]+\.mjs|tests\/[\w.-]+\.mjs|(?:schema\.sql|package\.json|wrangler\.jsonc|README\.md|OWNER_GUIDE\.md|SECURITY\.md|SETUP\.md|API_GUIDE\.md|PHARMACY_COMPLIANCE\.md|LICENSE|EDITION\.md|\.gitignore|\.dev\.vars\.example|\.env\.example))$/;
 const REQUIRED = [
  "src/worker.js", "src/core.js", "src/api-bridge.js", "public/index.html",
  "public/admin.html", "schema.sql", "wrangler.jsonc", "package.json", "API_GUIDE.md",

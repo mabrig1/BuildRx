@@ -1,7 +1,7 @@
 # StoreLaunch business templates and API-Anything-inspired connector
 
-Four **complete independent Cloudflare Worker** StoreLaunch apps can be imported as editable projects through BuildRx's New Project dialog.
-Select Restaurant, Supermarket, Gadgets, or Services and upload the corresponding ZIP, or the complete four-edition kit.
+Five **complete independent Cloudflare Worker** StoreLaunch apps can be imported as editable projects through BuildRx's New Project dialog.
+Select Restaurant, Supermarket, Gadgets, Services, or Pharmacy + AI Agents and upload the corresponding ZIP, or the complete four-edition kit.
 
 ## What importing does
 
@@ -35,3 +35,7 @@ browser automation product. Permissioned external website discovery and automate
 4. In the imported Worker project, run its Node tests, then a Wrangler dry-run against a test D1 binding.
 5. Test Paystack with sandbox/test keys and keep ENABLE_LIVE_PAYMENTS off until the owner approves.
 6. Only merge/deploy after review; deleting the draft rolls back the BuildRx import without changing third-party accounts.
+
+## Fifth edition: PharmaSmart (regulated shop preview)
+
+`05_Pharmacy` is a standalone Cloudflare Worker shop with demo wellness items, D1, a pharmacist contact queue, expiry/stock/restriction safety agents and optional OpenRouter aggregate-only summaries. It is imported through the **Pharmacy + AI Agents** card using the separately supplied ZIP. Its owner-only agent endpoints are inside the imported Worker, not the BuildRx server. Customer messages are not sent to external AI. Prescription-only and controlled medicines cannot be automatically checked out. E-pharmacy registration, independent PCN verification, pharmacist oversight, privacy and provider setup are operator responsibilities. No production activation or deployment is part of importing. See `PHARMACY_COMPLIANCE.md` in the pharmacy ZIP.

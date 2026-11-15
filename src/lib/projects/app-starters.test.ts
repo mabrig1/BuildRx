@@ -6,7 +6,7 @@ import { createProjectSchema } from "@/lib/validations/project";
 describe("credential-free project starters", () => {
   it("offers 25 diverse, searchable app briefs", () => {
     expect(APP_STARTERS).toHaveLength(25);
-    expect(new Set(APP_STARTERS.map((s) => s.id)).size).toBe(24);
+    expect(new Set(APP_STARTERS.map((s) => s.id)).size).toBe(25);
     expect(new Set(APP_STARTERS.map((s) => s.category)).size).toBeGreaterThan(7);
     expect(APP_STARTERS.some(s => s.id === "inventory")).toBe(true);
     expect(APP_STARTERS.some(s => s.id === "printing")).toBe(true);

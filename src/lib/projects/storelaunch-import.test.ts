@@ -20,8 +20,8 @@ async function zipFiles(extra:Record<string,string>={},prefix="01_Restaurant/") 
  return z.generateAsync({type:"uint8array"});
 }
 describe("StoreLaunch independent source import",()=>{
- it("offers four Nigerian business editions",()=>{
-  expect(STORELAUNCH_EDITIONS.map(x=>x.id)).toEqual(["restaurant","supermarket","gadgets","services"]);
+ it("offers five Nigerian business editions",()=>{
+  expect(STORELAUNCH_EDITIONS.map(x=>x.id)).toEqual(["restaurant","supermarket","gadgets","services","pharmacy"]);
  });
  it("extracts the selected edition into editable paths",async()=>{
   const files=await extractStoreLaunchArchive(await zipFiles(),"restaurant");

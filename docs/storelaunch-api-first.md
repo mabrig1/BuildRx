@@ -1,7 +1,7 @@
 # StoreLaunch business templates and API-Anything-inspired connector
 
-Five **complete independent Cloudflare Worker** StoreLaunch apps can be imported as editable projects through BuildRx's New Project dialog.
-Select Restaurant, Supermarket, Gadgets, Services, or Pharmacy + AI Agents and upload the corresponding ZIP, or the complete four-edition kit.
+Six **complete independent Cloudflare Worker** StoreLaunch apps can be imported as editable projects through BuildRx's New Project dialog.
+Select Restaurant, Supermarket, Gadgets, Services, Pharmacy + AI Agents, or EstateSmart Real Estate and upload the corresponding ZIP, or the complete four-edition kit.
 
 ## What importing does
 
@@ -39,3 +39,7 @@ browser automation product. Permissioned external website discovery and automate
 ## Fifth edition: PharmaSmart (regulated shop preview)
 
 `05_Pharmacy` is a standalone Cloudflare Worker shop with demo wellness items, D1, a pharmacist contact queue, expiry/stock/restriction safety agents and optional OpenRouter aggregate-only summaries. It is imported through the **Pharmacy + AI Agents** card using the separately supplied ZIP. Its owner-only agent endpoints are inside the imported Worker, not the BuildRx server. Customer messages are not sent to external AI. Prescription-only and controlled medicines cannot be automatically checked out. E-pharmacy registration, independent PCN verification, pharmacist oversight, privacy and provider setup are operator responsibilities. No production activation or deployment is part of importing. See `PHARMACY_COMPLIANCE.md` in the pharmacy ZIP.
+
+## Sixth edition: EstateSmart property marketplace
+
+`06_RealEstate` is a standalone Cloudflare Worker + D1 marketplace for house, apartment, shop, office and warehouse rental, land purchase/lease and property sales. Unlike ordinary goods, real properties are never instant checkout items: deposits, land transfers, rent collection and escrow are unavailable. Customers search and request human-confirmed viewings; owners manage genuine authorised listings, evidence checklists, private lead contact information and agent tasks. AI Operations uses deterministic duplicate/missing-evidence/staleness/follow-up scans; optional `openrouter/free` receives aggregate-only counts. The independent title verification process is described in `REAL_ESTATE_DUE_DILIGENCE.md`. The ZIP includes browser UI, dashboard, OpenAPI, 25 Node integration/unit tests and setup guidance. Source remains draft when imported into BuildRx.

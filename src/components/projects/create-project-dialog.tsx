@@ -29,7 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { APP_STARTERS } from "@/lib/projects/app-starters";
-import { STORELAUNCH_EDITIONS } from "@/lib/projects/storelaunch-import";
+import { STORELAUNCH_EDITIONS } from "@/lib/projects/storelaunch-editions";
 import { GITHUB_APP_TEMPLATES } from "@/lib/projects/github-app-templates";
 import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
 import {

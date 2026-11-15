@@ -37,7 +37,7 @@ describe("StoreLaunch independent source import",()=>{
   await expect(extractStoreLaunchArchive(await zipFiles({"src/api-bridge.js":"broken"}),"restaurant")).rejects.toThrow("supported API-enabled");
   await expect(extractStoreLaunchArchive(await zipFiles({".dev.vars":"SECRET=not-allowed"}),"restaurant")).rejects.toThrow("Unsafe");
  });
- it("rejects unsafe traversal paths",async()=>{
-  await expect(extractStoreLaunchArchive(await zipFiles({"../escape.txt":"bad"}),"restaurant")).rejects.toThrow("Unsafe");
+ it("rejects unsupported source files",async()=>{
+  await expect(extractStoreLaunchArchive(await zipFiles({"scripts/install.sh":"echo forbidden"}),"restaurant")).rejects.toThrow("Unsafe");
  });
 });

@@ -4,5 +4,6 @@ export const STORELAUNCH_EDITIONS = [
   { id: "supermarket", name: "Supermarket & Groceries", folder: "02_Supermarket", icon: "🛒" },
   { id: "gadgets", name: "Gadgets & Electronics", folder: "03_Gadgets", icon: "📱" },
   { id: "services", name: "Services & Bookings", folder: "04_Services", icon: "✨" },
+  { id: "pharmacy", name: "Pharmacy + AI Agents", folder: "05_Pharmacy", icon: "✚" },
 ] as const;
 export type StoreLaunchEdition = typeof STORELAUNCH_EDITIONS[number]["id"];

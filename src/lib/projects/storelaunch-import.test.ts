@@ -20,8 +20,20 @@ async function zipFiles(extra:Record<string,string>={},prefix="01_Restaurant/") 
  return z.generateAsync({type:"uint8array"});
 }
 describe("StoreLaunch independent source import",()=>{
- it("offers five Nigerian business editions",()=>{
-  expect(STORELAUNCH_EDITIONS.map(x=>x.id)).toEqual(["restaurant","supermarket","gadgets","services","pharmacy"]);
+ it("offers six Nigerian business editions",()=>{
+  expect(STORELAUNCH_EDITIONS.map(x=>x.id)).toEqual(["restaurant","supermarket","gadgets","services","pharmacy","realestate"]);
+ });
+ it("accepts EstateSmart's original Worker source contract without external deployment",async()=>{
+  const estateFixture={
+    ...fixture,
+    "wrangler.jsonc": '{"vars": {"DEFAULT_TEMPLATE": "realestate"}}',
+    "REAL_ESTATE_DUE_DILIGENCE.md": "Government title verification remains outside the application.",
+    "public/assets/estate.css": "body { color: green; }",
+    "public/assets/admin.css": ".owner { display: grid; }",
+  };
+  const files=await extractStoreLaunchArchive(await zipFiles(estateFixture,"06_RealEstate/"),"realestate");
+  expect(files.some(f=>f.path==="REAL_ESTATE_DUE_DILIGENCE.md")).toBe(true);
+  expect(files.some(f=>f.path==="src/api-bridge.js")).toBe(true);
  });
  it("extracts the selected edition into editable paths",async()=>{
   const files=await extractStoreLaunchArchive(await zipFiles(),"restaurant");

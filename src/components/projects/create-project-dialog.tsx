@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, FileText, LayoutTemplate, Loader2, Plus, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { APP_STARTERS } from "@/lib/projects/app-starters";
+import { STORELAUNCH_EDITIONS } from "@/lib/projects/storelaunch-editions";
 import { GITHUB_APP_TEMPLATES } from "@/lib/projects/github-app-templates";
 import { MAX_AI_PROMPT_CHARACTERS } from "@/lib/validations/limits";
 import {
@@ -51,6 +52,9 @@ export function CreateProjectDialog({
   const [starterSearch, setStarterSearch] = useState("");
   const [starterCategory, setStarterCategory] = useState("All");
   const [importingGithub, setImportingGithub] = useState<string | null>(null);
+  const [importingStoreLaunch, setImportingStoreLaunch] = useState<string | null>(null);
+  const storeLaunchInput = useRef<HTMLInputElement>(null);
+  const storeLaunchEdition = useRef<string>("restaurant");
   const initialValues: CreateProjectInput = {
     name: defaultValues?.name ?? "",
     description: defaultValues?.description ?? "",
@@ -113,6 +117,43 @@ export function CreateProjectDialog({
       toast.error(error instanceof Error ? error.message : "GitHub import failed");
     } finally {
       setImportingGithub(null);
+    }
+  }
+
+  function selectStoreLaunch(edition: string) {
+    if (demoMode) {
+      toast.error("Sign in with permanent storage to import a complete StoreLaunch app.");
+      return;
+    }
+    storeLaunchEdition.current = edition;
+    storeLaunchInput.current?.click();
+  }
+
+  async function importStoreLaunch(file: File) {
+    const edition = storeLaunchEdition.current;
+    if (file.size > 1_000_000) {
+      toast.error("StoreLaunch ZIP packages must be under 1 MB.");
+      return;
+    }
+    setImportingStoreLaunch(edition);
+    try {
+      const formData = new FormData();
+      formData.set("edition", edition);
+      formData.set("archive", file);
+      const response = await fetch("/api/projects/import-storelaunch", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.projectId) {
+        throw new Error(data.error ?? "Import failed");
+      }
+      toast.success("Complete StoreLaunch files imported. Review and configure before deploying.");
+      window.location.assign("/projects/" + encodeURIComponent(data.projectId));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not import StoreLaunch.");
+    } finally {
+      setImportingStoreLaunch(null);
     }
   }
 
@@ -232,6 +273,52 @@ export function CreateProjectDialog({
                 )}
                 <p className="text-muted-foreground text-xs">
                   These {APP_STARTERS.length} original briefs prefill an editable specification; the AI still needs to build and verify your app.
+                </p>
+              </section>
+              <section aria-label="StoreLaunch complete business storefronts" className="space-y-3 rounded-xl border p-3">
+                <div className="flex items-center gap-2">
+                  <LayoutTemplate className="size-4 text-primary" aria-hidden="true" />
+                  <h3 className="text-sm font-semibold">StoreLaunch: complete Nigerian business apps</h3>
+                </div>
+                <p className="text-muted-foreground text-xs leading-5">
+                  Import editable, independent Cloudflare Worker source, not just an AI prompt. The four
+                  editions include a shop, owner dashboard, Paystack verification, optional
+                  Resend/OpenRouter, and a permissioned OpenAPI business interface.
+                </p>
+                <input
+                  ref={storeLaunchInput}
+                  type="file"
+                  accept=".zip,application/zip"
+                  className="sr-only"
+                  aria-label="Choose StoreLaunch ZIP archive"
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = "";
+                    if (file) void importStoreLaunch(file);
+                  }}
+                />
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {STORELAUNCH_EDITIONS.map((edition) => (
+                    <div key={edition.id} className="flex flex-col gap-2 rounded-lg border p-3">
+                      <span aria-hidden="true" className="text-xl">{edition.icon}</span>
+                      <strong className="text-sm">{edition.name}</strong>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={demoMode || Boolean(importingStoreLaunch) || isPending}
+                        onClick={() => selectStoreLaunch(edition.id)}
+                      >
+                        {importingStoreLaunch === edition.id ? <Loader2 className="size-4 animate-spin" /> : <LayoutTemplate className="size-4" />}
+                        {importingStoreLaunch === edition.id ? "Importing…" : "Upload source"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  Obtain the StoreLaunch ZIP from the builder, then upload it here.
+                  BuildRx stores the complete editable source but does not run the Worker
+                  inside its Next.js preview or deploy or activate payments automatically.
                 </p>
               </section>
               <section aria-label="Clone vetted GitHub template source" className="space-y-3 rounded-xl border p-3">

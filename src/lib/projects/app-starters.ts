@@ -373,5 +373,20 @@ BILLING: show a demo plan clearly until server-side checkout, verified webhook a
 ACCEPTANCE: strict workspace isolation with RLS; roles constrain every read/write; search, edits and soft deletes persist; trial quotas are enforced server-side.
 ${expectations}`,
   },
+  {
+    id: "website-to-api",
+    category: "Integrations",
+    name: "Website-to-API Connector",
+    audience: "Authorized website operators",
+    description: "Discover, document and safely call permitted website operations.",
+    prompt: `Build an API connector that turns permitted website workflows into reusable HTTPS operations.
+USERS: owner, authorized operator, read-only API consumer with separated permissions.
+PAGES: connected sites, operation registry, learn wizard, API keys, API test console, diagnostics.
+TABLES: connected_sites, operation_specs, operation_versions, api_keys, test_runs, audit_events.
+WORKFLOW: owner registers their own website -> explicitly approves a read-only operation -> captures sample requests without storing any raw cookies or passwords -> validates variable parameters with independent examples -> creates a versioned operation with OpenAPI 3.1 -> returns structured results -> detects drift and proposes a reviewed repair.
+INTEGRATIONS: allowlisted HTTPS destinations and SSRF protections, rate limits, secure owner-managed credentials and tenant isolation; no automated writes or external side effects without explicit approval; never bypass authentication, anti-bot challenges or provider terms.
+ACCEPTANCE: public and private operations are separated; invalid inputs fail safely; no browser sessions or secrets are leaked; only verified calls report success; schema changes return class/reason/next guidance and never fabricate data.
+${expectations}`,
+  },
   ...EXTRA_STARTERS,
 ] as const;

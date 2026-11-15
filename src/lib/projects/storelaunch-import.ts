@@ -4,13 +4,8 @@ import { isSafeFilePath } from "@/lib/agents/llm";
 /** Stores complete editable StoreLaunch Worker source in an owner project.
  * This importer does not execute or deploy anything in the uploaded ZIP.
  */
-export const STORELAUNCH_EDITIONS = [
-  { id: "restaurant", name: "Restaurant & Food", folder: "01_Restaurant", icon: "🍲" },
-  { id: "supermarket", name: "Supermarket & Groceries", folder: "02_Supermarket", icon: "🛒" },
-  { id: "gadgets", name: "Gadgets & Electronics", folder: "03_Gadgets", icon: "📱" },
-  { id: "services", name: "Services & Bookings", folder: "04_Services", icon: "✨" },
-] as const;
-export type StoreLaunchEdition = typeof STORELAUNCH_EDITIONS[number]["id"];
+import { STORELAUNCH_EDITIONS, type StoreLaunchEdition } from "./storelaunch-editions";
+export { STORELAUNCH_EDITIONS } from "./storelaunch-editions";
 export type StoreLaunchFile = { path: string; content: string };
 
 const MAX_ZIP_BYTES = 1_000_000;

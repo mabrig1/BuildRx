@@ -12,7 +12,7 @@ const MAX_ZIP_BYTES = 1_000_000;
 const MAX_FILE_BYTES = 180_000;
 const MAX_TOTAL_BYTES = 1_700_000;
 const MAX_FILES = 50;
-const ALLOWED = /^(?:src\/[\w.-]+\.js|public\/(?:index|admin)\.html|public\/assets\/[\w.-]+\.(?:js|css)|scripts\/[\w.-]+\.mjs|tests\/[\w.-]+\.mjs|(?:schema\.sql|package\.json|wrangler\.jsonc|README\.md|OWNER_GUIDE\.md|SECURITY\.md|SETUP\.md|API_GUIDE\.md|LICENSE|EDITION\.md|\.gitignore|\.dev\.vars\.example))$/;
+const ALLOWED = /^(?:src\/[\w.-]+\.js|public\/(?:index|admin)\.html|public\/assets\/[\w.-]+\.(?:js|css)|scripts\/[\w.-]+\.mjs|tests\/[\w.-]+\.mjs|(?:schema\.sql|package\.json|wrangler\.jsonc|README\.md|OWNER_GUIDE\.md|SECURITY\.md|SETUP\.md|API_GUIDE\.md|LICENSE|EDITION\.md|\.gitignore|\.dev\.vars\.example|\.env\.example))$/;
 const REQUIRED = [
  "src/worker.js", "src/core.js", "src/api-bridge.js", "public/index.html",
  "public/admin.html", "schema.sql", "wrangler.jsonc", "package.json", "API_GUIDE.md",
@@ -46,7 +46,10 @@ export async function extractStoreLaunchArchive(zipBytes:Uint8Array,edition:Stor
  let total=0;
  const decoder=new TextDecoder("utf-8",{fatal:true});
  for(const item of chosen){
-  const path=item.name.slice(prefix.length);
+  // Keep example settings but rename to the scanner-approved .env.example.
+  // Real .dev.vars files and secret values are never imported.
+  const rawPath=item.name.slice(prefix.length);
+  const path=rawPath===".dev.vars.example"?".env.example":rawPath;
   if(!isSafeFilePath(path)||!ALLOWED.test(path)||seen.has(path))
     throw new StoreLaunchImportError("Unsafe or unexpected StoreLaunch path.");
   seen.add(path);

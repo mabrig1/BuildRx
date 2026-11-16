@@ -16,10 +16,11 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("curated GitHub app templates", () => {
   it("pins reviewed public MIT sources rather than accepting arbitrary URLs", () => {
-    expect(GITHUB_APP_TEMPLATES).toHaveLength(2);
+    expect(GITHUB_APP_TEMPLATES).toHaveLength(5);
     for (const template of GITHUB_APP_TEMPLATES) {
       expect(template.commit).toMatch(/^[a-f0-9]{40}$/);
-      expect(template.repository).toBe("vercel/next.js");
+      expect(["vercel/next.js", "shadcn-ui/chatbot-template", "thorchh/agent-starter", "AdityaKodez/gridly"]).toContain(template.repository);
+      expect(template.repository === "vercel/next.js" ? template.subdirectory.startsWith("examples/") : template.subdirectory === "").toBe(true);
       expect(template.license).toBe("MIT");
       expect(template.sourceUrl).toContain(template.commit);
     }
@@ -32,10 +33,15 @@ describe("curated GitHub app templates", () => {
     }
     expect(isAllowedGithubTemplateFile("src/app/page.tsx")).toBe(true);
     expect(isAllowedGithubTemplateFile(".env.example")).toBe(true);
+    expect(isAllowedGithubTemplateFile("prisma/schema.prisma")).toBe(true);
+    expect(isAllowedGithubTemplateFile("prisma/migrations/v1/migration.sql")).toBe(true);
+    expect(isAllowedGithubTemplateFile(".idea/config.json")).toBe(false);
   });
 
   it("enforces a real Next.js App Router project and rejects install-time hooks", () => {
     expect(() => validateImportedGithubFiles(files)).not.toThrow();
+    const grouped = files.map((f) => f.path === "src/app/page.tsx" ? { ...f, path: "app/(marketing)/page.tsx" } : f);
+    expect(() => validateImportedGithubFiles(grouped)).not.toThrow();
     expect(() => validateImportedGithubFiles(files.slice(0, 2))).toThrow(/complete supported/);
     const dangerous = { path: "package.json", content: JSON.stringify({
       dependencies: { next: "15.5.20" },
@@ -94,5 +100,48 @@ describe("curated GitHub app templates", () => {
     expect(imported.files.some(f => f.path === "cover.png")).toBe(false);
     expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("/git/blobs/99999"));
     expect(imported.skippedBinary).toBe(2);
+  });
+
+  it("imports an AI SaaS root snapshot and retains necessary Prisma source", async () => {
+    const source = findGithubAppTemplate("github-ai-saas-gridly")!;
+    const groupedFiles = [
+      files[0],
+      { ...files[1], path: "app/(marketing)/page.tsx" },
+      { ...files[2], path: "app/layout.tsx" },
+      { path: "prisma/schema.prisma", content: "datasource db { provider = \"postgresql\" }" },
+    ];
+    const descriptors = groupedFiles.map((file, index) => ({
+      ...file, sha: String(index + 1).repeat(40), size: Buffer.byteLength(file.content),
+    }));
+    const license = "MIT License\\nCopyright (c) 2026 Aditya\\nPermission is hereby granted, free of charge";
+    const responses: Record<string, unknown> = {
+      [`/repos/${source.repository}/git/commits/${source.commit}`]: {
+        tree: { sha: "f".repeat(40) },
+      },
+      [`/repos/${source.repository}/git/trees/${"f".repeat(40)}?recursive=1`]: {
+        tree: descriptors.map(f => ({ path: f.path, type: "blob", sha: f.sha, size: f.size })),
+        truncated: false,
+      },
+      [`/repos/${source.repository}/contents/LICENSE?ref=${source.commit}`]: {
+        encoding: "base64", content: Buffer.from(license).toString("base64"),
+      },
+    };
+    for (const f of descriptors) {
+      responses[`/repos/${source.repository}/git/blobs/${f.sha}`] = {
+        encoding: "base64", content: Buffer.from(f.content).toString("base64"),
+      };
+    }
+    const mockFetch = vi.fn(async (url: string) => {
+      const request = new URL(url);
+      return (request.pathname + request.search) in responses
+        ? Response.json(responses[request.pathname + request.search])
+        : Response.json({ message: "Not found" }, { status: 404 });
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const imported = await importGithubTemplateSource(source);
+    expect(imported.files.map(f => f.path)).toContain("prisma/schema.prisma");
+    expect(imported.files.find(f => f.path === "LICENSE")?.content).toContain("MIT License");
+    expect(imported.sourceUrl).toContain(source.commit);
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("/git/trees/undefined"));
   });
 });

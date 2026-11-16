@@ -35,7 +35,7 @@ export function generatePremiumNextPage(
     'const items = ' + js(subjects) + ';',
     'const navigation = ' + js(pages) + ';',
     'const brand = ' + js(brand) + ';',
-    'const pageTitle = ' + js(suffix) + ';',
+    'const pageTitle = ' + js(suffix) + ' as string;',
     'const headline = ' + js(headline) + ';',
     'const description = ' + js(page.path==="/" ? plan.summary : page.description) + ';',
     'const itemType = ' + js(itemType) + ';',

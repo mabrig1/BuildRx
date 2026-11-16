@@ -11,6 +11,8 @@ import {
   Lock,
   Rocket,
   Workflow,
+  Stethoscope,
+  Sparkles,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +34,16 @@ const featureGroups = [
     heading: "Build with AI",
     features: [
       {
+        icon: Sparkles,
+        title: "Three-answer app brief",
+        description: "New builders explain the idea, people and main task in everyday words. BuildRx prepares an editable product brief at no additional AI request.",
+      },
+      {
+        icon: Stethoscope,
+        title: "App Doctor diagnostics",
+        description: "Inspect the saved source for missing imports, unfinished pages, package issues and security indicators. Review findings before approving repairs.",
+      },
+      {
         icon: Bot,
         title: "AI chat workspace",
         description:
@@ -41,7 +53,7 @@ const featureGroups = [
         icon: Workflow,
         title: "Multi-agent pipeline",
         description:
-          "Six specialized agents — Planner, UI, Database, Coding, Debug, Deployment — collaborate to turn one prompt into a complete project.",
+          "Eleven specialized agents plan, design, generate, diagnose and repair code with bounded checks. Runtime and real-host testing remain separate.",
       },
       {
         icon: Eye,
@@ -81,13 +93,13 @@ const featureGroups = [
         icon: Rocket,
         title: "One-click deployment",
         description:
-          "Deploy to Vercel, Netlify, or Railway with live build logs, deployment history, status tracking, and custom domains.",
+          "Prepare source and deploy using supported Vercel or Cloudflare paths, with owner consent, provider checks and live-workflow verification.",
       },
       {
         icon: Lock,
         title: "Auth & data built in",
         description:
-          "Supabase authentication (email + Google) and Postgres with row-level security come pre-wired in every workspace.",
+          "Generate authentication and persistence workflows, then connect and test real provider settings and database permissions.",
       },
       {
         icon: LayoutDashboard,
@@ -148,12 +160,12 @@ export default function FeaturesPage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button size="lg" asChild>
               <Link href="/signup">
-                Start building free
+                Create an app
                 <ArrowRight />
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/pricing">View pricing</Link>
+              <Link href="/demo">See how BuildRx works</Link>
             </Button>
           </div>
         </div>

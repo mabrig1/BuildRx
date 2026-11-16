@@ -9,6 +9,7 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { DeployPanel } from "@/components/deploy/deploy-panel";
 import { GitHubPanel } from "@/components/github/github-panel";
 import { LaunchJourney } from "@/components/projects/launch-journey";
+import { ProjectDoctor } from "@/components/projects/project-doctor";
 import {
   WorkspaceSidebar,
   type SidebarProject,
@@ -60,6 +61,9 @@ export function Workspace({
   const [guidedDeployHost, setGuidedDeployHost] = useState<"cloudflare" | "vercel" | null>(null);
   const [previewUrl, setPreviewUrl] = useState(project.previewUrl);
   const [filesRefreshKey, setFilesRefreshKey] = useState(0);
+  const [repairRequest, setRepairRequest] = useState(0);
+  const [buildRequest, setBuildRequest] = useState(0);
+  const [journeyRequest, setJourneyRequest] = useState(0);
 
   useEffect(() => {
     if (!isDemoProject) return;
@@ -171,6 +175,8 @@ export function Workspace({
             <AgentRunPanel
               projectId={project.id}
               defaultPrompt={lastUserMessage}
+              repairRequest={repairRequest}
+              buildRequest={buildRequest}
               onDeployed={handleBuildDeployed}
             />
             {/* Chat/Preview toggle — below xl the preview is a tab */}
@@ -202,7 +208,18 @@ export function Workspace({
             <p className="truncate text-xs font-semibold">{project.status === "ready" ? "Your app is ready for the next steps" : project.status === "error" ? "Build needs attention — retry from the chat below" : "Describe your idea and build it with AI"}</p>
             <p className="hidden text-xs text-muted-foreground sm:block">{project.status === "ready" ? "Preview your app, then connect GitHub and prepare for publishing." : "BuildRx guides you through creating, checking, and improving your app."}</p>
           </div>
-          {project.status === "ready" && <LaunchJourney
+          {!isDemoProject && (
+            <ProjectDoctor
+              projectId={project.id}
+              filesRefreshKey={filesRefreshKey}
+              onRepair={() => setRepairRequest(n => n + 1)}
+              onBuild={() => setBuildRequest(n => n + 1)}
+              onNext={() => setJourneyRequest(n => n + 1)}
+              onPreview={() => setMobileView("preview")}
+            />
+          )}
+          <LaunchJourney
+            openRequest={journeyRequest}
             projectId={project.id}
             projectStatus={project.status}
             onOpenGithub={() => setGithubOpen(true)}
@@ -210,7 +227,7 @@ export function Workspace({
               setGuidedDeployHost(host);
               setDeployOpen(true);
             }}
-          />}
+          />
         </div>
 
         {isDemoProject && (

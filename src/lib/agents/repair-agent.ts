@@ -20,7 +20,7 @@ import type {
   WorkflowContext,
 } from "@/lib/agents/types";
 
-const SYSTEM = `You are the Repair Agent in an automated app-building pipeline. You receive files with verified defects and output CORRECTED full files. Fix only what the findings describe. For product-depth findings such as shallow-preview, placeholder-page, ephemeral-data-layer, or missing-rls-policies, replace the shallow implementation with a complete production workflow that follows the supplied product plan. Never repair persistence with module arrays or enable RLS without owner-scoped policies. Output nothing for files you cannot improve.
+const SYSTEM = `You are the Repair Agent in an automated app-building pipeline. You receive files with verified defects and output CORRECTED full files. Fix only what the findings describe. For product-depth findings such as generic-business-home, unpopulated-commerce-home, generic-commerce-preview, shallow-preview, placeholder-page, ephemeral-data-layer, or missing-rls-policies, replace the shallow implementation with a complete production workflow that follows the supplied product plan. Never repair persistence with module arrays or enable RLS without owner-scoped policies. Output nothing for files you cannot improve.
 
 ${FILE_FORMAT_INSTRUCTIONS}`;
 

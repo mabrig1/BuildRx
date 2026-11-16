@@ -17,7 +17,7 @@ database tables, validation, accessibility, privacy controls and
 testable acceptance criteria. The brief is **not** a deployed app.
 Choose one, adjust the specification, create the project and run the AI build.
 
-## 2. Clone reviewed GitHub code — five pinned sources
+## 2. Clone reviewed GitHub code — six pinned sources
 
 BuildRx also offers **Clone to my project** for these reviewed MIT-licensed
 Next.js repositories. Sources are pinned to their audited commit, not a moving branch:
@@ -29,6 +29,7 @@ Next.js repositories. Sources are pinned to their audited commit, not a moving b
 | AI Chatbot & Tools | [shadcn-ui chatbot-template](https://github.com/shadcn-ui/chatbot-template/tree/4106041b1bc9bab44e81ffd2764aa2b6f100e2b0) | MIT | Next.js 16, AI SDK 7, an authorized server-only model/Gateway key |
 | Tool-Using AI Agent | [thorchh/agent-starter](https://github.com/thorchh/agent-starter/tree/b6edd7621637781fd84c01dac022e9a0c33d3672) | MIT | Next.js 16, selected LLM/tools providers, scoped credentials and action safety |
 | AI Business SaaS | [AdityaKodez/gridly](https://github.com/AdityaKodez/gridly/tree/4f52ab299242ad380c559e077bd660c516e2fa65) | MIT | Next.js 16, Prisma + Postgres, Better Auth, optional AI and Polar billing |
+| Delivery & Dispatch Operations | [D-393Patel last-mile-delivery-tracker](https://github.com/D-393Patel/last-mile-delivery-tracker/tree/d54ee30687e920d4f5eaf60039590c1dcc82c73d) | MIT | Next.js 16, PostgreSQL and Prisma migrations, auth secret, optional Brevo/Resend/Twilio |
 
 These templates contain **real third-party source code**, copied from the
 immutable Git commits above rather than generated from a text prompt.
@@ -47,6 +48,10 @@ and creates
    secure provider settings. Test your app before enabling a live deployment.
 
 No personal GitHub token is needed to read these public examples.
+
+### Delivery setup notes
+
+The delivery template is real, MIT-licensed source code with customer bookings, configured rate cards, delivery-agent workflows, public tracking, role-based dashboards and notifications. It is a starting point, not a connected live courier business. Set up and validate PostgreSQL, run migrations manually, replace seeded demo credentials, set a server-side AUTH_SECRET, and configure business-specific service zones/prices. Email/SMS providers are optional and sending must never be claimed when unconfigured. AI-assisted operations are **not included** in this source: implement later through BuildRx, requiring human approval before assignments, customer messaging or pricing changes.
 
 ## Safeguards and limits
 

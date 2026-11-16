@@ -13,10 +13,10 @@ import { createClient } from "@/lib/supabase/server";
 export const maxDuration = 120;
 
 const schema = z.object({
-  templateId: z.enum(["github-blog-starter", "github-supabase-starter"]),
+  templateId: z.enum(["github-blog-starter", "github-supabase-starter", "github-shadcn-ai-chatbot", "github-ai-agent-starter", "github-ai-saas-gridly"]),
 });
 
-/** POST — copy an allowlisted MIT example's editable files into a new draft.
+/** POST — copy allowlisted, pinned MIT sources into a new draft.
  * This is a code import, NOT a verified app build or external deployment.
  * Users do not need a GitHub token; the pinned source is public.
  */

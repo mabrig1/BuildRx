@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 export const maxDuration = 120;
 
 const schema = z.object({
-  templateId: z.enum(["github-blog-starter", "github-supabase-starter", "github-shadcn-ai-chatbot", "github-ai-agent-starter", "github-ai-saas-gridly"]),
+  templateId: z.enum(["github-blog-starter", "github-supabase-starter", "github-shadcn-ai-chatbot", "github-ai-agent-starter", "github-ai-saas-gridly", "github-last-mile-delivery"]),
 });
 
 /** POST — copy allowlisted, pinned MIT sources into a new draft.

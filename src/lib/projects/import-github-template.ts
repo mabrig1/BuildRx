@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 
 import { fileWithEmbeddedCredential, isDeploymentSourcePath } from "@/lib/deploy/source";
 import { isSafeFilePath } from "@/lib/agents/llm";
@@ -95,16 +96,38 @@ async function gitTree(repository: string, sha: string, recursive = false) {
   );
 }
 
-async function readGitBlob(repository: string, sha: string): Promise<Buffer> {
-  const result = await githubGet<{ encoding: string; content: string; size?: number }>(
-    `/repos/${repository}/git/blobs/${sha}`
+/**
+ * Download a source file by immutable commit from GitHub's raw content host,
+ * then verify its Git blob SHA against the tree we fetched through the API.
+ * Avoids 100+ authenticated API blob requests for larger templates.
+ */
+async function readGitBlob(template: GithubAppTemplate, path: string, sha: string): Promise<Buffer> {
+  const relativePath = [template.subdirectory, path].filter(Boolean).join("/");
+  const safePath = relativePath.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(
+    `https://raw.githubusercontent.com/${template.repository}/${template.commit}/${safePath}`,
+    { cache: "force-cache", signal: AbortSignal.timeout(15_000), redirect: "error" }
   );
-  if (result.encoding !== "base64") {
-    throw new GithubTemplateImportError("GitHub returned an unsupported template file.");
+  if (response.status === 403 || response.status === 429) {
+    throw new GithubTemplateImportError("GitHub temporarily limited template downloads. Please try again later.", 503);
   }
-  const bytes = Buffer.from(result.content.replace(/\s/g, ""), "base64");
+  if (!response.ok) {
+    throw new GithubTemplateImportError("The pinned template source file could not be retrieved.", 502);
+  }
+  const declaredBytes = Number(response.headers.get("content-length"));
+  if (declaredBytes > MAX_SINGLE_FILE_BYTES) {
+    throw new GithubTemplateImportError("A template file exceeded the import safety limit.");
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.byteLength > MAX_SINGLE_FILE_BYTES) {
     throw new GithubTemplateImportError("A template file exceeded the import safety limit.");
+  }
+  const hash = createHash("sha1")
+    .update(`blob ${bytes.byteLength}\\0`)
+    .update(bytes)
+    .digest("hex");
+  if (hash !== sha) {
+    throw new GithubTemplateImportError("The downloaded file did not match its pinned GitHub snapshot.");
   }
   if (bytes.includes(0) || Buffer.from(bytes.toString("utf8"), "utf8").compare(bytes) !== 0) {
     throw new GithubTemplateImportError("A template file was binary or not UTF-8.");
@@ -202,7 +225,7 @@ export async function importGithubTemplateSource(
     const batch = allowed.slice(i, i + 4);
     const imported = await Promise.all(batch.map(async (entry) => ({
       path: entry.path,
-      content: (await readGitBlob(template.repository, entry.sha)).toString("utf8"),
+      content: (await readGitBlob(template, entry.path, entry.sha)).toString("utf8"),
     })));
     files.push(...imported);
   }

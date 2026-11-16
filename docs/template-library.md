@@ -17,19 +17,24 @@ database tables, validation, accessibility, privacy controls and
 testable acceptance criteria. The brief is **not** a deployed app.
 Choose one, adjust the specification, create the project and run the AI build.
 
-## 2. Clone reviewed GitHub code — two pinned sources
+## 2. Clone reviewed GitHub code — six pinned sources
 
-BuildRx also offers **Clone to my project** for these official open-source
-Next.js examples:
+BuildRx also offers **Clone to my project** for these reviewed MIT-licensed
+Next.js repositories. Sources are pinned to their audited commit, not a moving branch:
 
 | BuildRx name | Upstream | License | Additional setup |
 | --- | --- | --- | --- |
 | Editorial Blog | [Vercel blog-starter](https://github.com/vercel/next.js/tree/cc65c414d283e22e587828c94770d9b12522bbb4/examples/blog-starter) | MIT | Content, images, dependency review |
 | Login & Database Starter | [Vercel with-supabase](https://github.com/vercel/next.js/tree/cc65c414d283e22e587828c94770d9b12522bbb4/examples/with-supabase) | MIT | User-owned Supabase credentials and callback configuration |
+| AI Chatbot & Tools | [shadcn-ui chatbot-template](https://github.com/shadcn-ui/chatbot-template/tree/4106041b1bc9bab44e81ffd2764aa2b6f100e2b0) | MIT | Next.js 16, AI SDK 7, an authorized server-only model/Gateway key |
+| Tool-Using AI Agent | [thorchh/agent-starter](https://github.com/thorchh/agent-starter/tree/b6edd7621637781fd84c01dac022e9a0c33d3672) | MIT | Next.js 16, selected LLM/tools providers, scoped credentials and action safety |
+| AI Business SaaS | [AdityaKodez/gridly](https://github.com/AdityaKodez/gridly/tree/4f52ab299242ad380c559e077bd660c516e2fa65) | MIT | Next.js 16, Prisma + Postgres, Better Auth, optional AI and Polar billing |
+| Delivery & Dispatch Operations | [D-393Patel last-mile-delivery-tracker](https://github.com/D-393Patel/last-mile-delivery-tracker/tree/d54ee30687e920d4f5eaf60039590c1dcc82c73d) | MIT | Next.js 16, PostgreSQL and Prisma migrations, auth secret, optional Brevo/Resend/Twilio |
 
-These examples contain **real third-party source code**, copied from the
-immutable Git commit above rather than generated from a text prompt.
-BuildRx preserves the upstream MIT LICENSE and creates
+These templates contain **real third-party source code**, copied from the
+immutable Git commits above rather than generated from a text prompt.
+BuildRx preserves the upstream MIT license notice (root LICENSE or parent license.md)
+and creates
 `BUILD-RX-SOURCE.md` with the source URL and commit for attribution.
 
 ### Clone workflow
@@ -44,26 +49,42 @@ BuildRx preserves the upstream MIT LICENSE and creates
 
 No personal GitHub token is needed to read these public examples.
 
+### Delivery setup notes
+
+The delivery template is real, MIT-licensed source code with customer bookings, configured rate cards, delivery-agent workflows, public tracking, role-based dashboards and notifications. It is a starting point, not a connected live courier business. Set up and validate PostgreSQL, run migrations manually, replace seeded demo credentials, set a server-side AUTH_SECRET, and configure business-specific service zones/prices. Email/SMS providers are optional and sending must never be claimed when unconfigured. AI-assisted operations are **not included** in this source: implement later through BuildRx, requiring human approval before assignments, customer messaging or pricing changes.
+
 ## Safeguards and limits
 
 - The server accepts only catalog template IDs. Repository, commit, path and
   license are pinned server-side; arbitrary user-supplied URLs cannot be
-  cloned through this endpoint.
+  cloned through this endpoint. Root repositories and Next.js monorepo examples
+  have separately restricted source paths.
 - Third-party source is never executed on the BuildRx web server.
-- `.env`, local credentials, GitHub Actions workflows, package-manager
+- `.env`, local credentials, editor settings, GitHub Actions workflows, package-manager
   lockfiles, generated build directories and binaries are not imported.
+  The SaaS template preserves `.prisma` schemas and `.sql` migrations as text;
+  database migrations are NOT executed by BuildRx.
   A scan blocks recognized embedded credentials and installation hooks.
 - Each text file is limited to 90 kB, the import to 140 editable source
   files and 1.5 MB, and projects respect existing account creation limits.
 - Binary photographs, fonts and videos are not stored by the current
   text-only virtual file editor; missing assets must be added separately.
-- Public GitHub API requests are subject to rate limits. An optional
-  **server-only** `GITHUB_TEMPLATE_READ_TOKEN` raises authorized read
-  capacity and must never be exposed to the browser.
+- GitHub API requests retrieve pinned commit/tree metadata and license notices.
+  Source files are downloaded from pinned raw URLs and checked against each
+  Git blob SHA-1, reducing API quota use. An optional **server-only**
+  `GITHUB_TEMPLATE_READ_TOKEN` raises authorized API metadata capacity;
+  never expose it to the browser.
 - A clone does not establish working authentication, payments, databases,
   email or a deployed Worker. Imported projects begin as **Draft**, not Ready.
-- Upstream dependencies may be newer than the BuildRx Cloudflare OpenNext
-  deployment adapter; check runtime compatibility and security advisories.
+- Agentic templates need their own provider/model keys, rate limits, tool
+  permissions and human approval for high-impact or external actions.
+  The importer does not make AI API usage free or configure these integrations.
+- Advanced templates (such as Gridly) may require separate database services
+  and builds that are not compatible with BuildRx's current Cloudflare OpenNext
+  export adapter; validate locally before choosing a hosting target.
+- Upstream dependencies may be newer than BuildRx's editor/runtime; review
+  security advisories, accessibility, third-party component licenses and
+  deployment compatibility before publication.
 
 ## Adding future GitHub code templates
 

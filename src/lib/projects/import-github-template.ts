@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 
 import { fileWithEmbeddedCredential, isDeploymentSourcePath } from "@/lib/deploy/source";
 import { isSafeFilePath } from "@/lib/agents/llm";
@@ -14,7 +15,7 @@ const GITHUB_API = "https://api.github.com";
 const MAX_SOURCE_FILES = 140;
 const MAX_SINGLE_FILE_BYTES = 90_000;
 const MAX_TOTAL_BYTES = 1_500_000;
-const ALLOWED_EXTENSIONS = /\.(?:ts|tsx|js|jsx|mjs|cjs|json|css|scss|html|md|mdx|txt|svg|yml|yaml|toml|graphql|gql)$/i;
+const ALLOWED_EXTENSIONS = /\.(?:ts|tsx|js|jsx|mjs|cjs|json|css|scss|html|md|mdx|txt|svg|yml|yaml|toml|graphql|gql|prisma|sql)$/i;
 
 type TreeItem = {
   path: string;
@@ -39,9 +40,16 @@ export class GithubTemplateImportError extends Error {
 }
 
 function validateSourceRef(template: GithubAppTemplate) {
-  if (template.repository !== "vercel/next.js" ||
+  const approvedPath =
+    template.repository === "vercel/next.js"
+      ? /^examples\/[a-z0-9-]+$/.test(template.subdirectory)
+      : (template.repository === "shadcn-ui/chatbot-template" ||
+          template.repository === "thorchh/agent-starter" ||
+          template.repository === "AdityaKodez/gridly" ||
+          template.repository === "D-393Patel/last-mile-delivery-tracker") &&
+        template.subdirectory === "";
+  if (!approvedPath ||
       !/^[a-f0-9]{40}$/.test(template.commit) ||
-      !/^examples\/[a-z0-9-]+$/.test(template.subdirectory) ||
       template.license !== "MIT") {
     throw new GithubTemplateImportError("This template is not approved for import.");
   }
@@ -49,7 +57,7 @@ function validateSourceRef(template: GithubAppTemplate) {
 
 export function isAllowedGithubTemplateFile(path: string): boolean {
   if (!isSafeFilePath(path) || !isDeploymentSourcePath(path)) return false;
-  if (/(^|\/)(?:\.github|\.git|\.vercel|\.next|node_modules|\.turbo|coverage)(?:\/|$)/i.test(path)) return false;
+  if (/(^|\/)(?:\.github|\.git|\.idea|\.vscode|\.vercel|\.next|node_modules|\.turbo|coverage)(?:\/|$)/i.test(path)) return false;
   if (/(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|npm-shrinkwrap\.json)$/i.test(path)) return false;
   if (/\.(?:lock|map|min\.js)$/i.test(path)) return false;
   // Binary assets cannot be represented in the editable text file system.
@@ -89,16 +97,39 @@ async function gitTree(repository: string, sha: string, recursive = false) {
   );
 }
 
-async function readGitBlob(repository: string, sha: string): Promise<Buffer> {
-  const result = await githubGet<{ encoding: string; content: string; size?: number }>(
-    `/repos/${repository}/git/blobs/${sha}`
+/**
+ * Download a source file by immutable commit from GitHub's raw content host,
+ * then verify its Git blob SHA against the tree we fetched through the API.
+ * Avoids 100+ authenticated API blob requests for larger templates.
+ */
+async function readGitBlob(template: GithubAppTemplate, path: string, sha: string): Promise<Buffer> {
+  const relativePath = [template.subdirectory, path].filter(Boolean).join("/");
+  const safePath = relativePath.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(
+    `https://raw.githubusercontent.com/${template.repository}/${template.commit}/${safePath}`,
+    { cache: "force-cache", signal: AbortSignal.timeout(15_000), redirect: "error" }
   );
-  if (result.encoding !== "base64") {
-    throw new GithubTemplateImportError("GitHub returned an unsupported template file.");
+  if (response.status === 403 || response.status === 429) {
+    throw new GithubTemplateImportError("GitHub temporarily limited template downloads. Please try again later.", 503);
   }
-  const bytes = Buffer.from(result.content.replace(/\s/g, ""), "base64");
+  if (!response.ok) {
+    throw new GithubTemplateImportError("The pinned template source file could not be retrieved.", 502);
+  }
+  const declaredBytes = Number(response.headers.get("content-length"));
+  if (declaredBytes > MAX_SINGLE_FILE_BYTES) {
+    throw new GithubTemplateImportError("A template file exceeded the import safety limit.");
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.byteLength > MAX_SINGLE_FILE_BYTES) {
     throw new GithubTemplateImportError("A template file exceeded the import safety limit.");
+  }
+  const hash = createHash("sha1")
+    .update(`blob ${bytes.byteLength}`)
+    .update(Buffer.from([0]))
+    .update(bytes)
+    .digest("hex");
+  if (hash !== sha) {
+    throw new GithubTemplateImportError("The downloaded file did not match its pinned GitHub snapshot.");
   }
   if (bytes.includes(0) || Buffer.from(bytes.toString("utf8"), "utf8").compare(bytes) !== 0) {
     throw new GithubTemplateImportError("A template file was binary or not UTF-8.");
@@ -108,9 +139,14 @@ async function readGitBlob(repository: string, sha: string): Promise<Buffer> {
 
 export function validateImportedGithubFiles(files: GithubImportedFile[]) {
   const names = new Set(files.map((file) => file.path));
-  if (!names.has("package.json") ||
-      !(names.has("src/app/page.tsx") || names.has("app/page.tsx")) ||
-      !(names.has("src/app/layout.tsx") || names.has("app/layout.tsx"))) {
+  // Route groups like app/(marketing)/page.tsx are valid Next.js homepages.
+  const hasHome = files.some((file) =>
+    /^(?:src\/)?app\/(?:\([^/]+\)\/)*page\.(?:tsx|jsx|js)$/.test(file.path)
+  );
+  const hasLayout = files.some((file) =>
+    /^(?:src\/)?app\/layout\.(?:tsx|jsx|js)$/.test(file.path)
+  );
+  if (!names.has("package.json") || !hasHome || !hasLayout) {
     throw new GithubTemplateImportError(
       "The selected GitHub example is not a complete supported Next.js App Router project."
     );
@@ -155,7 +191,7 @@ export async function importGithubTemplateSource(
   if (!/^[a-f0-9]{40}$/.test(subtreeSha ?? "")) {
     throw new GithubTemplateImportError("The pinned GitHub snapshot is not valid.");
   }
-  for (const part of template.subdirectory.split("/")) {
+  for (const part of template.subdirectory ? template.subdirectory.split("/") : []) {
     const parent = await gitTree(template.repository, subtreeSha);
     if (parent.truncated) throw new GithubTemplateImportError("Template directory listing was truncated.");
     const child = parent.tree.find((item) => item.path === part && item.type === "tree");
@@ -191,21 +227,22 @@ export async function importGithubTemplateSource(
     const batch = allowed.slice(i, i + 4);
     const imported = await Promise.all(batch.map(async (entry) => ({
       path: entry.path,
-      content: (await readGitBlob(template.repository, entry.sha)).toString("utf8"),
+      content: (await readGitBlob(template, entry.path, entry.sha)).toString("utf8"),
     })));
     files.push(...imported);
   }
 
-  // The parent repository's MIT license governs these examples. Keep the
-  // complete original notice with every cloned project for attribution.
+  // Preserve the complete MIT license from the exact pinned repository.
+  // Some examples use the parent repository license, others a root LICENSE.
+  const licensePath = template.repository === "vercel/next.js" ? "license.md" : "LICENSE";
   const licenseContents = await githubGet<{ encoding: string; content: string }>(
-    `/repos/${template.repository}/contents/license.md?ref=${template.commit}`
+    `/repos/${template.repository}/contents/${licensePath}?ref=${template.commit}`
   );
   if (licenseContents.encoding !== "base64") {
     throw new GithubTemplateImportError("Could not verify the GitHub source license.");
   }
   const license = Buffer.from(licenseContents.content.replace(/\s/g, ""), "base64").toString("utf8");
-  if (!/The MIT License \(MIT\)/.test(license)) {
+  if (!/\bMIT License\b|The MIT License \(MIT\)/.test(license)) {
     throw new GithubTemplateImportError("The upstream MIT license could not be verified.");
   }
   if (!files.some((file) => /^license(?:\.[a-z]+)?$/i.test(file.path))) {

@@ -64,9 +64,11 @@ No personal GitHub token is needed to read these public examples.
   files and 1.5 MB, and projects respect existing account creation limits.
 - Binary photographs, fonts and videos are not stored by the current
   text-only virtual file editor; missing assets must be added separately.
-- Public GitHub API requests are subject to rate limits. An optional
-  **server-only** `GITHUB_TEMPLATE_READ_TOKEN` raises authorized read
-  capacity and must never be exposed to the browser.
+- GitHub API requests retrieve pinned commit/tree metadata and license notices.
+  Source files are downloaded from pinned raw URLs and checked against each
+  Git blob SHA-1, reducing API quota use. An optional **server-only**
+  `GITHUB_TEMPLATE_READ_TOKEN` raises authorized API metadata capacity;
+  never expose it to the browser.
 - A clone does not establish working authentication, payments, databases,
   email or a deployed Worker. Imported projects begin as **Draft**, not Ready.
 - Agentic templates need their own provider/model keys, rate limits, tool

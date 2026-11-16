@@ -45,7 +45,8 @@ function validateSourceRef(template: GithubAppTemplate) {
       ? /^examples\/[a-z0-9-]+$/.test(template.subdirectory)
       : (template.repository === "shadcn-ui/chatbot-template" ||
           template.repository === "thorchh/agent-starter" ||
-          template.repository === "AdityaKodez/gridly") &&
+          template.repository === "AdityaKodez/gridly" ||
+          template.repository === "D-393Patel/last-mile-delivery-tracker") &&
         template.subdirectory === "";
   if (!approvedPath ||
       !/^[a-f0-9]{40}$/.test(template.commit) ||

@@ -123,7 +123,8 @@ async function readGitBlob(template: GithubAppTemplate, path: string, sha: strin
     throw new GithubTemplateImportError("A template file exceeded the import safety limit.");
   }
   const hash = createHash("sha1")
-    .update(`blob ${bytes.byteLength}\\0`)
+    .update(`blob ${bytes.byteLength}`)
+    .update(Buffer.from([0]))
     .update(bytes)
     .digest("hex");
   if (hash !== sha) {

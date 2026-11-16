@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { runWorkflow } from "@/lib/agents/orchestrator";
+import { toCustomerBuildEvent } from "@/lib/agents/public-progress";
+import { logWarn } from "@/lib/health/logger";
 import { acquireBuildLease } from "@/lib/agents/build-lease";
 import { normalizePlan } from "@/lib/agents/planner";
 import type { AgentEvent, AppPlan, WorkflowContext } from "@/lib/agents/types";
@@ -132,9 +134,18 @@ export async function POST(request: Request) {
       // is watching — the build finishes and persists either way.
       let clientGone = false;
       const emit = (event: AgentEvent) => {
+        // Full provider diagnostics belong in administrator logs, never in customer streams.
+        if (event.type === "agent_degraded") {
+          void logWarn("agents-run", event.message, {
+            code: event.code,
+            subsystem: "ai",
+            context: { projectId, agent: event.agent, cause: event.cause },
+          });
+        }
         if (clientGone) return;
         try {
-          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+          const customerEvent = toCustomerBuildEvent(event);
+          controller.enqueue(encoder.encode(`${JSON.stringify(customerEvent)}\n`));
         } catch {
           clientGone = true;
         }

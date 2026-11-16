@@ -205,18 +205,19 @@ export function Workspace({
 
         <div className="flex shrink-0 items-center justify-between gap-3 border-b bg-muted/20 px-3 py-2">
           <div className="min-w-0">
-            <p className="truncate text-xs font-semibold">Finished building? Here is exactly what to do next.</p>
-            <p className="hidden text-xs text-muted-foreground sm:block">GitHub, database setup, Cloudflare or Vercel, and live app checks.</p>
+            <p className="truncate text-xs font-semibold">{project.status === "ready" ? "Your app is ready for the next steps" : project.status === "error" ? "Build needs attention — retry from the chat below" : "Describe your idea and build it with AI"}</p>
+            <p className="hidden text-xs text-muted-foreground sm:block">{project.status === "ready" ? "Preview your app, then connect GitHub and prepare for publishing." : "BuildRx guides you through creating, checking, and improving your app."}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-          <ProjectDoctor
-            projectId={project.id}
-            filesRefreshKey={filesRefreshKey}
-            onRepair={() => setRepairRequest(value => value + 1)}
-            onBuild={() => setBuildRequest(value => value + 1)}
-            onNext={() => setJourneyRequest(value => value + 1)}
-            onPreview={() => setMobileView("preview")}
-          />
+          {!isDemoProject && (
+            <ProjectDoctor
+              projectId={project.id}
+              filesRefreshKey={filesRefreshKey}
+              onRepair={() => setRepairRequest(n => n + 1)}
+              onBuild={() => setBuildRequest(n => n + 1)}
+              onNext={() => setJourneyRequest(n => n + 1)}
+              onPreview={() => setMobileView("preview")}
+            />
+          )}
           <LaunchJourney
             openRequest={journeyRequest}
             projectId={project.id}
@@ -227,7 +228,6 @@ export function Workspace({
               setDeployOpen(true);
             }}
           />
-          </div>
         </div>
 
         {isDemoProject && (

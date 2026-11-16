@@ -38,7 +38,8 @@ import { isBuildBrief, isRepairCommand } from "@/lib/validations/build-prompt";
 import { useChatStore } from "@/stores/chat-store";
 import type { AgentEvent, AgentName } from "@/lib/agents/types";
 import { AgentEventStream } from "@/lib/agents/event-stream";
-import { AGENT_LABELS, AGENT_ORDER } from "@/lib/agents/types";
+import { AGENT_ORDER } from "@/lib/agents/types";
+import { CUSTOMER_BUILD_STAGES } from "@/lib/agents/public-progress";
 
 const AGENT_ICONS: Record<AgentName, typeof Brain> = {
   planner: Brain,
@@ -118,6 +119,7 @@ export function AgentRunPanel({
   const [steps, setSteps] = useState(initialSteps);
   const [files, setFiles] = useState<string[]>([]);
   const [finished, setFinished] = useState(false);
+  const [needsRetry, setNeedsRetry] = useState(false);
   // A ref, not state: workflow_complete can arrive in the same batch as
   // the degraded events it needs to count, and a queued setState would
   // still read as empty when the summary toast fires.
@@ -167,22 +169,27 @@ export function AgentRunPanel({
         setFinished(true);
         const degradedCount = degradedRef.current.length;
         if (!event.verificationPassed) {
+          setNeedsRetry(true);
           setSteps((prev) => ({ ...prev, deployment: { status: "error", message: "Verification failed. Review the checklist and retry." } }));
           toast.error("Build saved, but verification failed", {
             description: "A preview may be available, but the project is not certified.",
           });
         } else if (degradedCount > 0) {
+          setNeedsRetry(true);
           toast.warning(`Build passed checks with ${degradedCount} degraded step(s)`, {
             description: "Review scaffolded content before deploying externally.",
           });
         } else {
+          setNeedsRetry(false);
           toast.success(`Build checks passed — ${event.fileCount} files saved`);
         }
         window.dispatchEvent(new CustomEvent("vfs-changed", { detail: {} }));
-        onDeployed?.(event.previewUrl);
+        // Do not navigate away from retry controls on a failed build.
+        if (event.verificationPassed && event.previewUrl) onDeployed?.(event.previewUrl);
         break;
       }
       case "agent_degraded":
+        setNeedsRetry(true);
         degradedRef.current = [...degradedRef.current, event.message];
         // Not an error — the step produced files — but not a success
         // either. It gets its own status so the row can't read as "done".
@@ -198,6 +205,7 @@ export function AgentRunPanel({
         toast.warning(event.message, { description: event.suggestedFix });
         break;
       case "error":
+        setNeedsRetry(true);
         if (event.agent) {
           setSteps((prev) => ({
             ...prev,
@@ -230,6 +238,7 @@ export function AgentRunPanel({
     setWorkspaceBusy(true);
     setRunning(true);
     setFinished(false);
+    setNeedsRetry(false);
     setSteps(initialSteps());
     setFiles([]);
     degradedRef.current = [];
@@ -258,6 +267,7 @@ export function AgentRunPanel({
       for (const event of events.push(decoder.decode())) applyEvent(event);
       for (const event of events.end()) applyEvent(event);
     } catch (error) {
+      setNeedsRetry(true);
       toast.error(
         error instanceof Error ? error.message : "Failed to start the build"
       );
@@ -303,6 +313,11 @@ export function AgentRunPanel({
                   <>
                     <Loader2 className="animate-spin" />
                     Agents working…
+                  </>
+                ) : needsRetry ? (
+                  <>
+                    <Hammer />
+                    Retry build
                   </>
                 ) : finished ? (
                   <>
@@ -369,7 +384,7 @@ export function AgentRunPanel({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium">
-                            {AGENT_LABELS[name]}
+                            {CUSTOMER_BUILD_STAGES[name]}
                           </p>
                           <span className="text-muted-foreground text-xs">
                             {index + 1}/{activeAgents.length}

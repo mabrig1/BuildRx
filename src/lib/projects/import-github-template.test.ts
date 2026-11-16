@@ -21,14 +21,19 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("curated GitHub app templates", () => {
   it("pins reviewed public MIT sources rather than accepting arbitrary URLs", () => {
-    expect(GITHUB_APP_TEMPLATES).toHaveLength(5);
+    expect(GITHUB_APP_TEMPLATES).toHaveLength(6);
     for (const template of GITHUB_APP_TEMPLATES) {
       expect(template.commit).toMatch(/^[a-f0-9]{40}$/);
-      expect(["vercel/next.js", "shadcn-ui/chatbot-template", "thorchh/agent-starter", "AdityaKodez/gridly"]).toContain(template.repository);
+      expect(["vercel/next.js", "shadcn-ui/chatbot-template", "thorchh/agent-starter", "AdityaKodez/gridly", "D-393Patel/last-mile-delivery-tracker"]).toContain(template.repository);
       expect(template.repository === "vercel/next.js" ? template.subdirectory.startsWith("examples/") : template.subdirectory === "").toBe(true);
       expect(template.license).toBe("MIT");
       expect(template.sourceUrl).toContain(template.commit);
     }
+    const delivery = findGithubAppTemplate("github-last-mile-delivery");
+    expect(delivery?.category).toBe("Delivery");
+    expect(delivery?.repository).toBe("D-393Patel/last-mile-delivery-tracker");
+    expect(delivery?.subdirectory).toBe("");
+    expect(delivery?.commit).toMatch(/^[a-f0-9]{40}$/);
     expect(findGithubAppTemplate("not-approved")).toBeUndefined();
   });
 

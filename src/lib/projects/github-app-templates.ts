@@ -11,8 +11,8 @@ export interface GithubAppTemplate {
   id: string;
   name: string;
   description: string;
-  category: "Content" | "Authentication" | "AI Assistant" | "AI Agents" | "AI SaaS";
-  repository: "vercel/next.js" | "shadcn-ui/chatbot-template" | "thorchh/agent-starter" | "AdityaKodez/gridly";
+  category: "Content" | "Authentication" | "AI Assistant" | "AI Agents" | "AI SaaS" | "Delivery";
+  repository: "vercel/next.js" | "shadcn-ui/chatbot-template" | "thorchh/agent-starter" | "AdityaKodez/gridly" | "D-393Patel/last-mile-delivery-tracker";
   subdirectory: string;
   commit: string;
   license: "MIT";
@@ -82,6 +82,18 @@ export const GITHUB_APP_TEMPLATES: readonly GithubAppTemplate[] = [
     license: "MIT",
     sourceUrl: "https://github.com/AdityaKodez/gridly/tree/4f52ab299242ad380c559e077bd660c516e2fa65",
     setupNote: "Advanced Next.js 16 + Prisma/PostgreSQL template. Configure database migrations, Better Auth and AI providers. Payments remain disabled until you deliberately configure and validate Polar billing.",
+  },
+  {
+    id: "github-last-mile-delivery",
+    name: "Delivery & Dispatch Operations (GitHub)",
+    description: "Full-stack parcel delivery with customer bookings, rate quotes, dispatch, driver assignment, tracking, rescheduling and admin operations.",
+    category: "Delivery",
+    repository: "D-393Patel/last-mile-delivery-tracker",
+    subdirectory: "",
+    commit: "d54ee30687e920d4f5eaf60039590c1dcc82c73d",
+    license: "MIT",
+    sourceUrl: "https://github.com/D-393Patel/last-mile-delivery-tracker/tree/d54ee30687e920d4f5eaf60039590c1dcc82c73d",
+    setupNote: "Requires Next.js 16, Prisma 6, PostgreSQL, AUTH_SECRET and APP_URL. Brevo/Resend/Twilio are optional. Replace all demo credentials before production. Configure local zones and rate cards before taking real bookings. AI-assisted dispatch is not included by default; add supervised AI through BuildRx.",
   },
 ] as const;
 

@@ -116,7 +116,7 @@ describe("curated GitHub app templates", () => {
       { ...files[2], path: "app/layout.tsx" },
       { path: "prisma/schema.prisma", content: "datasource db { provider = \"postgresql\" }" },
     ];
-    const descriptors = groupedFiles.map((file, index) => ({
+    const descriptors = groupedFiles.map((file) => ({
       ...file, sha: gitBlobSha(file.content), size: Buffer.byteLength(file.content),
     }));
     const license = "MIT License\\nCopyright (c) 2026 Aditya\\nPermission is hereby granted, free of charge";

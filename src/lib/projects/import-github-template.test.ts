@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GITHUB_APP_TEMPLATES, findGithubAppTemplate } from "@/lib/projects/github-app-templates";
 import {
@@ -5,6 +6,10 @@ import {
   importGithubTemplateSource,
   validateImportedGithubFiles,
 } from "@/lib/projects/import-github-template";
+
+function gitBlobSha(content: string) {
+  return createHash("sha1").update(`blob ${Buffer.byteLength(content)}`).update(Buffer.from([0])).update(content).digest("hex");
+}
 
 const files = [
   { path: "package.json", content: JSON.stringify({ dependencies: { next: "15.5.20", react: "19.1.0" }, scripts: { build: "next build" } }) },
@@ -64,7 +69,7 @@ describe("curated GitHub app templates", () => {
 
   it("copies immutable source with original license but never imports environment secrets", async () => {
     const source = GITHUB_APP_TEMPLATES[0];
-    const fileNames = files.map((f, i) => ({ ...f, sha: String(i + 1).repeat(40), size: Buffer.byteLength(f.content) }));
+    const fileNames = files.map((f) => ({ ...f, sha: gitBlobSha(f.content), size: Buffer.byteLength(f.content) }));
     const license = "The MIT License (MIT)\nCopyright (c) 2025 Vercel, Inc.\nPermission is hereby granted...";
     const responses: Record<string, unknown> = {
       [`/repos/vercel/next.js/git/commits/${source.commit}`]: { tree: { sha: "a".repeat(40) } },
@@ -81,13 +86,14 @@ describe("curated GitHub app templates", () => {
       },
     };
     for (const f of fileNames) {
-      responses[`/repos/vercel/next.js/git/blobs/${f.sha}`] = {
-        encoding: "base64", content: Buffer.from(f.content).toString("base64"),
-      };
+      responses[`https://raw.githubusercontent.com/vercel/next.js/${source.commit}/${source.subdirectory}/${f.path}`] = f.content;
     }
     const mockFetch = vi.fn(async (url: string) => {
-      const path = new URL(url).pathname + new URL(url).search;
-      return path in responses ? Response.json(responses[path]) : Response.json({ message: "Not found" }, { status: 404 });
+      const parsed = new URL(url);
+      const key = parsed.hostname === "raw.githubusercontent.com" ? url : parsed.pathname + parsed.search;
+      return key in responses
+        ? typeof responses[key] === "string" ? new Response(responses[key] as string) : Response.json(responses[key])
+        : Response.json({ message: "Not found" }, { status: 404 });
     });
     vi.stubGlobal("fetch", mockFetch);
     const imported = await importGithubTemplateSource(source);
@@ -98,7 +104,7 @@ describe("curated GitHub app templates", () => {
     expect(imported.files.find(f => f.path === "BUILD-RX-SOURCE.md")?.content).toContain(source.commit);
     expect(imported.files.some(f => f.path === ".env.production")).toBe(false);
     expect(imported.files.some(f => f.path === "cover.png")).toBe(false);
-    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("/git/blobs/99999"));
+    expect(mockFetch.mock.calls.some(([url]) => url.includes(".env.production"))).toBe(false);
     expect(imported.skippedBinary).toBe(2);
   });
 
@@ -111,7 +117,7 @@ describe("curated GitHub app templates", () => {
       { path: "prisma/schema.prisma", content: "datasource db { provider = \"postgresql\" }" },
     ];
     const descriptors = groupedFiles.map((file, index) => ({
-      ...file, sha: String(index + 1).repeat(40), size: Buffer.byteLength(file.content),
+      ...file, sha: gitBlobSha(file.content), size: Buffer.byteLength(file.content),
     }));
     const license = "MIT License\\nCopyright (c) 2026 Aditya\\nPermission is hereby granted, free of charge";
     const responses: Record<string, unknown> = {
@@ -127,14 +133,13 @@ describe("curated GitHub app templates", () => {
       },
     };
     for (const f of descriptors) {
-      responses[`/repos/${source.repository}/git/blobs/${f.sha}`] = {
-        encoding: "base64", content: Buffer.from(f.content).toString("base64"),
-      };
+      responses[`https://raw.githubusercontent.com/${source.repository}/${source.commit}/${f.path}`] = f.content;
     }
     const mockFetch = vi.fn(async (url: string) => {
       const request = new URL(url);
-      return (request.pathname + request.search) in responses
-        ? Response.json(responses[request.pathname + request.search])
+      const key = request.hostname === "raw.githubusercontent.com" ? url : request.pathname + request.search;
+      return key in responses
+        ? typeof responses[key] === "string" ? new Response(responses[key] as string) : Response.json(responses[key])
         : Response.json({ message: "Not found" }, { status: 404 });
     });
     vi.stubGlobal("fetch", mockFetch);
@@ -142,6 +147,6 @@ describe("curated GitHub app templates", () => {
     expect(imported.files.map(f => f.path)).toContain("prisma/schema.prisma");
     expect(imported.files.find(f => f.path === "LICENSE")?.content).toContain("MIT License");
     expect(imported.sourceUrl).toContain(source.commit);
-    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("/git/trees/undefined"));
+    expect(mockFetch.mock.calls.some(([url]) => url.includes("/git/trees/undefined"))).toBe(false);
   });
 });

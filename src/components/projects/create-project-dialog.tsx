@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, FileText, LayoutTemplate, Loader2, Plus, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -61,6 +61,27 @@ export function CreateProjectDialog({
     resolver: zodResolver(createProjectSchema),
     defaultValues: initialValues,
   });
+  // Explicit, session-only handoff from the 20–50 agent demonstration.
+  // This only opens a prefilled review form; nothing is submitted automatically.
+  useEffect(() => {
+    let brief: string | null = null;
+    try {
+      brief = window.sessionStorage.getItem("buildrx-swarmlab-brief");
+    } catch {
+      return;
+    }
+    if (!brief || brief.trim().length < 15 || brief.length > 1500) return;
+    form.setValue("name", "SwarmLab Project", { shouldValidate: true });
+    form.setValue("description", "Human-reviewed proposal from the MABRIG SwarmLab demonstration.", { shouldValidate: true });
+    form.setValue("prompt", brief, { shouldValidate: true });
+    try {
+      window.sessionStorage.removeItem("buildrx-swarmlab-brief");
+    } catch {
+      // The form remains reviewable even if storage cleanup is unavailable.
+    }
+    setOpen(true);
+  }, [form.setValue]);
+
   const promptValue = form.watch("prompt") ?? "";
   const starterCategories = ["All", ...Array.from(new Set(APP_STARTERS.map((s) => s.category ?? "Other"))).sort()];
   const starterResults = APP_STARTERS.filter((starter) => {

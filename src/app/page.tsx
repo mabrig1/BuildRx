@@ -25,9 +25,9 @@ import { brandConfig, siteConfig } from "@/lib/constants";
 const features = [
   {
     icon: Bot,
-    title: "AI-powered building",
+    title: "Template-first AI builder",
     description:
-      "Describe your app in plain English. AI agents turn your ideas into working code.",
+      "Start with a polished, editable app template. Free AI refines copy; the guided builder helps connect real functionality.",
   },
   {
     icon: Eye,
@@ -43,21 +43,21 @@ const features = [
   },
   {
     icon: Rocket,
-    title: "One-click deploy",
+    title: "Guided deployment",
     description:
-      "Ship straight to Vercel, Netlify, or Railway with a production-grade stack underneath.",
+      "Review and export the source, configure providers, and verify the live app before publishing.",
   },
   {
     icon: ShieldCheck,
-    title: "Auth & data built in",
+    title: "Authentication & data guidance",
     description:
-      "Supabase authentication and Postgres come pre-wired with row-level security.",
+      "Generate secure code and database setup steps, then connect and verify your own production services.",
   },
   {
     icon: Sparkles,
-    title: "Beautiful by default",
+    title: "Seven distinctive app designs",
     description:
-      "Every generated app starts from a polished, accessible design system.",
+      "Explore local template kits for deliveries, retail, restaurants, learning, bookings, research and operations.",
   },
 ];
 
@@ -76,14 +76,14 @@ export default function LandingPage() {
             {brandConfig.companyName} · AI app builder
           </Badge>
           <h1 className="text-4xl font-semibold tracking-tighter text-balance md:text-6xl">
-            Build production apps by{" "}
+            Start with a beautiful app.{" "}
             <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent">
-              chatting with AI
+              Build with free AI.
             </span>
           </h1>
           <p className="text-muted-foreground max-w-2xl text-lg text-balance">
-            {siteConfig.description} From idea to deployed product — no
-            boilerplate, no setup, no friction.
+            {siteConfig.description} Preview the interface, then connect and verify
+            your real features before going live.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button size="lg" asChild>
@@ -93,7 +93,7 @@ export default function LandingPage() {
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/dashboard">View dashboard</Link>
+              <Link href="/showcase">Explore 7 interactive designs</Link>
             </Button>
           </div>
           <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">

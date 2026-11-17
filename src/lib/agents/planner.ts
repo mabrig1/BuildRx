@@ -439,6 +439,73 @@ export function fallbackPlan(prompt: string): AppPlan {
     return { ...church, ...parsed };
   }
 
+  // Template-first reliability: if free inference is slow or rate-limited,
+  // never hand a courier customer a "My App / Workspace / items" product.
+  // Explicit user-defined pages, tables and components still take priority.
+  if (/(?:courier|logistic|dispatch|shipment|parcel|delivery app|deliveries|rider tracking)/i.test(lower)
+    && !/(?:restaurant|food menu|kitchen workflow)/i.test(lower)) {
+    const delivery: AppPlan = {
+      appName: "Courier & Deliveries",
+      summary: "A mobile-first parcel dispatch application for pickup requests, rider assignments, delivery status tracking and proof of handoff.",
+      userRoles: [
+        { name: "Dispatcher", permissions: ["manage own shipment queue", "assign authorized riders"] },
+        { name: "Rider", permissions: ["view assigned jobs", "submit authorized status updates"] },
+        { name: "Sender", permissions: ["request pickups", "track own shipments"] },
+      ],
+      workflows: [
+        { name: "Arrange delivery", actor: "Sender", steps: [
+          "enter pickup and dropoff", "review delivery quote", "submit pickup request",
+          "wait for assigned rider", "track shipment milestones",
+        ], outcome: "A real shipment is saved with an auditable status history" },
+        { name: "Dispatch and confirm", actor: "Dispatcher", steps: [
+          "open dispatch board", "review pending shipment", "assign available authorized rider",
+          "rider marks in transit", "record authorized delivery confirmation",
+        ], outcome: "Shipment reaches delivered status only after proof of handoff" },
+      ],
+      pages: [
+        { name: "Home", path: "/", description: "Premium dispatch command center with delivery metrics and next actions" },
+        { name: "Shipments", path: "/shipments", description: "Searchable shipment board, create and status filters" },
+        { name: "Dispatch", path: "/dispatch", description: "Rider assignment workflow and dispatch queue" },
+        { name: "Riders", path: "/riders", description: "Rider availability and authorized task list" },
+        { name: "Tracking", path: "/tracking", description: "Recipient-limited tracking events and delivery proof" },
+      ],
+      components: [
+        { name: "CourierShell", description: "Mobile and desktop delivery navigation" },
+        { name: "ShipmentTable", description: "Filter, search and review shipments" },
+        { name: "DispatchBoard", description: "Assignment queue and task status" },
+        { name: "RiderStatus", description: "Availability and assigned rider indicators" },
+        { name: "TrackingTimeline", description: "Authorized shipment status history" },
+      ],
+      dataModel: [
+        { table: "shipments", description: "Owner-scoped deliveries", columns: [
+          { name: "id", type: "uuid" }, { name: "owner_id", type: "uuid" },
+          { name: "recipient", type: "text" }, { name: "origin", type: "text" },
+          { name: "destination", type: "text" }, { name: "status", type: "text" },
+          { name: "created_at", type: "timestamptz" },
+        ]},
+        { table: "riders", description: "Available delivery riders", columns: [
+          { name: "id", type: "uuid" }, { name: "owner_id", type: "uuid" },
+          { name: "name", type: "text" }, { name: "availability", type: "text" },
+          { name: "created_at", type: "timestamptz" },
+        ]},
+        { table: "shipment_events", description: "Authorized immutable delivery status changes", columns: [
+          { name: "id", type: "uuid" }, { name: "owner_id", type: "uuid" },
+          { name: "shipment_id", type: "uuid" }, { name: "status", type: "text" },
+          { name: "created_at", type: "timestamptz" },
+        ]},
+      ],
+      features: ["Shipment requests", "Dispatch queue", "Rider assignments", "Tracking milestones", "Proof of delivery"],
+      acceptanceCriteria: [
+        "A sender can only see their own shipments and authorized tracking events.",
+        "Dispatchers can assign riders only when they have access to the shipment.",
+        "A shipment cannot be marked delivered without actual verified handoff evidence.",
+        "GPS, WhatsApp, maps and payments display setup-required until configured.",
+      ],
+      qualityRequirements: ["mobile first", "accessible dispatch UI", "persistent audited records", "provider honesty"],
+    };
+    return { ...delivery, ...parsed };
+  }
+
   const appName = lower.includes("coffee")
     ? "Brew & Bean"
     : lower.includes("task")

@@ -10,6 +10,7 @@ import {
   type ModelRole,
 } from "@/lib/ai/models";
 import { isAnyProviderConfigured, completeText } from "@/lib/ai/provider";
+import { isOpenRouterConfigured } from "@/lib/ai/openrouter";
 import { isNvidiaConfigured, nvidiaGlmModel } from "@/lib/ai/nvidia";
 
 /** Model used only if the opt-in Anthropic tier is ever reached. */
@@ -20,7 +21,13 @@ export const ANTHROPIC_AGENT_MODEL = "claude-opus-4-8";
  * actually starts on. NVIDIA is the default provider, so hardcoding a
  * Claude model here would have mislabelled every build.
  */
+/** Default is zero-model-price OpenRouter inference. Paid models require explicit opt-in. */
+export function freeOnlyBuildMode(): boolean {
+  return process.env.BUILDRX_ALLOW_PAID_AI !== "true";
+}
+
 export function agentModel(): string {
+  if (freeOnlyBuildMode()) return "openrouter/free";
   return isNvidiaConfigured() ? nvidiaGlmModel() : ANTHROPIC_AGENT_MODEL;
 }
 
@@ -32,7 +39,7 @@ export function agentModel(): string {
 export type AgentRole = ModelRole;
 
 export function isLlmConfigured() {
-  return isAnyProviderConfigured();
+  return freeOnlyBuildMode() ? isOpenRouterConfigured() : isAnyProviderConfigured();
 }
 
 /** Default per-call budget when the orchestrator hasn't set a tighter one. */
@@ -279,6 +286,16 @@ export async function runAgentCompletion({
   role?: AgentRole;
   timeoutMs?: number;
 }): Promise<string> {
+  // Fast zero-cost path: a free-router request does not need provider model
+  // catalog queries or paid-model role resolution. Avoid extra network calls
+  // and preserve the time budget for a working UI and backend.
+  if (freeOnlyBuildMode()) {
+    const completion=await completeText(
+      [{role:"system",content:system},{role:"user",content:prompt}],
+      {freeOnly:true,maxTokens,temperature:0.3,timeoutMs}
+    );
+    return completion.text;
+  }
   // Route by task complexity (see lib/ai/models.ts): the strongest
   // model for this role that the configured key can actually call,
   // with a general-purpose model as the chain's second tier.
@@ -307,6 +324,7 @@ export async function runAgentCompletion({
       nvidiaModel,
       nvidiaFallbackModel,
       openrouterModel: openrouterModelId,
+      freeOnly: freeOnlyBuildMode(),
     }
   );
   return result.text;

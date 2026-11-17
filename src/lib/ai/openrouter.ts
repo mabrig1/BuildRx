@@ -106,7 +106,7 @@ function errorForStatus(status: number, detail: string): OpenRouterApiError {
       );
     case 402:
       return new OpenRouterApiError(
-        "OpenRouter credit balance is exhausted — top up the account or lower the configured model.",
+        "OpenRouter 402: insufficient available credit or a key/in-flight spending limit. Check account and key limits or use a free model.",
         status,
         false
       );
@@ -216,8 +216,11 @@ function affordableOutputBudget(detail: string, requested: unknown): number | nu
   if (typeof requested !== "number" || !Number.isFinite(requested) ||
       !Number.isSafeInteger(affordable) || affordable >= requested) return null;
   const reduced = Math.floor(affordable * 0.9);
-  // Below this floor the code/plan would almost certainly be truncated.
-  return reduced >= 256 ? reduced : null;
+  // A 4,000-token app request reduced to 270 tokens cannot form working
+  // code. Reject unusably small retries instead of burning the last credit
+  // and claiming a scaffold was successful AI generation.
+  const minimumViable = typeof requested === "number" && requested >= 1000 ? 700 : 256;
+  return reduced >= minimumViable ? reduced : null;
 }
 
 /** Streaming chat completion through OpenRouter. */

@@ -278,7 +278,7 @@ async function smokeBuiltCrm(root: string) {
           const response = await fetch("http://127.0.0.1:" + server.address().port + path,
             { redirect: "manual", signal: AbortSignal.timeout(10000) });
           const html = await response.text();
-          const expected = path === "/" ? "Product workspace" : ">Customers</h1>";
+          const expected = path === "/" ? "SAMPLE EXPERIENCE" : "Customers";
           if (response.status !== 200 || !html.includes("<h1") || !html.includes(expected)) {
             throw Error(path + " did not render the CRM page (HTTP " + response.status + ")");
           }

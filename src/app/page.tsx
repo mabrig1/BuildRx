@@ -93,7 +93,7 @@ export default function LandingPage() {
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/dashboard">View dashboard</Link>
+              <Link href="/showcase">Explore 7 interactive designs</Link>
             </Button>
           </div>
           <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">

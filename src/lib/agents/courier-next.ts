@@ -37,7 +37,7 @@ export function generateCourierNextPage(
     'const [formOpen,setFormOpen]=useState(false);',
     'const [selected,setSelected]=useState<string|null>(null);',
     'const [pickup,setPickup]=useState("");const [destination,setDestination]=useState("");const [recipient,setRecipient]=useState("");',
-    'useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(Array.isArray(saved)&&saved.length<=50){const valid=saved.filter((x:Shipment)=>x && typeof x.id==="string" && states.includes(x.status));if(valid.length)setShipments(valid)}}catch{}setReady(true)},[]);',
+    'useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(Array.isArray(saved)&&saved.length<=50){const valid=saved.filter((x:Shipment)=>x && typeof x.id==="string" && typeof x.recipient==="string" && typeof x.from==="string" && typeof x.to==="string" && states.includes(x.status));if(valid.length)setShipments(valid)}}catch{}setReady(true)},[]);',
     'useEffect(()=>{if(!ready)return;try{localStorage.setItem(storageKey,JSON.stringify(shipments.slice(0,50)))}catch{}},[shipments,ready]);',
     'const visible=useMemo(()=>shipments.filter(s=>(filter==="All"||s.status===filter)&&[s.id,s.recipient,s.from,s.to].some(v=>v.toLowerCase().includes(query.trim().toLowerCase()))),[shipments,filter,query]);',
     'const focus=shipments.find(x=>x.id===selected) ?? null;',

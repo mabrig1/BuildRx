@@ -147,7 +147,12 @@ function isAnthropicEnabled(): boolean {
 /** Providers usable right now, in priority order. */
 export function availableProviders(): ProviderName[] {
   const providers: ProviderName[] = [];
-  if (isOpenRouterConfigured()) providers.push(...OPENROUTER_PROVIDERS);
+  if (isOpenRouterConfigured()) {
+    providers.push("openrouter-primary", "openrouter-fast");
+    if (process.env.OPENROUTER_FREE_FALLBACK !== "false") {
+      providers.push("openrouter-free");
+    }
+  }
   if (isNvidiaConfigured()) providers.push(...NVIDIA_PROVIDERS);
   if (isAnthropicEnabled()) providers.push("anthropic");
   return providers;
@@ -199,9 +204,6 @@ function plannedAttempts(options: ProviderCallOptions): Attempt[] {
   const seenModels = new Set<string>();
 
   for (const provider of availableProviders()) {
-    // Operators may turn off free inference when a stable production quality
-    // or data-processing policy forbids routing to unspecified free models.
-    if (provider === "openrouter-free" && process.env.OPENROUTER_FREE_FALLBACK === "false") continue;
     if (isOpenRouterProvider(provider)) {
       const model = openrouterModelFor(provider, options);
       if (seenModels.has(model)) continue;

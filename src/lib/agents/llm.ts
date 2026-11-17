@@ -286,6 +286,16 @@ export async function runAgentCompletion({
   role?: AgentRole;
   timeoutMs?: number;
 }): Promise<string> {
+  // Fast zero-cost path: a free-router request does not need provider model
+  // catalog queries or paid-model role resolution. Avoid extra network calls
+  // and preserve the time budget for a working UI and backend.
+  if (freeOnlyBuildMode()) {
+    const completion=await completeText(
+      [{role:"system",content:system},{role:"user",content:prompt}],
+      {freeOnly:true,maxTokens,temperature:0.3,timeoutMs}
+    );
+    return completion.text;
+  }
   // Route by task complexity (see lib/ai/models.ts): the strongest
   // model for this role that the configured key can actually call,
   // with a general-purpose model as the chain's second tier.

@@ -94,7 +94,7 @@ async function probeProvider(provider: ProviderProbe): Promise<ProviderHealth> {
 /**
  * GET /api/ai/health — is the AI provider actually usable right now?
  *
- * Makes one real request to every configured provider and reports reachability,
+ * Makes a model-catalog request to every configured provider and reports reachability,
  * latency and a sanitized failure category. Public by design (it is a
  * liveness probe), which is exactly why it returns no key, no model
  * variable values, and no raw upstream error text — only the category.
@@ -139,6 +139,12 @@ export async function GET() {
       status,
       configured: true,
       reachable,
+      // GET /models only proves the key can list the model catalog; it
+      // does NOT prove the account can afford a paid completion. In
+      // particular, this may be true while app generation fails with 402.
+      generationVerified: false,
+      generationStatus: "not_tested",
+      generationNote: "Model catalog reachable. Balance, spending caps, completion capacity and app quality have not been verified.",
       /** Backward-compatible summary fields describe the primary provider. */
       latencyMs: primary.latencyMs,
       httpStatus: primary.httpStatus,

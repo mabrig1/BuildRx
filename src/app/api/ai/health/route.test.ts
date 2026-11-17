@@ -38,7 +38,10 @@ describe("GET /api/ai/health", () => {
       configured: true,
       reachable: true,
       primaryProvider: "openrouter",
+      generationVerified: false,
+      generationStatus: "not_tested",
     });
+    expect(body.generationNote).toContain("Balance");
     expect(body.providers).toEqual([
       expect.objectContaining({ name: "openrouter", reachable: true }),
     ]);

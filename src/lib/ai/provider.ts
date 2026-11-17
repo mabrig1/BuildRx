@@ -45,6 +45,7 @@ import {
 export type ProviderName =
   | "openrouter-primary"
   | "openrouter-fast"
+  | "openrouter-free"
   | "nvidia-primary"
   | "nvidia-fast"
   | "nvidia-lite"
@@ -59,7 +60,9 @@ export type ProviderName =
  * every generated app as a built-in scaffold. NVIDIA stays in the chain
  * behind it as a no-cost fallback.
  */
-const OPENROUTER_PROVIDERS = ["openrouter-primary", "openrouter-fast"] as const;
+// Free is always attempted last within OpenRouter; it uses zero-cost model
+// pricing but is subject to much tighter provider/request limits.
+const OPENROUTER_PROVIDERS = ["openrouter-primary", "openrouter-fast", "openrouter-free"] as const;
 
 /** The NVIDIA tiers, in the order they are attempted. */
 const NVIDIA_PROVIDERS = ["nvidia-primary", "nvidia-fast", "nvidia-lite"] as const;
@@ -144,7 +147,12 @@ function isAnthropicEnabled(): boolean {
 /** Providers usable right now, in priority order. */
 export function availableProviders(): ProviderName[] {
   const providers: ProviderName[] = [];
-  if (isOpenRouterConfigured()) providers.push(...OPENROUTER_PROVIDERS);
+  if (isOpenRouterConfigured()) {
+    providers.push("openrouter-primary", "openrouter-fast");
+    if (process.env.OPENROUTER_FREE_FALLBACK !== "false") {
+      providers.push("openrouter-free");
+    }
+  }
   if (isNvidiaConfigured()) providers.push(...NVIDIA_PROVIDERS);
   if (isAnthropicEnabled()) providers.push("anthropic");
   return providers;
@@ -174,9 +182,9 @@ function openrouterModelFor(
   provider: OpenRouterProviderName,
   options: ProviderCallOptions
 ): string {
-  return provider === "openrouter-primary"
-    ? (options.openrouterModel ?? openrouterStrongModel())
-    : openrouterModel();
+  if (provider === "openrouter-primary") return options.openrouterModel ?? openrouterStrongModel();
+  if (provider === "openrouter-fast") return openrouterModel();
+  return "openrouter/free";
 }
 
 interface Attempt {
@@ -462,7 +470,12 @@ export async function completeText(
   const deadlineAt = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   let lastError: unknown;
   const tried: string[] = [];
+  let skipOtherPaidOpenRouter = false;
   for (const [index, attempt] of attempts.entries()) {
+    // A credit/key-budget rejection is shared by all paid models behind this
+    // OpenRouter key. Do not waste another request on the same exhausted key.
+    // The zero-price free router is a distinct, rate-limited fallback.
+    if (skipOtherPaidOpenRouter && isOpenRouterProvider(attempt.provider) && attempt.provider !== "openrouter-free") continue;
     const budgetMs = attemptBudgetMs(deadlineAt, attempts.length - index);
     // No time at all stops even the first attempt: opening a request
     // against a spent budget only produces a misleading timeout.
@@ -480,6 +493,13 @@ export async function completeText(
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      // OpenRouter status 402 denotes insufficient purchasing power, a
+      // key-level cap, or an in-flight budget rejection. All paid tiers
+      // share that condition. Avoid repeated paid attempts when it occurs.
+      if (isOpenRouterProvider(attempt.provider) && attempt.provider !== "openrouter-free" &&
+        /\b402\b|credit balance|credit limit|insufficient credit|in.flight spend|can only afford/i.test(message)) {
+        skipOtherPaidOpenRouter = true;
+      }
       console.error(`AI provider ${label} failed:`, message);
       tried.push(`${label}: ${message}`);
       lastError = error;

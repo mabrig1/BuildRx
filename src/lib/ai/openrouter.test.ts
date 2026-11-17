@@ -205,7 +205,7 @@ describe("streamChatCompletion", () => {
   describe("error mapping", () => {
     it.each([
       [401, /authentication failed/i, false],
-      [402, /credit balance is exhausted/i, false],
+      [402, /insufficient available credit or a key\/in-flight spending limit/i, false],
       [404, /model not found/i, false],
       [429, /rate limit/i, true],
       [503, /temporarily unavailable/i, true],
@@ -267,6 +267,12 @@ describe("bounded affordability recovery", () => {
   });
   it.each(["Balance exhausted", "can only afford 0", "can only afford 100", "can only afford 9000"])("does not loop on an unrecoverable limit: %s", async message => {
     const fetchMock = vi.fn().mockResolvedValue(denied(message));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(streamChatCompletion([], { maxTokens: 4000 })).rejects.toBeInstanceOf(OpenRouterApiError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it("does not spend the last 300-token allowance on a 4,000-token code generation", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(denied("You requested up to 4000 tokens, but can only afford 300."));
     vi.stubGlobal("fetch", fetchMock);
     await expect(streamChatCompletion([], { maxTokens: 4000 })).rejects.toBeInstanceOf(OpenRouterApiError);
     expect(fetchMock).toHaveBeenCalledTimes(1);

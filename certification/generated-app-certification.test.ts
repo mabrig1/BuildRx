@@ -195,6 +195,19 @@ Use authenticated ownership, persistent editorial workflow, search and filters, 
     ],
     expectedTables: ["articles", "authors", "assignments", "reviews", "schedules"],
   },
+  {
+    slug: "courier-dispatch",
+    label: "Courier & Deliveries",
+    prompt: "Build a mobile-first courier and delivery management application for dispatchers and riders.\nPages:\n- Home: beautiful delivery command center and shipment KPI cards\n- Shipments: searchable tracking and shipment status board\n- Dispatch: assignment queue and rider handoff\n- Riders: registered rider profiles and available tasks\n- Tracking: recipient-specific delivery tracking\n\nComponents: CourierShell, ShipmentTable, DispatchBoard, RiderStatus, TrackingTimeline\n\nTables:\n- shipments (id, owner_id, recipient, origin, destination, status, created_at)\n- riders (id, owner_id, name, availability, created_at)\n- shipment_events (id, owner_id, shipment_id, status, created_at)\n\nWorkflow: Sender requests shipment, dispatcher assigns an authorized rider, rider updates statuses, recipient sees permitted tracking evidence. Protect cross-user data and do not claim GPS or payment works unless provider is configured.",
+    expectedPageFiles:[
+      "src/app/page.tsx",
+      "src/app/shipments/page.tsx",
+      "src/app/dispatch/page.tsx",
+      "src/app/riders/page.tsx",
+      "src/app/tracking/page.tsx",
+    ],
+    expectedTables:["shipments","riders","shipment_events"],
+  },
 ];
 
 const ISOLATED_ENV_KEYS = [

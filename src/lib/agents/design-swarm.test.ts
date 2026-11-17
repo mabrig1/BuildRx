@@ -23,7 +23,7 @@ describe("BuildRx template-first swarm",()=>{
    const page=built.files.find(x=>x.path==="src/app/page.tsx")?.content || "";
    expect(preview).toContain("Delivery command center");
    expect(preview).toContain("PX-2486");
-   expect(preview).toContain("New demo delivery");
+   expect(preview).toContain("Create demo delivery");
    expect(preview).toContain("addEventListener");
    expect(preview).toContain("localStorage");
    expect(preview).toContain("@media(max-width:760px)");

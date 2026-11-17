@@ -100,7 +100,7 @@ export const brandContactLinks = [
 export const siteConfig = {
   name: brandConfig.productName,
   description:
-    "Build production-ready apps by chatting with AI. Describe what you want, watch it come to life. Built by MABRIG Technologies.",
+    "Build beautiful editable apps from industry templates, with optional free-model AI assistance and guided real-service setup. Built by MABRIG Technologies.",
   url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   links: {
     github: "https://github.com/mabrig1/BuildRx",

@@ -24,7 +24,7 @@ import {
 export const metadata: Metadata = {
   title: "Features",
   description:
-    "Everything BuildRx ships with: AI agents, in-browser IDE, live preview, GitHub, one-click deploys, and more.",
+    "BuildRx features: original app templates, free-model AI assistance, in-browser IDE, previews, code export, GitHub and guided deployment.",
 };
 
 const featureGroups = [
@@ -41,7 +41,7 @@ const featureGroups = [
         icon: Workflow,
         title: "Multi-agent pipeline",
         description:
-          "Six specialized agents — Planner, UI, Database, Coding, Debug, Deployment — collaborate to turn one prompt into a complete project.",
+          "Eleven pipeline agents coordinate planning, architecture, source generation, review, repair and saving. Twelve deterministic design checks review template-first UX; free-model availability varies.",
       },
       {
         icon: Eye,
@@ -81,13 +81,13 @@ const featureGroups = [
         icon: Rocket,
         title: "One-click deployment",
         description:
-          "Deploy to Vercel, Netlify, or Railway with live build logs, deployment history, status tracking, and custom domains.",
+          "Export and review your code, connect the target hosting provider, and verify the actual public routes and data flows before launch.",
       },
       {
         icon: Lock,
         title: "Auth & data built in",
         description:
-          "Supabase authentication (email + Google) and Postgres with row-level security come pre-wired in every workspace.",
+          "Generate Supabase-compatible authentication and database code, then configure keys and verify real per-user access policies.",
       },
       {
         icon: LayoutDashboard,

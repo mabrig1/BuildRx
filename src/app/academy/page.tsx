@@ -70,6 +70,12 @@ export default function AcademyPage() {
               <Button size="lg" variant="outline" asChild>
                 <Link href="/login?next=/course">I already have an account</Link>
               </Button>
+              <Button size="lg" variant="outline" asChild>
+                <Link href="/swarm-lab">
+                  Try the 20–50 Agent SwarmLab
+                  <Sparkles className="ml-2 size-4" />
+                </Link>
+              </Button>
               <Button size="lg" variant="secondary" asChild>
                 <Link href="/signup?next=/learn/labs">
                   Open connected engineering labs

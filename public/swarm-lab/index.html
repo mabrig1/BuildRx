@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#080d18" />
+  <meta name="description" content="MABRIG SwarmLab: explore and orchestrate 20–50 specialized AI agents with a transparent simulation and an optional live API." />
+  <title>MABRIG SwarmLab — Multi-Agent Command Center</title>
+  <style>
+:root{color-scheme:dark;--bg:#080e18;--surface:#101827;--surface2:#121e30;--line:#243246;--text:#e9f2fc;--muted:#8697b1;--accent:#50e5bf;--blue:#7cc4ff;--violet:#bba4ff;--gold:#f1c779;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-synthesis:none}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font-size:14px}button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}a{color:inherit;text-decoration:none}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.hidden{display:none!important}.visually-hidden{position:absolute;clip:rect(0,0,0,0);height:1px;width:1px;overflow:hidden;white-space:nowrap}.app-shell{display:flex;min-height:100vh}.sidebar{width:246px;min-width:246px;background:#0b1422;border-right:1px solid #202e41;min-height:100vh;display:flex;flex-direction:column;padding:28px 16px 22px;position:sticky;top:0;height:100vh}.brand{display:flex;align-items:center;gap:10px;padding:0 13px 37px}.brand-symbol{background:linear-gradient(135deg,#6aefce,#2d9ca9);height:37px;width:37px;border-radius:10px;display:flex;justify-content:center;align-items:center;color:#042c2d;font-size:27px;font-weight:900;box-shadow:0 0 24px #39d6b21f}.brand strong{display:block;letter-spacing:.22em;font-size:15px}.brand small{display:block;color:var(--muted);font-size:10px;letter-spacing:.22em;margin-top:3px;font-weight:700}.brand small em{font-style:normal;color:var(--accent)}.sidebar-label{font-size:10px;letter-spacing:.18em;font-weight:800;color:#63758f;margin:0 13px 14px}.sidebar nav{display:grid;gap:4px}.navitem{display:flex;gap:12px;align-items:center;padding:12px 13px;color:#95a6bd;border-radius:9px;font-size:12px;font-weight:600}.navitem span{font-size:18px;line-height:1;width:20px;text-align:center}.navitem:hover,.navitem.selected{background:#17352f;color:var(--accent)}.missions-label{margin-top:36px}.preset-list{display:grid;gap:5px}.preset{background:transparent;border:0;color:#9cafc4;display:flex;align-items:center;gap:11px;text-align:left;padding:11px 12px;border-radius:9px;font-size:12px}.preset.active,.preset:hover{background:#17263a;color:#eef8ff}.preset-icon{background:#24364b;border:1px solid #34475c;border-radius:7px;width:25px;height:25px;display:grid;place-items:center;color:#9ddedb;font-size:14px}.sidebar-bottom{margin-top:auto}.sidebar-note{background:#122233;padding:14px 12px;border:1px solid #254050;border-radius:10px;display:flex;align-items:flex-start;gap:9px;color:#c0d7e5;font-size:11px;line-height:1.6}.sidebar-note small{color:#7998a8}.green-dot{display:inline-block;vertical-align:middle;width:7px;height:7px;flex:none;border-radius:50%;background:var(--accent);box-shadow:0 0 9px #50e5bf70}.sidebar-bottom>a{display:block;text-align:center;color:#7288a2;font-size:11px;margin-top:19px}.main-area{min-width:0;flex:1}.topbar{border-bottom:1px solid #202e40;min-height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 40px}.breadcrumb{letter-spacing:.13em;color:#7890a7;font-size:10px;font-weight:800}.breadcrumb span{margin:0 12px;color:#405670}.breadcrumb strong{color:#c3d0de}.top-actions{display:flex;align-items:center;gap:17px}.env-pill{display:flex;align-items:center;gap:9px;color:#a4e3d4;border:1px solid #2a5550;background:#11312f;border-radius:50px;padding:8px 11px;font-size:9px;letter-spacing:.1em;font-weight:800}.icon-button{height:28px;width:28px;border-radius:50%;border:1px solid #445267;background:transparent;color:#9cb0c6}.avatar{background:linear-gradient(120deg,#266c72,#19464f);border:1px solid #47908d;border-radius:50%;width:33px;height:33px;display:grid;place-items:center;font-size:10px;font-weight:900;color:#d8fff4}.content{max-width:1710px;margin:0 auto;padding:39px 40px 23px}.hero-head{display:flex;justify-content:space-between;align-items:center;gap:24px;margin-bottom:27px}.eyebrow{font-size:10px;letter-spacing:.19em;font-weight:800;color:var(--accent);display:flex;align-items:center;gap:8px}.live-line{width:16px;height:2px;background:var(--accent)}h1,h2,p{margin-top:0}h1{letter-spacing:-.045em;font-size:clamp(28px,3.15vw,43px);font-weight:780;line-height:1.1;margin:13px 0}h1 span{color:var(--accent)}.hero-head p{margin:0;color:#93a6bc;font-size:13px;line-height:1.65;max-width:540px}.hero-actions{display:flex;gap:10px}.btn{border:1px solid transparent;padding:12px 17px;border-radius:8px;font-size:11px;font-weight:800;letter-spacing:.015em;display:inline-flex;align-items:center;justify-content:center;gap:10px;white-space:nowrap}.btn-primary{background:var(--accent);color:#062a2d;box-shadow:0 8px 22px #51e2bd1e}.btn-primary:hover{background:#74f2d4}.btn-subtle{background:#182436;color:#cad8ea;border-color:#324158}.btn-subtle:hover,.btn-ghost:hover{background:#24364b}.btn-ghost{background:transparent;border-color:#34435a;color:#a5bad0}.btn-small{padding:8px 13px;font-size:10px}.mission-panel{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:28px;background:linear-gradient(115deg,#152436,#112033);border:1px solid #2a4357;border-radius:13px;padding:23px 25px;margin-bottom:19px;box-shadow:0 15px 70px #00000014}.section-mini{display:flex;align-items:center;gap:10px}.section-mini h2,h2{font-size:14px;letter-spacing:-.01em;font-weight:750;margin:0}.step-no{font-size:10px;color:var(--accent);font-weight:900;letter-spacing:.07em}.mini-extra{color:#65849b;font-size:9px;letter-spacing:.13em;font-weight:800;margin-left:auto}.mission-copy textarea{resize:vertical;border:1px solid #344b63;outline:none;background:#0b1928;color:#f1f7fe;border-radius:8px;width:100%;min-height:79px;padding:15px 17px;line-height:1.65;font-size:12px;margin-top:15px}.mission-copy textarea:focus{border-color:#4ddcbd}.mission-bottom{display:flex;justify-content:space-between;gap:10px;color:#67869e;font-size:10px;margin-top:9px}.config-title{font-size:9px;font-weight:800;color:#819bb3;letter-spacing:.16em;margin:0 0 18px}.mission-config{border-left:1px solid #2e465a;padding-left:25px}.slider-header,.slider-markers,.mode-row{display:flex;justify-content:space-between;align-items:center;gap:9px}.slider-header span,.mode-row label{font-size:11px;color:#c2d2e0}.slider-header strong{font-size:23px;line-height:1;color:var(--accent)}.slider-header strong small{font-size:11px;color:#7095a0;font-weight:500}input[type=range]{accent-color:var(--accent);width:100%;margin:17px 0 2px}.slider-markers{color:#6e88a2;font-size:10px}.mode-row{margin-top:17px}.mode-row select{border:1px solid #3c5268;border-radius:6px;background:#0d1c2b;color:#c7d8e4;padding:7px 8px;min-width:155px;font-size:11px}.live-controls{padding-top:12px}.live-controls label{display:block;color:#a8bfd0;font-size:10px;margin:10px 0 5px}.live-controls input{width:100%;background:#0b1828;border:1px solid #38526b;border-radius:6px;padding:9px;color:var(--text);font-size:11px}.live-controls p{font-size:10px;line-height:1.45;color:#eac99b;margin:8px 0 0}.inline-alert{font-size:10px;color:#f0b1a2;line-height:1.5}.inline-alert.ok{color:#81e5cf}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin-bottom:18px}.metric{border:1px solid #23354b;background:#111c2b;padding:17px 20px;border-radius:11px;min-height:116px}.metric-top{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#8fa0b7;font-weight:800;letter-spacing:.135em}.metric-icon{border-radius:8px;width:27px;height:27px;display:grid;place-items:center;font-size:16px}.metric-icon.mint{background:#14362f;color:#68edca}.metric-icon.blue{background:#1b3546;color:#89c9ee}.metric-icon.violet{background:#2a2848;color:#c9b3ff}.metric-icon.gold{background:#3c3222;color:#f1cb8f}.metric-number{font-size:31px;font-weight:800;letter-spacing:-.045em;margin:8px 0 0;line-height:1}.metric-foot{font-size:10px;color:#758ba4;margin-top:9px}.metric-foot span{color:var(--accent)}.dashboard-grid{display:grid;grid-template-columns:minmax(0,1.77fr) minmax(250px,.85fr);gap:16px;margin-bottom:17px}.panel{background:#101a29;border:1px solid #24354b;border-radius:12px;min-width:0;overflow:hidden}.panel-heading{display:flex;align-items:start;justify-content:space-between;gap:15px;padding:21px 23px 0}.panel-heading p{font-size:11px;color:#7891aa;margin:9px 0 0;line-height:1.5}.pill,.count-pill,.feed-indicator{padding:7px 10px;border:1px solid #3a4d62;border-radius:100px;font-size:9px;color:#aec1d2;font-weight:800;letter-spacing:.07em;white-space:nowrap}.pill{display:flex;align-items:center;gap:8px}.small-circle{background:#6e8299;width:6px;height:6px;border-radius:50%}.pill.working .small-circle{background:#f1c779;box-shadow:0 0 10px #f1c779}.pill.finished .small-circle{background:var(--accent);box-shadow:0 0 10px #50e5bf}.network-legend{display:flex;gap:18px;margin:18px 24px 0;color:#869cb6;font-size:10px;flex-wrap:wrap}.network-legend span{display:flex;align-items:center;gap:6px}.network-legend i{width:7px;height:7px;border-radius:50%;display:inline-block}.dot-idle{background:#65748e}.dot-run{background:#f1c779}.dot-done{background:#50e5bf}.dot-fail{background:#ff808f}.network-wrap{padding:2px 13px 0;position:relative}.network-wrap svg{display:block;width:100%;height:auto;min-height:250px;max-height:405px}.network-corner{position:absolute;bottom:10px;left:25px;font-size:8px;letter-spacing:.15em;color:#5b718a;font-weight:800}.network-corner span{margin-left:14px;color:#4a9189}.node-hub{cursor:pointer}.node-hub circle{stroke-width:1.2;fill:#15273b}.node-hub text{font-size:9px;fill:#acc2d5;letter-spacing:.03em;font-weight:800;pointer-events:none}.node-agent{cursor:pointer}.node-agent circle{stroke-width:1.7;transition:fill .2s,stroke .2s,r .2s}.node-agent:hover circle,.node-agent.selected circle{stroke-width:3;r:10}.node-agent:focus{outline:0}.node-agent:focus-visible circle{stroke:#fff;stroke-width:3}.node-agent .node-number{pointer-events:none;font-weight:800;fill:#c5d2e5;font-size:8px}.connection{stroke:#36516b;stroke-width:1;opacity:.6}.connection-active{stroke:#4de1ba;opacity:.83}.network-core-title{fill:#dcfff4;font-size:13px;font-weight:900;letter-spacing:.2em}.network-core-sub{fill:#62c9b1;font-size:8px;letter-spacing:.11em}.network-footer{border-top:1px solid #23354b;margin-top:0;padding:15px 23px 16px;display:grid;grid-template-columns:1fr auto;gap:12px}.progress-info strong{font-size:11px;display:block}.progress-info span{color:#8297ad;font-size:10px;display:block;margin-top:5px}.progress-percent{color:var(--accent);font-size:12px;font-weight:900}.progress-track{height:5px;grid-column:1/-1;border-radius:10px;background:#253449;overflow:hidden;margin:2px 0}.progress-track>div{width:0;height:100%;background:linear-gradient(90deg,#389c94,#50e5bf);transition:width .3s}.network-buttons{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end}.team-panel .panel-heading{align-items:center}.team-list{padding:18px 23px 10px;display:grid;gap:13px}.team-row{display:grid;grid-template-columns:9px 1fr auto;align-items:center;gap:10px;cursor:pointer;padding:3px 0}.team-row:hover .team-name,.team-row.active .team-name{color:#fff}.team-bullet{width:9px;height:9px;border-radius:50%}.team-info{min-width:0}.team-name{font-size:11px;font-weight:700;color:#b5c7d8;display:flex;justify-content:space-between;gap:9px}.team-sub{color:#7187a0;font-size:9px;margin-top:3px}.team-count{font-size:10px;color:#94abc2;font-weight:700}.team-meter{height:3px;background:#26384b;border-radius:4px;margin-top:5px;overflow:hidden}.team-meter>span{display:block;height:100%;border-radius:3px;transition:width .2s}.inspector{margin:10px 19px 18px;background:#0b1928;border:1px solid #2d4355;border-radius:8px;padding:15px;min-height:146px}.inspector-kicker{color:#6d95a9;font-size:9px;font-weight:800;letter-spacing:.14em;margin-bottom:11px}.inspector>strong{font-size:12px}.inspector p{font-size:10px;color:#91a7bc;line-height:1.6;margin:7px 0 12px}.inspect-bottom{display:flex;justify-content:space-between;gap:9px;font-size:9px;color:#55d9bd;font-weight:800}.inspect-output{max-height:180px;overflow:auto;white-space:pre-wrap;color:#bacbdc;font-size:10px;line-height:1.6;border-top:1px solid #284053;margin-top:10px;padding-top:10px}.inspect-output:empty{display:none}.lower-grid{display:grid;grid-template-columns:minmax(0,1.77fr) minmax(250px,.85fr);gap:16px;margin-bottom:17px}.search-wrap{border:1px solid #34455a;border-radius:7px;padding:8px 11px;display:flex;gap:8px;align-items:center;min-width:185px}.search-wrap span{color:#82a3bd;font-size:16px}.search-wrap input{width:100%;min-width:0;border:0;background:transparent;color:#d8e7f3;outline:0;font-size:11px}.search-wrap input::placeholder{color:#748ba4}.filter-buttons{display:flex;gap:6px;flex-wrap:wrap;padding:17px 22px 9px}.filter-btn{background:#152338;color:#8198b0;border:1px solid #293d51;font-size:9px;font-weight:800;border-radius:5px;padding:7px 10px}.filter-btn.active{color:#133c37;background:#61e5c3;border-color:#61e5c3}.agent-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;padding:9px 22px 22px;max-height:350px;overflow-y:auto}.agent-card{background:#152235;border:1px solid #2b3f56;border-radius:8px;padding:12px;cursor:pointer;display:block;min-width:0;text-align:left;color:inherit}.agent-card:hover,.agent-card.selected{border-color:#59d6be;background:#1b3040}.agent-topline{display:flex;justify-content:space-between;gap:4px;align-items:center;margin-bottom:10px}.agent-code{font-size:9px;color:#7e96ad;font-weight:800;letter-spacing:.05em}.agent-state{font-size:9px;color:#7e91a9;font-weight:700}.agent-state.done{color:#55e0ba}.agent-state.running{color:#eec681}.agent-state.failed{color:#ff929e}.agent-person{display:flex;align-items:center;gap:9px}.agent-avatar{width:30px;height:30px;border-radius:8px;background:#243c53;flex:none;display:grid;place-items:center;font-size:11px;font-weight:800}.agent-person strong{font-size:10px;display:block;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.agent-person small{font-size:9px;color:#8ca3bb;display:block;margin-top:3px}.activity-feed{padding:21px 21px 8px;max-height:420px;overflow-y:auto;min-height:300px}.feed-item{display:grid;grid-template-columns:17px 1fr;gap:10px;margin-bottom:19px}.feed-symbol{height:20px;width:20px;border-radius:50%;display:grid;place-items:center;background:#19352f;color:#6ee6cc;font-size:10px;font-weight:900}.feed-item.warn .feed-symbol{background:#403024;color:#f4c584}.feed-item.error .feed-symbol{background:#412933;color:#fba5ac}.feed-item strong{font-size:10px;color:#d4e3ee;display:block;line-height:1.45}.feed-item p{font-size:10px;color:#839bb0;margin:5px 0;line-height:1.5}.feed-item time{font-size:9px;color:#637f96}.feed-footer{border-top:1px solid #283a50;padding:14px 21px;color:#6d8299;font-size:10px}.report-panel{min-height:190px}.report-actions{display:flex;gap:9px}.report-actions .btn{padding:8px 11px}.report-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 22px 30px;text-align:center;min-height:132px}.report-mark{color:#6be4c6;font-size:27px;margin:0 0 10px}.report-placeholder strong{font-size:12px}.report-placeholder p{color:#819bb4;font-size:11px;max-width:420px;line-height:1.6;margin:6px 0 0}.report-content{padding:16px 23px 25px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.report-team{background:#142337;border:1px solid #2d435a;border-radius:9px;padding:14px}.report-team header{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px}.report-team strong{font-size:11px}.report-team small{font-size:9px;color:#88a6b8}.report-team ul{margin:0;padding-left:16px;color:#adc0d3;font-size:10px;line-height:1.6}.report-team li{margin:6px 0}.report-team .role-output{font-size:10px;color:#b7cad9;line-height:1.6;margin:5px 0;white-space:pre-line}.footer{display:flex;justify-content:space-between;gap:16px;font-size:9px;letter-spacing:.07em;color:#68809b;margin-top:25px;padding-bottom:3px}dialog{max-width:520px;width:calc(100% - 32px);background:#122134;color:#d9e9f2;border:1px solid #456076;border-radius:12px;padding:23px;box-shadow:0 0 0 100vmax #000a}dialog .dialog-header{display:flex;justify-content:space-between;align-items:center;font-size:17px}dialog .dialog-header button{border:0;background:none;color:#e9f2fc;font-size:18px}dialog p{font-size:13px;line-height:1.75;color:#9bb3c7;margin:17px 0}@media(max-width:1250px){.sidebar{width:207px;min-width:207px}.content{padding:30px 24px}.topbar{padding:0 24px}.dashboard-grid,.lower-grid{grid-template-columns:minmax(0,1.5fr) minmax(240px,.9fr)}.agent-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:980px){.sidebar{width:75px;min-width:75px;padding:24px 9px}.brand{padding:0 9px 34px}.brand>span:last-child,.sidebar-label,.sidebar nav a{font-size:0}.sidebar nav a span{font-size:20px}.navitem{justify-content:center}.preset-list,.sidebar-bottom{display:none}.content{padding:26px 19px}.hero-head{align-items:flex-start}.mission-panel{grid-template-columns:1fr}.mission-config{border-left:0;border-top:1px solid #2e465a;padding-left:0;padding-top:15px}.mode-row{justify-content:flex-start}.metrics{grid-template-columns:repeat(2,1fr)}}@media(max-width:730px){.sidebar{display:none}.topbar{min-height:61px;padding:0 15px}.breadcrumb{font-size:8px}.env-pill{font-size:8px}.top-actions{gap:7px}.content{padding:24px 13px}.hero-head{flex-direction:column;gap:19px}.hero-actions{width:100%}.hero-actions .btn{flex:1}.hero-head p{font-size:12px}.dashboard-grid,.lower-grid{grid-template-columns:1fr}.metric{padding:13px}.metric-number{font-size:26px}.mission-panel{padding:18px 16px}.panel-heading{padding:16px 15px 0}.network-legend{margin-left:15px;gap:10px}.team-list{grid-template-columns:repeat(2,minmax(0,1fr));padding:15px}.inspector{margin:4px 15px 15px}.agent-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px 15px}.report-content{grid-template-columns:1fr}.report-actions{flex-wrap:wrap}.footer{flex-direction:column;gap:8px}.mission-bottom span:last-child{display:none}}@media(max-width:430px){.agent-grid{grid-template-columns:1fr}.hero-actions{flex-wrap:wrap}.hero-actions .btn{min-width:125px}.search-wrap{min-width:125px}.metrics{gap:8px}.team-list{grid-template-columns:1fr}.report-panel .panel-heading{flex-direction:column}.mission-config .mode-row{justify-content:space-between}.mode-row select{min-width:140px}}
+
+</style>
+
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#overview" aria-label="MABRIG SwarmLab home"><span class="brand-symbol">✳</span><span><strong>MABRIG</strong><small>SWARMLAB <em>01</em></small></span></a>
+      <div class="sidebar-label">WORKSPACE</div>
+      <nav aria-label="Workspace navigation">
+        <a class="navitem selected" href="#overview"><span>◫</span> Command center</a>
+        <a class="navitem" href="#swarm"><span>⬡</span> Live swarm map</a>
+        <a class="navitem" href="#agents"><span>▦</span> Agent directory</a>
+        <a class="navitem" href="#reports"><span>▤</span> Intelligence report</a>
+      </nav>
+      <div class="sidebar-label missions-label">MISSION TEMPLATES</div>
+      <div class="preset-list">
+        <button class="preset active" data-preset="education"><span class="preset-icon">✦</span><span>AI learning platform</span></button>
+        <button class="preset" data-preset="business"><span class="preset-icon">◈</span><span>Launch a startup</span></button>
+        <button class="preset" data-preset="research"><span class="preset-icon">⌕</span><span>Research a challenge</span></button>
+        <button class="preset" data-preset="safety"><span class="preset-icon">◇</span><span>Consumer safety app</span></button>
+      </div>
+      <div class="sidebar-bottom"><div class="sidebar-note"><span class="green-dot"></span><span>Transparent orchestration<br><small>Human remains in control</small></span></div><a href="https://www.mabrigkorie.org" target="_blank" rel="noopener noreferrer">Mabrig Technologies ↗</a></div>
+    </aside>
+
+    <div class="main-area" id="overview">
+      <header class="topbar"><div class="breadcrumb">MABRIG / INNOVATION STUDIO <span>/</span> <strong>SWARM LAB</strong></div><div class="top-actions"><span id="mode-label" class="env-pill"><span class="green-dot"></span> SIMULATION MODE</span><button id="help-btn" class="icon-button" aria-label="About this app" title="About this app">?</button><div class="avatar">MK</div></div></header>
+
+      <main class="content">
+        <div class="hero-head"><div><div class="eyebrow"><span class="live-line"></span> NEXT-GEN MULTI-AGENT ORCHESTRATION</div><h1>One mission. <span>Fifty minds.</span></h1><p>Deploy specialist agents, coordinate their work in four waves, and inspect how collective intelligence comes together.</p></div><div class="hero-actions"><button class="btn btn-subtle" id="download-report-top">↓ Export report</button><button class="btn btn-primary" id="run-btn"><span>▶</span> Launch swarm</button></div></div>
+
+        <section class="mission-panel" aria-labelledby="mission-heading"><div class="mission-copy"><div class="section-mini"><span class="step-no">01</span><h2 id="mission-heading">Define your mission</h2><span class="mini-extra">START HERE</span></div><label for="mission-input" class="visually-hidden">Mission instruction</label><textarea id="mission-input" rows="2" maxlength="1500" spellcheck="true">Design a privacy-first AI learning platform for African creators, with accessible lessons, 20-agent collaboration, and measurable outcomes.</textarea><div class="mission-bottom"><span id="mission-length">147 / 1500 characters</span><span>Human-reviewed mission · No autonomous real-world actions</span></div></div><div class="mission-config"><div class="config-title">SWARM CONFIGURATION</div><div class="slider-header"><span>Agents deployed</span><strong id="count-value">30 <small>/ 50</small></strong></div><input id="count-slider" type="range" min="20" max="50" value="30" step="1" aria-label="Number of agents" /><div class="slider-markers"><span>20 agents</span><span>50 agents</span></div><div class="mode-row"><label for="engine-select">Execution engine</label><select id="engine-select"><option value="demo">Guided simulation</option><option value="live" disabled>Live AI — separate protected gateway required</option></select></div><div id="live-controls" class="live-controls hidden"><div id="live-status" class="inline-alert">Checking secure AI gateway…</div><label for="access-token">Access token (optional server lock)</label><input id="access-token" type="password" autocomplete="off" placeholder="Session-only access token" /><p>One model call per agent. Free providers impose daily and minute limits.</p></div></div></section>
+
+        <section class="mission-panel" aria-label="Connected learning and building" style="display:block; margin-top:12px">
+ <div class="section-mini"><span class="step-no">↗</span><h2>Connected MABRIG learning → building workflow</h2></div>
+ <p style="color:#a8bdd0;margin:12px 0">Study swarm collaboration at AI University, then hand a <strong>human-reviewed mission brief</strong> to BuildRx for real app development. The 20–50 specialist runs here are local scripted demonstrations, not 50 live model calls.</p>
+ <div class="hero-actions" style="flex-wrap:wrap;justify-content:flex-start">
+ <button class="btn btn-primary" id="handoff-buildrx" type="button">Continue building in BuildRx ↗</button>
+ <a class="btn btn-subtle" href="https://aiuniversityhq.uk/" target="_blank" rel="noopener noreferrer">AI University learning hub</a>
+ <a class="btn btn-subtle" href="https://www.buildrx.online/academy" target="_blank" rel="noopener noreferrer">BuildRx engineering academy</a>
+ </div>
+ <p id="handoff-status" role="status" aria-live="polite" style="margin:12px 0 0;color:#a8bdd0;font-size:12px">No automatic charges, deployments, background agents, or course-access changes. Do not include secrets or private records in the mission.</p>
+ </section>
+ <section class="metrics" aria-label="Swarm performance"><article class="metric"><div class="metric-top"><span>TOTAL AGENTS</span><span class="metric-icon mint">⬡</span></div><div class="metric-number" id="stat-total">30</div><div class="metric-foot">10 specialist teams</div></article><article class="metric"><div class="metric-top"><span>COMPLETED</span><span class="metric-icon blue">✓</span></div><div class="metric-number" id="stat-completed">0</div><div class="metric-foot"><span id="completion-percent">0%</span> of the swarm finished</div></article><article class="metric"><div class="metric-top"><span>ACTIVE NOW</span><span class="metric-icon violet">✺</span></div><div class="metric-number" id="stat-active">0</div><div class="metric-foot">Parallel execution</div></article><article class="metric"><div class="metric-top"><span>ORCHESTRATION</span><span class="metric-icon gold">◴</span></div><div class="metric-number" id="stat-wave">—</div><div class="metric-foot" id="wave-foot">4 sequential waves</div></article></section>
+
+        <div class="dashboard-grid" id="swarm"><section class="panel topology-panel"><div class="panel-heading"><div><div class="section-mini"><span class="step-no">02</span><h2>Swarm intelligence map</h2></div><p>See every agent, connection, and real-time execution state.</p></div><span class="pill" id="swarm-state"><span class="small-circle"></span> IDLE</span></div><div class="network-legend"><span><i class="dot-idle"></i> Waiting</span><span><i class="dot-run"></i> Working</span><span><i class="dot-done"></i> Complete</span><span><i class="dot-fail"></i> Blocked</span></div><div class="network-wrap"><svg id="network" viewBox="0 0 740 460" role="img" aria-label="Interactive map showing agent teams connected to the central mission"></svg><div class="network-corner">SWARM TOPOLOGY <span>● SYSTEM READY</span></div></div><div class="network-footer"><div class="progress-info"><strong id="progress-title">Ready to orchestrate</strong><span id="progress-detail">Your specialist teams are standing by.</span></div><div class="progress-percent" id="progress-percent">0%</div><div class="progress-track"><div id="progress-fill"></div></div><div class="network-buttons"><button id="pause-btn" class="btn btn-small btn-ghost" disabled>Ⅱ Pause</button><button id="step-btn" class="btn btn-small btn-ghost" disabled>▷ Resume</button><button id="reset-btn" class="btn btn-small btn-ghost">↺ Reset</button></div></div></section>
+        <aside class="panel team-panel"><div class="panel-heading"><div><h2>Specialist teams</h2><p>10 disciplines. One shared objective.</p></div><span class="count-pill">10 TEAMS</span></div><div id="team-list" class="team-list"></div><div class="inspector" id="agent-inspector"><div class="inspector-kicker">AGENT INSPECTOR</div><strong id="inspect-name">Select an agent</strong><p id="inspect-desc">Click a dot in the swarm map or an agent in the directory to examine its assignment.</p><div class="inspect-bottom"><span id="inspect-tag">NO AGENT SELECTED</span><span id="inspect-status"></span></div><div id="inspect-output" class="inspect-output"></div></div></aside></div>
+
+        <div class="lower-grid"><section class="panel agent-panel" id="agents"><div class="panel-heading"><div><div class="section-mini"><span class="step-no">03</span><h2>Agent directory</h2></div><p>Specialists, responsibilities and traceable work.</p></div><label class="search-wrap"><span>⌕</span><input id="agent-search" type="search" placeholder="Find an agent…" aria-label="Search agents" /></label></div><div id="filter-buttons" class="filter-buttons"></div><div id="agent-list" class="agent-grid"></div></section><section class="panel activity-panel"><div class="panel-heading"><div><h2>Coordination feed</h2><p>Every handoff, decision and result.</p></div><span class="feed-indicator"><span class="green-dot"></span> EVENT LOG</span></div><div id="activity-feed" class="activity-feed" aria-live="polite"></div><div class="feed-footer">Activity is generated locally in demo mode. No claims of actual AI calls.</div></section></div>
+
+        <section class="panel report-panel" id="reports"><div class="panel-heading"><div><div class="section-mini"><span class="step-no">04</span><h2>Collective intelligence report</h2></div><p>Summarized deliverables, not a black box. Review before you act.</p></div><div class="report-actions"><button class="btn btn-subtle" id="download-json">↓ JSON</button><button class="btn btn-subtle" id="download-md">↓ Markdown</button></div></div><div id="report-placeholder" class="report-placeholder"><div class="report-mark">✴</div><strong>Your report begins with one mission.</strong><p>Launch the swarm to unlock outputs from Strategy, Research, Product, Engineering, Growth, Trust & Safety, and more.</p></div><div id="report-content" class="report-content hidden"></div></section>
+        <footer class="footer"><span>© 2026 MABRIG TECHNOLOGIES · SWARMLAB</span><span>Simulation is illustrative. Live results require human verification.</span></footer>
+      </main>
+    </div>
+  </div>
+  <dialog id="about-dialog"><div class="dialog-header"><strong>About MABRIG SwarmLab</strong><button id="close-dialog" aria-label="Close">✕</button></div><p>SwarmLab demonstrates 20–50 coordinated specialist agents in four dependency-aware waves. The default mode is a transparent, scripted simulation. A Cloudflare Worker can securely call a real language model for each agent when configured.</p><p>No AI calls happen in simulation mode. The live gateway never puts the OpenRouter API key in browser code. Review all outputs; agents cannot publish, purchase, or change accounts.</p><button class="btn btn-primary" id="dialog-ok">Understood</button></dialog>
+<script>
+/** Agent roster is shared by the browser and the Cloudflare Worker. */
+const TEAMS = [
+  {key:'strategy', name:'Strategy', short:'STR', color:'#b49cff', wave:1, subtitle:'Frame the mission', roles:[
+    ['Mission Architect','Translate the mission into a measurable scope, constraints, dependencies, and success criteria.'],
+    ['User Researcher','Identify the intended users, their problems, and unanswered questions requiring interviews.'],
+    ['Market Analyst','Map alternatives, competitive advantages, and claims that must be validated.'],
+    ['Opportunity Mapper','Prioritize outcomes by expected value, effort, and feasibility.'],
+    ['Risk Navigator','Identify assumptions and fallback strategies before execution.'] ]},
+  {key:'research', name:'Research', short:'RES', color:'#67c9ff', wave:1, subtitle:'Test the evidence', roles:[
+    ['Evidence Scout','List reliable evidence needed for this mission; never invent citations or data.'],
+    ['Fact Checker','Separate verified facts, estimates, and hypotheses; flag unsupported claims.'],
+    ['Data Analyst','Propose useful metrics, a data collection plan, and interpretation cautions.'],
+    ['Experiment Designer','Create a low-risk test with a measurable hypothesis and stopping rule.'],
+    ['Insight Synthesizer','Summarize what is known, unknown, and important to investigate.'] ]},
+  {key:'product', name:'Product', short:'PRD', color:'#f3b66c', wave:2, subtitle:'Design the experience', roles:[
+    ['Product Lead','Define an achievable MVP, target user, scope boundaries, and acceptance criteria.'],
+    ['UX Architect','Suggest a mobile-first information architecture and core screens.'],
+    ['Accessibility Reviewer','Identify inclusive design, readable typography, keyboard and contrast needs.'],
+    ['Journey Mapper','Describe onboarding, core task flow, and success/failure states.'],
+    ['Prototype Planner','Recommend a quick clickable prototype and user-testing plan.'] ]},
+  {key:'education', name:'Education', short:'EDU', color:'#68e3c9', wave:2, subtitle:'Make learning stick', roles:[
+    ['Curriculum Designer','Transform complex skills into a short learning path with prerequisites.'],
+    ['Learning Designer','Create an active exercise, scaffolded examples, and learner feedback points.'],
+    ['Assessment Builder','Draft measurable mastery checks and a transparent rubric.'],
+    ['Mentor Coach','Anticipate beginner confusion and write useful next-step guidance.'],
+    ['Feedback Specialist','Suggest ways to collect learning outcomes without invasive data collection.'] ]},
+  {key:'finance', name:'Finance', short:'FIN', color:'#e3cc7b', wave:2, subtitle:'Keep it viable', roles:[
+    ['Cost Estimator','Outline realistic cost categories and clearly label unknown numbers.'],
+    ['ROI Analyst','Describe benefits and outcomes that could justify spending without inventing results.'],
+    ['Pricing Strategist','Recommend pricing experiments with fair access and clear terms.'],
+    ['Budget Reviewer','Identify expense controls, free tiers, and cost escalation triggers.'],
+    ['Sustainability Planner','Suggest a feasible long-term operating model and funding options.'] ]},
+  {key:'engineering', name:'Engineering', short:'ENG', color:'#6aa8ff', wave:3, subtitle:'Plan the implementation', roles:[
+    ['Solution Architect','Propose a minimal secure technical architecture and clear system boundaries.'],
+    ['Frontend Engineer','Specify accessible responsive UI components and meaningful interactions.'],
+    ['Backend Engineer','Define backend API contracts, validation, authentication, and error handling.'],
+    ['Integration Engineer','Plan external service integration, secret storage, and fallback behavior.'],
+    ['Test Engineer','Specify smoke tests, edge cases, rollback checks, and success criteria.'] ]},
+  {key:'creative', name:'Creative', short:'CRT', color:'#ff94af', wave:3, subtitle:'Tell the story', roles:[
+    ['Brand Storyteller','Create a concise truthful value proposition for the intended audience.'],
+    ['Script Writer','Draft a short demo narrative with hook, transformation, and call-to-action.'],
+    ['Visual Director','Suggest visual metaphors and scenes without promising nonexistent features.'],
+    ['Copy Editor','Simplify language, remove unsupported hype, and clarify the next step.'],
+    ['Content Planner','Suggest an ethical distribution plan across suitable content formats.'] ]},
+  {key:'growth', name:'Growth', short:'GRO', color:'#d5a1ff', wave:3, subtitle:'Reach the audience', roles:[
+    ['Growth Strategist','Recommend low-cost acquisition loops with trackable outcomes.'],
+    ['Search Specialist','Outline search intent, page structure, and useful discoverability content.'],
+    ['Community Builder','Design a trustworthy feedback community and referral path.'],
+    ['Channel Analyst','Define attribution metrics and experiments without inventing traffic.'],
+    ['Retention Planner','Suggest useful activation and retention improvements for real users.'] ]},
+  {key:'operations', name:'Operations', short:'OPS', color:'#7dc8c3', wave:3, subtitle:'Keep work moving', roles:[
+    ['Project Manager','Break delivery into prioritized checkpoints, owners, and dependencies.'],
+    ['Resource Planner','Estimate team skills and infrastructure required without fake commitments.'],
+    ['Workflow Engineer','Describe how human approvals, queues, and audit logs should work.'],
+    ['Quality Coordinator','Specify definition of done and cross-team handoff checks.'],
+    ['Documentation Lead','Write onboarding and maintenance instructions for non-experts.'] ]},
+  {key:'trust', name:'Trust & Safety', short:'TRU', color:'#f0a47c', wave:4, subtitle:'Challenge the plan', roles:[
+    ['Privacy Auditor','Challenge unnecessary data collection and propose privacy safeguards.'],
+    ['Security Reviewer','Identify threat scenarios, abuse controls, and secret-management requirements.'],
+    ['Bias Reviewer','Check who may be excluded or unfairly affected and how to test it.'],
+    ['Policy Writer','Clarify consent, transparency, acceptable use, and human accountability.'],
+    ['Red-Team Critic','Find the weakest assumptions and require evidence before launch.'] ]}
+];
+function getAgents(count=30){
+  const max=Math.max(20,Math.min(50,Math.round(Number(count)||30)));
+  const selected=[];
+  for(let slot=0;slot<5;slot++){
+    for(const team of TEAMS){
+      if(selected.length>=max)break;
+      const [role,instruction]=team.roles[slot];
+      selected.push({id:`${team.short}-${String(slot+1).padStart(2,'0')}`,name:role,instruction,team:team.key,teamName:team.name,color:team.color,wave:team.wave,slot, status:'idle', output:'',duration:0});
+    }
+  }
+  return selected.sort((a,b)=>a.wave-b.wave || a.slot-b.slot || a.teamName.localeCompare(b.teamName));
+}
+function getTeam(key){return TEAMS.find(t=>t.key===key)}
+
+
+
+const $ = id => document.getElementById(id);
+const presets = {
+  education:'Design a privacy-first AI learning platform for African creators, with accessible lessons, 20-agent collaboration, and measurable outcomes.',
+  business:'Design a mobile-first marketplace for local entrepreneurs, with easy storefront setup, transparent payments, customer support, and a realistic launch plan.',
+  research:'Investigate how AI assistance could improve access to credible African research opportunities, with verifiable evidence and an ethical pilot design.',
+  safety:'Design a proof-first consumer protection app that helps people check rental listings and suspicious offers, with privacy and human reporting safeguards.'
+};
+const state={count:30,agents:getAgents(30),mode:'demo',mission:presets.education,runId:0,running:false,paused:false,finished:false,currentWave:0,selectedAgent:null,teamFilter:'all',query:'',feed:[],liveAvailable:false,requireToken:false,model:'openrouter/free',startedAt:null,endedAt:null,dispatchAt:0};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const escapeAttr=esc;
+function formatTime(){return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+function addFeed(title,detail,level='info'){
+  state.feed.unshift({time:formatTime(),title,detail,level});
+  if(state.feed.length>90)state.feed.pop();
+  renderFeed();
+}
+function renderFeed(){
+  $('activity-feed').innerHTML=state.feed.map(f=>`<div class="feed-item ${esc(f.level)}"><span class="feed-symbol">${f.level==='error'?'!':f.level==='warn'?'◇':'✓'}</span><div><strong>${esc(f.title)}</strong><p>${esc(f.detail)}</p><time>${esc(f.time)}</time></div></div>`).join('')||'<div class="feed-item"><span class="feed-symbol">✦</span><div><strong>Orchestration engine ready</strong><p>Choose a mission and launch the simulation.</p><time>AWAITING INSTRUCTIONS</time></div></div>';
+}
+function stat(){const agents=state.agents,done=agents.filter(a=>a.status==='done').length,failed=agents.filter(a=>a.status==='failed').length,active=agents.filter(a=>a.status==='running').length;return{done,failed,active,pct:Math.round((done+failed)/agents.length*100)}}
+function renderStats(){
+  const v=stat();$('stat-total').textContent=state.count;$('stat-completed').textContent=v.done;$('stat-active').textContent=v.active;$('completion-percent').textContent=`${Math.round(v.done/state.count*100)}%`;$('stat-wave').textContent=state.currentWave?`${state.currentWave} / 4`:'—';$('wave-foot').textContent=state.currentWave?['','Discovery','Design','Execution','Safety review'][state.currentWave]:'4 sequential waves';$('progress-percent').textContent=`${v.pct}%`;$('progress-fill').style.width=`${v.pct}%`;
+  $('swarm-state').className=`pill ${state.finished?'finished':state.running?'working':''}`;
+  $('swarm-state').innerHTML=`<span class="small-circle"></span> ${state.finished?'COMPLETE':state.paused?'PAUSED':state.running?'RUNNING':'IDLE'}`;
+  $('progress-title').textContent=state.finished?'Swarm orchestration complete':state.paused?'Execution paused':state.running?`Wave ${state.currentWave} in progress`:'Ready to orchestrate';
+  $('progress-detail').textContent=state.finished?`${v.done} completed · ${v.failed} blocked · Human review required`:state.running?`${v.active} currently working · ${v.done} completed · ${v.failed} blocked`:'Your specialist teams are standing by.';
+  $('pause-btn').disabled=!state.running||state.paused;$('step-btn').disabled=!state.running||!state.paused;$('run-btn').disabled=state.running;$('count-slider').disabled=state.running;$('engine-select').disabled=state.running;$('mission-input').disabled=state.running;
+  $('run-btn').innerHTML=state.running?'<span>◌</span> Swarm running':'<span>▶</span> Launch swarm';
+  $('mode-label').innerHTML=`<span class="green-dot"></span> ${state.mode==='live'?'LIVE AI MODE':'SIMULATION MODE'}`;
+}
+function renderTeams(){
+  $('team-list').innerHTML=TEAMS.map(t=>{const agents=state.agents.filter(a=>a.team===t.key),finished=agents.filter(a=>a.status==='done').length,pct=Math.round(finished/Math.max(agents.length,1)*100);return `<div class="team-row ${state.teamFilter===t.key?'active':''}" data-team="${t.key}" role="button" tabindex="0" aria-label="Filter ${esc(t.name)} agents"><span class="team-bullet" style="background:${t.color}"></span><div class="team-info"><div class="team-name">${esc(t.name)} <span class="team-count">${finished}/${agents.length}</span></div><div class="team-sub">${esc(t.subtitle)}</div><div class="team-meter"><span style="width:${pct}%;background:${t.color}"></span></div></div></div>`}).join('');
+  for(const item of $('team-list').querySelectorAll('[data-team]')){const act=()=>{state.teamFilter=state.teamFilter===item.dataset.team?'all':item.dataset.team;renderTeams();renderFilters();renderAgents();};item.addEventListener('click',act);item.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();act()}})}
+}
+function renderFilters(){
+  const options=[['all','All agents'],...TEAMS.map(t=>[t.key,t.name])];
+  $('filter-buttons').innerHTML=options.map(([key,name])=>`<button class="filter-btn ${state.teamFilter===key?'active':''}" data-filter="${key}">${esc(name)}</button>`).join('');
+  for(const btn of $('filter-buttons').querySelectorAll('[data-filter]'))btn.addEventListener('click',()=>{state.teamFilter=btn.dataset.filter;renderFilters();renderAgents();renderTeams()});
+}
+function renderAgents(){
+  const visible=state.agents.filter(a=>(state.teamFilter==='all'||a.team===state.teamFilter)&&`${a.name} ${a.teamName} ${a.id}`.toLowerCase().includes(state.query));
+  $('agent-list').innerHTML=visible.length?visible.map(a=>`<button class="agent-card ${a.id===state.selectedAgent?'selected':''}" data-agent="${a.id}"><div class="agent-topline"><span class="agent-code">${a.id}</span><span class="agent-state ${a.status}">${{idle:'● READY',queued:'○ QUEUED',running:'◴ WORKING',done:'✓ COMPLETE',failed:'! BLOCKED'}[a.status]}</span></div><div class="agent-person"><span class="agent-avatar" style="color:${a.color};background:${a.color}1d">${esc(a.id.split('-')[0])}</span><span style="min-width:0"><strong>${esc(a.name)}</strong><small>${esc(a.teamName)}</small></span></div></button>`).join(''):'<p style="color:#91a6ba;padding:12px;">No agents match this filter.</p>';
+  for(const btn of $('agent-list').querySelectorAll('[data-agent]'))btn.addEventListener('click',()=>selectAgent(btn.dataset.agent));
+}
+function renderInspector(){
+  const a=state.agents.find(x=>x.id===state.selectedAgent);if(!a){$('inspect-name').textContent='Select an agent';$('inspect-desc').textContent='Click a dot in the swarm map or an agent in the directory to examine its assignment.';$('inspect-tag').textContent='NO AGENT SELECTED';$('inspect-status').textContent='';$('inspect-output').textContent='';return}
+  $('inspect-name').textContent=a.name;$('inspect-desc').textContent=a.instruction;$('inspect-tag').textContent=`${a.id} · WAVE ${a.wave}`;$('inspect-status').textContent=a.status.toUpperCase();$('inspect-output').textContent=a.output||'Agent has not generated an output yet.';
+}
+function selectAgent(id){state.selectedAgent=id;renderInspector();renderAgents();renderNetwork()}
+function renderNetwork(){
+  const cx=370,cy=235,R=162;let out='';const positions=new Map();
+  // Fixed 10-team topology avoids reshuffling the map when the agent count changes.
+  TEAMS.forEach((t,i)=>{const angle=-Math.PI/2+i*2*Math.PI/10,hx=cx+R*Math.cos(angle),hy=cy+R*Math.sin(angle),a=state.agents.filter(n=>n.team===t.key);positions.set(t.key,{x:hx,y:hy,angle});out+=`<line class="connection" x1="${cx}" y1="${cy}" x2="${hx.toFixed(1)}" y2="${hy.toFixed(1)}"/>`;a.forEach((agent,j)=>{const spread=(j-(a.length-1)/2)*.41,theta=angle+spread,dist=44+(j%2)*4,x=hx+dist*Math.cos(theta),y=hy+dist*Math.sin(theta);positions.set(agent.id,{x,y});out+=`<line class="connection ${agent.status==='done'?'connection-active':''}" x1="${hx.toFixed(1)}" y1="${hy.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" />`})});
+  TEAMS.forEach(t=>{const p=positions.get(t.key);out+=`<g class="node-hub" data-team-hub="${t.key}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="14" stroke="${t.color}" /><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${t.color}"/><title>${esc(t.name)}</title></g>`;const outward=(p.x>=cx?1:-1);const tx=p.x+outward*18;out+=`<text x="${tx.toFixed(1)}" y="${(p.y+4).toFixed(1)}" text-anchor="${outward===1?'start':'end'}" fill="#7790a7" font-size="8" font-weight="700">${esc(t.name.toUpperCase())}</text>`});
+  state.agents.forEach(a=>{const p=positions.get(a.id),fill={idle:'#17283a',queued:'#25364a',running:'#f1c779',done:'#50e5bf',failed:'#ff8997'}[a.status],stroke=a.status==='idle'?a.color:fill;out+=`<g class="node-agent ${state.selectedAgent===a.id?'selected':''}" data-node="${a.id}" tabindex="0" role="button" aria-label="Select ${esc(a.name)}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="7" fill="${fill}" stroke="${stroke}"></circle><title>${esc(a.name)} — ${a.status}</title></g>`});
+  out+=`<circle cx="${cx}" cy="${cy}" r="38" fill="#183c3f" stroke="#46cbb0" stroke-width="1.3"/><circle cx="${cx}" cy="${cy}" r="29" fill="#194848" stroke="#3b8c82" stroke-dasharray="2 4"/><text class="network-core-title" text-anchor="middle" x="${cx}" y="${cy-3}">MABRIG</text><text class="network-core-sub" text-anchor="middle" x="${cx}" y="${cy+13}">CORE MISSION</text>`;
+  $('network').innerHTML=out;
+  for(const item of $('network').querySelectorAll('[data-node]')){const pick=()=>selectAgent(item.dataset.node);item.addEventListener('click',pick);item.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick()}})}
+  for(const item of $('network').querySelectorAll('[data-team-hub]'))item.addEventListener('click',()=>{state.teamFilter=item.dataset.teamHub;renderFilters();renderAgents();renderTeams()});
+}
+function demoOutput(a,mission){
+  const m=mission.replace(/\s+/g,' ').trim().slice(0,150);const teamSpecific={
+    strategy:['Define a sharply bounded first release and a measurable outcome.','List assumptions that require interviews or verification.','Record exclusions, constraints, owners, and a rollback plan.'],
+    research:['Create an evidence register with source, date, and confidence fields.','Mark proposed outcomes as hypotheses until tested.','Run a small pilot; record negative as well as positive findings.'],
+    product:['Start with three essential user journeys and accessible mobile screens.','Test with beginners before expanding the feature set.','Document failure states and understandable recovery actions.'],
+    education:['Build short applied lessons with practice and reflection.','Check understanding through authentic tasks, not passive views.','Provide beginner-friendly guidance and opt-in feedback.'],
+    finance:['Budget hosting, inference calls, support, and maintenance separately.','Use free tiers carefully and add usage alerts and spending ceilings.','Validate willingness to pay before assuming profitability.'],
+    engineering:['Implement a small secure API boundary and modular UI.','Store credentials server-side; validate inputs and limit requests.','Add smoke tests, observability, rollback, and accessible errors.'],
+    creative:['Show a real workflow before making marketing promises.','Use a thirty-second story: problem, demonstration, next action.','Make the call-to-action specific, truthful, and measurable.'],
+    growth:['Target one audience and one clear activation event first.','Track signups-to-value without excessive surveillance.','Compare channels through controlled, low-cost experiments.'],
+    operations:['Assign milestones with review gates and visible ownership.','Keep decision logs, escalation paths, and handoff criteria.','Release in stages with human approvals at consequential steps.'],
+    trust:['Minimize stored personal information and protect credentials.','Audit unsupported claims, exclusion risks, and abuse cases.','Require a human decision before publication or high-stakes use.']
+  };
+  const s=teamSpecific[a.team],n=a.slot;
+  return `FOCUS · ${a.name}\nMission: ${m}\n\nRECOMMENDED NEXT ACTION\n${s[n%3]}\n\nEVIDENCE / ACCEPTANCE CHECK\n${s[(n+1)%3]}\n\nSTATUS · Illustrative recommendation; not independently verified.`;
+}
+function renderReport(){
+  const done=state.agents.filter(a=>a.status==='done'||a.status==='failed');$('report-placeholder').classList.toggle('hidden',done.length>0);$('report-content').classList.toggle('hidden',done.length===0);
+  if(!done.length)return;
+  $('report-content').innerHTML=TEAMS.map(t=>{const completed=done.filter(a=>a.team===t.key);if(!completed.length)return'';return `<article class="report-team"><header><strong style="color:${t.color}">${esc(t.name)}</strong><small>${completed.filter(a=>a.status==='done').length}/${state.agents.filter(a=>a.team===t.key).length} completed</small></header>${completed.map(a=>`<div class="role-output"><strong>${esc(a.name)}</strong><div>${esc(a.status==='failed'?'BLOCKED · '+a.output:(a.output.split('\n').find(x=>x.startsWith('RECOMMENDED'))?a.output.split('RECOMMENDED NEXT ACTION\n')[1]?.split('\n')[0]:a.output).slice(0,270))}</div></div>`).join('')}</article>`}).join('');
+}
+function refresh(){renderStats();renderTeams();renderFilters();renderAgents();renderInspector();renderNetwork();renderReport()}
+function reset(opts={announce:true}){
+  state.runId++;state.running=false;state.paused=false;state.finished=false;state.currentWave=0;state.startedAt=null;state.endedAt=null;state.dispatchAt=0;state.agents=getAgents(state.count);state.selectedAgent=null;state.feed=[];refresh();renderFeed();if(opts.announce)addFeed('Swarm reset','All agents returned to ready state.');
+}
+function setMission(preset){if(state.running)return;$('mission-input').value=presets[preset];state.mission=presets[preset];for(const btn of document.querySelectorAll('[data-preset]'))btn.classList.toggle('active',btn.dataset.preset===preset);updateLength();reset({announce:false});addFeed('Mission template loaded',`${preset[0].toUpperCase()+preset.slice(1)} mission selected.`)}
+function updateLength(){const s=$('mission-input').value;$('mission-length').textContent=`${s.length} / 1500 characters`}
+function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
+async function waitUnpaused(runId){while(state.paused&&state.runId===runId)await sleep(120)}
+async function demoAgent(a,runId){await sleep(500+(a.slot*157+a.name.length*79)%850);if(state.runId!==runId)throw new Error('Cancelled');return demoOutput(a,state.mission)}
+async function liveAgent(a,runId){
+  const context=state.agents.filter(x=>x.status==='done'&&x.wave<a.wave).slice(-8).map(x=>`${x.name}: ${x.output.slice(0,220)}`).join('\n').slice(0,2600);
+  const token=$('access-token').value;
+  const res=await fetch('/api/agent',{method:'POST',headers:{'Content-Type':'application/json',...(token?{'X-Swarm-Access':token}:{})},body:JSON.stringify({agentId:a.id,mission:state.mission,context})});
+  let payload;try{payload=await res.json()}catch{throw new Error(`Gateway returned HTTP ${res.status}`)}
+  if(!res.ok)throw new Error(payload.error||`Gateway returned HTTP ${res.status}`);
+  if(state.runId!==runId)throw new Error('Cancelled');return payload.output||'No usable model output returned.';
+}
+async function execute(a,runId){
+  await waitUnpaused(runId);if(state.runId!==runId)return;
+  a.status='running';addFeed(`${a.name} dispatched`,`${a.teamName} specialist assigned to wave ${a.wave}.`);refresh();const t0=Date.now();
+  try{if(state.mode==='live'){
+      // Respect a conservative 20-request/minute launch cadence for free-model routing.
+      const delay=Math.max(0,state.dispatchAt+3200-Date.now());if(delay)await sleep(delay);await waitUnpaused(runId);if(state.runId!==runId)return;state.dispatchAt=Date.now();
+    }
+    const result=state.mode==='live'?await liveAgent(a,runId):await demoAgent(a,runId);
+    if(state.runId!==runId)return;a.output=result;a.duration=Date.now()-t0;a.status='done';addFeed(`${a.name} completed`,`${a.teamName} delivered a ${state.mode==='live'?'model-generated':'scripted sample'} recommendation.`);
+  }catch(e){if(state.runId!==runId)return;a.status='failed';a.output=String(e?.message||e).slice(0,260);addFeed(`${a.name} blocked`,a.output,'error')}
+  refresh();
+}
+async function runWave(wave,runId){
+  const queue=state.agents.filter(a=>a.wave===wave);let next=0;const limit=state.mode==='live'?1:4;
+  await Promise.all(Array.from({length:Math.min(limit,queue.length)},async()=>{while(next<queue.length&&state.runId===runId){await waitUnpaused(runId);if(state.runId!==runId)return;const a=queue[next++];await execute(a,runId)}}));
+}
+async function launch(){
+  if(state.running)return;const mission=$('mission-input').value.trim();if(mission.length<15){addFeed('Mission needs detail','Write at least 15 characters describing what the swarm should accomplish.','warn');$('mission-input').focus();return}
+  if(state.mode==='live'&&!state.liveAvailable){addFeed('Live gateway unavailable','Deploy the secure Cloudflare Worker with an OPENROUTER_API_KEY, or choose the simulation.','error');return}
+  reset({announce:false});state.mission=mission;state.running=true;state.startedAt=new Date().toISOString();const id=state.runId;
+  addFeed('Mission accepted',state.mode==='live'?'Live AI model calls enabled. All results require human review.':'Guided simulation started. Outputs are scripted illustrative recommendations.');refresh();
+  for(let wave=1;wave<=4;wave++){
+    if(state.runId!==id)return;await waitUnpaused(id);if(state.runId!==id)return;
+    state.currentWave=wave;const names=['','Discovery','Product design','Execution','Safety review'];addFeed(`Wave ${wave}: ${names[wave]}`,`${state.agents.filter(a=>a.wave===wave).length} specialists scheduled; prior-wave outputs will inform live agents.`);refresh();await runWave(wave,id);
+  }
+  if(state.runId!==id)return;state.running=false;state.finished=true;state.endedAt=new Date().toISOString();const v=stat();addFeed('Mission cycle finished',`${v.done} completed; ${v.failed} blocked. Inspect the report and verify important recommendations.`);refresh();
+}
+function buildReport(kind){const used=state.agents.filter(a=>a.status==='done'||a.status==='failed');const report={name:'MABRIG SwarmLab intelligence report',mode:state.mode==='demo'?'scripted demonstration':'live model responses',generatedAt:new Date().toISOString(),mission:state.mission,agentsConfigured:state.count,agentsCompleted:used.filter(a=>a.status==='done').length,agentsBlocked:used.filter(a=>a.status==='failed').length,executionWaves:4,notice:'Simulation is not an AI result. Live model output is unverified and needs human review.',agents:used.map(({id,name,teamName,wave,status,output,duration})=>({id,name,team:teamName,wave,status,output,durationMs:duration}))};
+  if(kind==='json')return{filename:'mabrig-swarm-report.json',type:'application/json',text:JSON.stringify(report,null,2)};
+  let md=`# MABRIG SwarmLab — Intelligence report\n\n**Mode:** ${report.mode}\n\n**Mission:** ${report.mission}\n\n**Generated:** ${report.generatedAt}\n\n**Agents:** ${report.agentsCompleted}/${report.agentsConfigured} completed; ${report.agentsBlocked} blocked\n\n> ${report.notice}\n\n`;
+  for(const t of TEAMS){const agents=used.filter(a=>a.teamName===t.name);if(!agents.length)continue;md+=`## ${t.name}\n\n`;for(const a of agents)md+=`### ${a.name} (${a.id}) — ${a.status}\n\n${a.output}\n\n`}
+  return{filename:'mabrig-swarm-report.md',type:'text/markdown',text:md};
+}
+function download(kind){const file=buildReport(kind),blob=new Blob([file.text],{type:file.type+';charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=file.filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);addFeed('Report exported',`${file.filename} prepared for download.`)}
+async function checkLive(){
+  $('live-status').className='inline-alert';$('live-status').textContent='Checking secure AI gateway…';
+  try{const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),6000);const res=await fetch('/api/status',{signal:controller.signal});clearTimeout(timeout);if(!res.ok)throw Error('API unavailable');const data=await res.json();state.liveAvailable=Boolean(data.enabled);state.requireToken=Boolean(data.protected);state.model=data.model||'openrouter/free';$('live-status').textContent=state.liveAvailable?`Gateway connected · ${state.model}${state.requireToken?' · token required':''}`:'Gateway installed, but OpenRouter key is not configured.';$('live-status').classList.toggle('ok',state.liveAvailable)}catch{state.liveAvailable=false;$('live-status').textContent='Live gateway is offline. Deploy the Worker and configure its secrets.'}
+}
+function init(){
+  $('mission-input').addEventListener('input',()=>{updateLength();state.mission=$('mission-input').value});updateLength();
+  for(const b of document.querySelectorAll('[data-preset]'))b.addEventListener('click',()=>setMission(b.dataset.preset));
+  $('count-slider').addEventListener('input',e=>{state.count=Number(e.target.value);$('count-value').innerHTML=`${state.count} <small>/ 50</small>`;reset({announce:false})});
+  $('engine-select').addEventListener('change',e=>{state.mode=e.target.value;$('live-controls').classList.toggle('hidden',state.mode!=='live');if(state.mode==='live')checkLive();reset({announce:false});addFeed('Execution engine selected',state.mode==='demo'?'Guided simulation: no model calls.':'Live AI: requires a configured server and may hit rate limits.')});
+  $('run-btn').addEventListener('click',launch);
+  $('pause-btn').addEventListener('click',()=>{state.paused=true;addFeed('Swarm paused','No further agents will be dispatched until resumed. Already-running calls may finish.','warn');refresh()});
+  $('step-btn').addEventListener('click',()=>{state.paused=false;addFeed('Swarm resumed','Orchestration resumed at the next available agent.');refresh()});
+  $('reset-btn').addEventListener('click',()=>reset());
+  $('agent-search').addEventListener('input',e=>{state.query=e.target.value.toLowerCase().trim();renderAgents()});
+  $('download-report-top').addEventListener('click',()=>download('md'));$('download-md').addEventListener('click',()=>download('md'));$('download-json').addEventListener('click',()=>download('json'));
+  const dialog=$('about-dialog');$('help-btn').addEventListener('click',()=>dialog.showModal());$('close-dialog').addEventListener('click',()=>dialog.close());$('dialog-ok').addEventListener('click',()=>dialog.close());
+  for(const a of document.querySelectorAll('.navitem'))a.addEventListener('click',()=>{for(const n of document.querySelectorAll('.navitem'))n.classList.remove('selected');a.classList.add('selected')});
+  refresh();addFeed('Orchestration engine ready','30 agents across 10 specialist teams. Choose a mission to begin.');
+}
+init();
+
+</script>
+<script>
+(function(){
+  const isBuildRx=true;
+  const btn=document.getElementById('handoff-buildrx');
+  btn?.addEventListener('click',async()=>{
+    const mission=document.getElementById('mission-input').value.trim();
+    const status=document.getElementById('handoff-status');
+    if(mission.length<15){status.textContent='Write at least 15 characters before continuing.';document.getElementById('mission-input').focus();return;}
+    if(isBuildRx){
+      try {
+        sessionStorage.setItem('buildrx-swarmlab-brief',mission.slice(0,1500));
+        status.textContent='Brief saved in this browser session. BuildRx will ask you to review it in the New Project dialog.';
+        location.assign('/projects');
+      }catch(e){status.textContent='Browser storage is blocked. Copy the mission manually into BuildRx Projects.';}
+      return;
+    }
+    let copied=false;
+    try{await navigator.clipboard.writeText(mission);copied=true;}catch(e){}
+    if(!copied){window.prompt('Copy this non-sensitive mission into BuildRx → New project:',mission);}
+    status.textContent=copied?'Mission copied. Paste it into the BuildRx New Project dialog.':'Use the displayed mission to create a project in BuildRx.';
+    window.open('https://www.buildrx.online/projects','_blank','noopener,noreferrer');
+  });
+})();
+</script>
+</body>
+</html>

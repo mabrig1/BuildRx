@@ -28,6 +28,14 @@ describe("fallbackPlan", () => {
     expect(plan.acceptanceCriteria?.length).toBeGreaterThanOrEqual(5);
   });
 
+  it("uses the delivery-specific real-workflow plan when free inference is unavailable", () => {
+    const plan = fallbackPlan("Create a courier and deliveries app for riders and dispatchers.");
+    expect(plan.appName).toBe("Courier & Deliveries");
+    expect(plan.pages.map(page=>page.path)).toEqual(["/","/shipments","/dispatch","/riders","/tracking"]);
+    expect(plan.dataModel.map(table=>table.table)).toContain("shipments");
+    expect(plan.dataModel.map(table=>table.table)).toContain("shipment_events");
+    expect(plan.acceptanceCriteria?.some(item=>item.includes("GPS"))).toBe(true);
+  });
   it("uses an operational persistent workspace for unknown domains", () => {
     const plan = fallbackPlan("Build a vendor compliance tracker");
 

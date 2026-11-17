@@ -98,6 +98,8 @@ export interface CompletionResult {
 }
 
 export interface ProviderCallOptions {
+  /** Fail-closed free-only BuildRx agent mode: never request a paid tier. */
+  freeOnly?: boolean;
   maxTokens?: number;
   temperature?: number;
   /** Budget for a single provider attempt, not the whole fallback chain. */
@@ -200,6 +202,13 @@ interface Attempt {
  * request to be retried under a second tier name).
  */
 function plannedAttempts(options: ProviderCallOptions): Attempt[] {
+  // All BuildRx generation agents use this path by default. Never route to
+  // premium OpenRouter, NVIDIA or Anthropic by accident in free-only mode.
+  if (options.freeOnly) {
+    return isOpenRouterConfigured()
+      ? [{ provider: "openrouter-free", model: "openrouter/free" }]
+      : [];
+  }
   const attempts: Attempt[] = [];
   const seenModels = new Set<string>();
 
